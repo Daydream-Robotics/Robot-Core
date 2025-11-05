@@ -55,9 +55,17 @@ ArcLengths get_wheel_travel() {
 	return del;
 }
 
-// Returns the change in heading value using parallel tracker wheels
+// Returns the change in heading value (degrees) using parallel tracker wheels
 double compute_heading_change(ArcLengths arcs) {
-	return (arcs.right - arcs.left) / (RIGHT_TRACKING_WHEEL_DISTANCE + LEFT_TRACKING_WHEEL_DISTANCE);
+	// Calculate heading in radians
+	double rads = (arcs.right - arcs.left) / (double) (RIGHT_TRACKING_WHEEL_DISTANCE + LEFT_TRACKING_WHEEL_DISTANCE);
+	// Return heading in degrees
+	return rads * (180.0 / std::numbers::pi);
+}
+
+// Convert Degrees to Radians
+double convertDegToRad (double degree) {
+	return degree * (std::numbers::pi / 180.0);
 }
 
 // Calculate and update global variables holding position and orientation
@@ -73,11 +81,10 @@ void update_position_and_angle() {
 	double dy_local = arcs.back - (del_theta * -BACK_TRACKING_WHEEL_DISTANCE);
 
 	// Compute using midpoint formula
-	double heading_mid = theta + (del_theta / 2);
+	double heading_mid = convertDegToRad(theta + (del_theta / 2));
 
-	// Calculate change in x and y
 	double del_x = std::cos(heading_mid) * dx_local - std::sin(heading_mid) * dy_local;
-	double del_y = std::sin(heading_mid) * dx_local - std::sin(heading_mid) * dy_local;
+	double del_y = std::sin(heading_mid) * dx_local + std::cos(heading_mid) * dy_local;
 
 	// Increment position and angle by calculated changes
 	pos_x += del_x;
