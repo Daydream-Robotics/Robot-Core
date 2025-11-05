@@ -7,11 +7,14 @@
 #define RIGHT_TRACKING_WHEEL_PORT 2
 #define BACK_TRACKING_WHEEL_PORT 3
 
+// Measured estimates
 #define LEFT_TRACKING_WHEEL_DISTANCE 6.4
 #define RIGHT_TRACKING_WHEEL_DISTANCE 6.4
 #define BACK_TRACKING_WHEEL_DISTANCE 5
 
 #define TRACKING_WHEEL_DIAMETER 3.25
+
+// Unmeasured
 #define BACK_TRACKING_WHEEL_DIAMETER 3.00
 
 pros::Rotation LTWheel(LEFT_TRACKING_WHEEL_PORT);
@@ -21,9 +24,6 @@ pros::Rotation BTWheel(BACK_TRACKING_WHEEL_PORT);
 // Position is in inches
 // Theta is in degrees
 double pos_x = 0, pos_y = 0, theta = 0;
-
-// Testing Vars
-double distTraveled = 0;
 
 typedef struct ArcLengths {
 	double left;
@@ -47,9 +47,6 @@ ArcLengths get_wheel_travel() {
 	del.left = del_L;
 	del.right = del_R;
 	del.back = del_B;
-
-	// Tracking for testing
-	distTraveled += del_L;
 
 	LTWheel.reset_position();
 	RTWheel.reset_position();
