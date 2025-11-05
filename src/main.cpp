@@ -18,6 +18,8 @@ pros::Rotation LTWheel(LEFT_TRACKING_WHEEL_PORT);
 pros::Rotation RTWheel(RIGHT_TRACKING_WHEEL_PORT);
 pros::Rotation BTWheel(BACK_TRACKING_WHEEL_PORT);
 
+// Position is in inches
+// Theta is in degrees
 double pos_x = 0, pos_y = 0, theta = 0;
 
 // Testing Vars
@@ -58,7 +60,7 @@ ArcLengths get_wheel_travel() {
 
 // Returns the change in heading value using parallel tracker wheels
 double compute_heading_change(ArcLengths arcs) {
-	return (arcs.right - arcs.left) / (RIGHT_TRACKING_WHEEL_DISTANCE - LEFT_TRACKING_WHEEL_DISTANCE);
+	return (arcs.right - arcs.left) / (RIGHT_TRACKING_WHEEL_DISTANCE + LEFT_TRACKING_WHEEL_DISTANCE);
 }
 
 // Calculate and update global variables holding position and orientation
