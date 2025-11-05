@@ -75,10 +75,12 @@ void autonomous() {}
  */
 
 // Instantiate Motor Groups and Controller
- pros::MotorGroup leftMotors({-10, -9, -8, -18});
- pros::MotorGroup rightMotors({16, 2, 14, 13});
+ pros::MotorGroup leftMotors({-1, -2, -3, -4});
+ pros::MotorGroup rightMotors({5, 17, 14, 12});
  pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
+ pros::Motor leftIntake(0);// To Do: Add the port number
+ pros::Motor rightIntake(1);// To Do: Add the port number
 void opcontrol() {
 	// Set Motor Brakes to Coast
 	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
