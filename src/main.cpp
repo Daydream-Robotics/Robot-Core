@@ -7,11 +7,12 @@
 #define RIGHT_TRACKING_WHEEL_PORT 2
 #define BACK_TRACKING_WHEEL_PORT 3
 
-#define LEFT_TRACKING_WHEEL_DISTANCE 5.5
-#define RIGHT_TRACKING_WHEEL_DISTANCE 5.5
-#define BACK_TRACKING_WHEEL_DISTANCE 3
+#define LEFT_TRACKING_WHEEL_DISTANCE 6.4
+#define RIGHT_TRACKING_WHEEL_DISTANCE 6.4
+#define BACK_TRACKING_WHEEL_DISTANCE 5
 
-#define TRACKING_WHEEL_DIAMETER 2.6
+#define TRACKING_WHEEL_DIAMETER 3.25
+#define BACK_TRACKING_WHEEL_DIAMETER 3.00
 
 pros::Rotation LTWheel(LEFT_TRACKING_WHEEL_PORT);
 pros::Rotation RTWheel(RIGHT_TRACKING_WHEEL_PORT);
@@ -38,7 +39,7 @@ ArcLengths get_wheel_travel() {
 	// Convert centidegrees to degrees and find distance travelled by wheel
 	double del_L = (currLeft / 36000.0) * TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
 	double del_R = (currRight / 36000.0) * TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
-	double del_B = (currBack / 36000.0) * TRACKING_WHEEL_DIAMETER * std::numbers::pi;
+	double del_B = (currBack / 36000.0) * BACK_TRACKING_WHEEL_DIAMETER * std::numbers::pi;
 
 	ArcLengths del;
 	del.left = del_L;
@@ -147,8 +148,10 @@ void autonomous() {}
 void opcontrol() {
 
 	while (true) {
-		get_wheel_travel();
-		pros::lcd::print(0, "Distance Traveled: %f", distTraveled);
+		update_position_and_angle();
+		pros::lcd::print(0, "Position X: %lf", pos_x);
+		pros::lcd::print(1, "Position Y: %lf", pos_y);
+		pros::lcd::print(2, "Orientation: %lf", theta);
 		pros::delay(20);
 	}
 
