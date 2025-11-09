@@ -16,6 +16,8 @@ constexpr int BACK_TRACKING_WHEEL_PORT = 13;
 #define LEFT_DRIVE_WHEEL_PORTS {LEFT_TRACKING_WHEEL_PORT, 2, -3, -4}
 #define RIGHT_DRIVE_WHEEL_PORTS {RIGHT_TRACKING_WHEEL_PORT, -17, 14, 12}
 
+constexpr int IMU_PORT = 10;
+
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
 constexpr int DEADZONE = 3;

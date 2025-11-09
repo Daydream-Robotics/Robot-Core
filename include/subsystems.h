@@ -4,3 +4,5 @@ extern pros::Controller controller;
 
 extern pros::MotorGroup leftMotors;
 extern pros::MotorGroup rightMotors;
+
+extern pros::IMU imu;
