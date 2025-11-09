@@ -20,4 +20,13 @@ constexpr int BACK_TRACKING_WHEEL_PORT = 15;
 
 constexpr int DEADZONE = 3;
 
+/* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
+
+constexpr double LEFT_TRACKING_WHEEL_DISTANCE = 1.65;
+constexpr double RIGHT_TRACKING_WHEEL_DISTANCE = 1.65;
+constexpr double BACK_TRACKING_WHEEL_DISTANCE = 2.4;
+
+constexpr double TRACKING_WHEEL_DIAMETER = 2.00;
+constexpr double BACK_TRACKING_WHEEL_DIAMETER = 2.75;
+
 #endif
