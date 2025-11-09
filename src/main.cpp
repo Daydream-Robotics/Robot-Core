@@ -3,23 +3,26 @@
 
 // All Distances in Inches
 
-#define LEFT_TRACKING_WHEEL_PORT 1
-#define RIGHT_TRACKING_WHEEL_PORT 2
-#define BACK_TRACKING_WHEEL_PORT 3
+#define LEFT_TRACKING_WHEEL_PORT -19
+#define RIGHT_TRACKING_WHEEL_PORT 13
+#define BACK_TRACKING_WHEEL_PORT 15
 
 // Measured estimates
-#define LEFT_TRACKING_WHEEL_DISTANCE 6.4
-#define RIGHT_TRACKING_WHEEL_DISTANCE 6.4
-#define BACK_TRACKING_WHEEL_DISTANCE 5
+#define LEFT_TRACKING_WHEEL_DISTANCE 1.65
+#define RIGHT_TRACKING_WHEEL_DISTANCE 1.65
+#define BACK_TRACKING_WHEEL_DISTANCE 2.4
 
-#define TRACKING_WHEEL_DIAMETER 3.25
+#define TRACKING_WHEEL_DIAMETER 2.00
 
-// Unmeasured
-#define BACK_TRACKING_WHEEL_DIAMETER 3.00
+// Unmeasured	
+#define BACK_TRACKING_WHEEL_DIAMETER 2.75
 
 pros::Rotation LTWheel(LEFT_TRACKING_WHEEL_PORT);
 pros::Rotation RTWheel(RIGHT_TRACKING_WHEEL_PORT);
 pros::Rotation BTWheel(BACK_TRACKING_WHEEL_PORT);
+
+
+double del_theta;
 
 // Position is in inches
 // Theta is in degrees
@@ -72,13 +75,16 @@ double convertDegToRad (double degree) {
 void update_position_and_angle() {
 	// Calculate distance travelled by each tracking wheel
 	ArcLengths arcs = get_wheel_travel();
+	// pros::lcd::print(0, "Left Travel: %lf", arcs.left);
+	// pros::lcd::print(1, "Right Travel: %lf", arcs.right);
+	// pros::lcd::print(2, "Back Travel: %lf", arcs.back);
 	
 	// Determine change in heading 
-	double del_theta = compute_heading_change(arcs);
+	del_theta = compute_heading_change(arcs);
 
 	// Determine change in local x and in local y
 	double dx_local = (arcs.left + arcs.right) / 2.0;
-	double dy_local = arcs.back - (del_theta * -BACK_TRACKING_WHEEL_DISTANCE);
+	double dy_local = arcs.back - (convertDegToRad(del_theta) * BACK_TRACKING_WHEEL_DISTANCE);
 
 	// Compute using midpoint formula
 	double heading_mid = convertDegToRad(theta + (del_theta / 2));
@@ -92,8 +98,8 @@ void update_position_and_angle() {
 	theta += del_theta;
 
 	// Keep theta between 0 and 360
-	if (theta < 0) theta += 360;
-	if (theta > 360) theta -= 360;
+	theta = std::fmod(theta, 360.0);
+    if (theta < 0) theta += 360.0;
 }
 
 
@@ -154,6 +160,20 @@ void autonomous() {}
 void opcontrol() {
 
 	while (true) {
+
+		// ArcLengths delta = get_wheel_travel();
+		// forward_dist_travelled += delta.right;
+		// horz_dist_travelled += delta.back;
+		// pros::lcd::print(0, "Forward Dist Travelled: %lf", forward_dist_travelled);
+		// pros::lcd::print(1, "Horizontal Distance Travelled: %lf", horz_dist_travelled);
+		// // wheelTravel.left += delta.left;
+		// // wheelTravel.right += delta.right;
+		// // wheelTravel.back += delta.back;
+
+		// // pros::lcd::print(0, "Position left: %lf", wheelTravel.left);
+		// // pros::lcd::print(1, "Position right: %lf", wheelTravel.right);
+		// // pros::lcd::print(2, "Position back: %lf", wheelTravel.back);
+
 		update_position_and_angle();
 		pros::lcd::print(0, "Position X: %lf", pos_x);
 		pros::lcd::print(1, "Position Y: %lf", pos_y);
