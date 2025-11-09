@@ -6,6 +6,11 @@ pros::Rotation LTWheel(LEFT_TRACKING_WHEEL_PORT);
 pros::Rotation RTWheel(RIGHT_TRACKING_WHEEL_PORT);
 pros::Rotation BTWheel(BACK_TRACKING_WHEEL_PORT);
 
+double pos_x = 0;
+double pos_y = 0;
+double theta = 0;
+
+
 void update_position_and_angle() {
 	// Calculate distance travelled by each tracking wheel
 	ArcLengths arcs = get_wheel_travel();

@@ -8,13 +8,13 @@
 #define ODOMETRY_H
 
 // Longitudinal position (inches)
-double pos_x = 0;
+extern double pos_x;
 
 // Lateral position (inches)
-double pos_y = 0;
+extern double pos_y;
 
 // Orientation (degrees) (0 - 360)
-double theta = 0;
+extern double theta;
 
 // Tracking Wheels
 extern pros::Rotation LTWheel;
