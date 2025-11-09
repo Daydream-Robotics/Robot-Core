@@ -4,20 +4,13 @@
 
 #include <numbers>
 
-// All Distances in Inches
 
-#define LEFT_TRACKING_WHEEL_PORT -19
-#define RIGHT_TRACKING_WHEEL_PORT 13
-#define BACK_TRACKING_WHEEL_PORT 15
-
-// Measured estimates
 #define LEFT_TRACKING_WHEEL_DISTANCE 1.65
 #define RIGHT_TRACKING_WHEEL_DISTANCE 1.65
 #define BACK_TRACKING_WHEEL_DISTANCE 2.4
 
 #define TRACKING_WHEEL_DIAMETER 2.00
-
-// Unmeasured	
+	
 #define BACK_TRACKING_WHEEL_DIAMETER 2.75
 
 pros::Rotation LTWheel(LEFT_TRACKING_WHEEL_PORT);
@@ -49,11 +42,13 @@ ArcLengths get_wheel_travel() {
 	double del_R = (currRight / 36000.0) * TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
 	double del_B = (currBack / 36000.0) * BACK_TRACKING_WHEEL_DIAMETER * std::numbers::pi;
 
+	// Create a structure of lengths
 	ArcLengths del;
 	del.left = del_L;
 	del.right = del_R;
 	del.back = del_B;
 
+	// Reset tracking for next measurements
 	LTWheel.reset_position();
 	RTWheel.reset_position();
 	BTWheel.reset_position();
@@ -78,10 +73,7 @@ double convertDegToRad (double degree) {
 void update_position_and_angle() {
 	// Calculate distance travelled by each tracking wheel
 	ArcLengths arcs = get_wheel_travel();
-	// pros::lcd::print(0, "Left Travel: %lf", arcs.left);
-	// pros::lcd::print(1, "Right Travel: %lf", arcs.right);
-	// pros::lcd::print(2, "Back Travel: %lf", arcs.back);
-	
+
 	// Determine change in heading 
 	del_theta = compute_heading_change(arcs);
 
@@ -114,6 +106,11 @@ void update_position_and_angle() {
  */
 void initialize() {
 	pros::lcd::initialize();
+
+	// Initialize tracking wheels to zero
+	LTWheel.reset_position();
+	RTWheel.reset_position();
+	BTWheel.reset_position();
 }
 
 void disabled() {}
@@ -128,6 +125,8 @@ void opcontrol() {
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 
 	while(true){
+		update_position_and_angle();
+		controller.print(0, 0, "X: %.1lf Y: %.1lf O: %.1lf", pos_x, pos_y, theta);
 		// Get joystick values
 		int leftY = controller.get_analog(ANALOG_LEFT_Y);
 		int rightY = controller.get_analog(ANALOG_RIGHT_Y);
@@ -146,28 +145,6 @@ void opcontrol() {
 		}
 
 		// Delay added to prevent crashing
-		pros::delay(20);
-	}
-
-	while (true) {
-
-		// ArcLengths delta = get_wheel_travel();
-		// forward_dist_travelled += delta.right;
-		// horz_dist_travelled += delta.back;
-		// pros::lcd::print(0, "Forward Dist Travelled: %lf", forward_dist_travelled);
-		// pros::lcd::print(1, "Horizontal Distance Travelled: %lf", horz_dist_travelled);
-		// // wheelTravel.left += delta.left;
-		// // wheelTravel.right += delta.right;
-		// // wheelTravel.back += delta.back;
-
-		// // pros::lcd::print(0, "Position left: %lf", wheelTravel.left);
-		// // pros::lcd::print(1, "Position right: %lf", wheelTravel.right);
-		// // pros::lcd::print(2, "Position back: %lf", wheelTravel.back);
-
-		update_position_and_angle();
-		pros::lcd::print(0, "Position X: %lf", pos_x);
-		pros::lcd::print(1, "Position Y: %lf", pos_y);
-		pros::lcd::print(2, "Orientation: %lf", theta);
 		pros::delay(20);
 	}
 
