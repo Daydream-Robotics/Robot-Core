@@ -22,9 +22,9 @@ constexpr int DEADZONE = 3;
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 
-constexpr double LEFT_TRACKING_WHEEL_DISTANCE = 1.65;
-constexpr double RIGHT_TRACKING_WHEEL_DISTANCE = 1.65;
-constexpr double BACK_TRACKING_WHEEL_DISTANCE = 2.4;
+constexpr double LEFT_TRACKING_WHEEL_DISTANCE = 1.58;
+constexpr double RIGHT_TRACKING_WHEEL_DISTANCE = 1.58;
+constexpr double BACK_TRACKING_WHEEL_DISTANCE = 1.188;
 
 constexpr double TRACKING_WHEEL_DIAMETER = 2.00;
 constexpr double BACK_TRACKING_WHEEL_DIAMETER = 2.75;
