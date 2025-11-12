@@ -17,36 +17,47 @@ void opcontrol() {
 	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 
+	frontIntake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+	mainIntake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+
 	bool pistonToggle = false, pistonLatch = false;
 
 	while(true){
-		// Get joystick values
-		int leftY = controller.get_analog(ANALOG_LEFT_Y);
-		int rightY = controller.get_analog(ANALOG_RIGHT_Y);
+		// Arcade control scheme
+		int leftY = controller.get_analog(ANALOG_LEFT_Y);    // Gets amount forward/backward from left joystick
+		int rightX = controller.get_analog(ANALOG_RIGHT_X);  // Gets the turn left/right from right joystick
 
-		// Dead zone for both motors
-		if(abs(leftY) > DEADZONE) {
-			leftMotors.move(leftY);
-		} else {
-			leftMotors.move(0);
+		if(abs(leftY) < DEADZONE) {
+			leftY = 0;
 		}
 
-		if(abs(rightY) > DEADZONE) {
-			rightMotors.move(rightY);
-		} else { 
-			rightMotors.move(0);
+		if(abs(rightX) < DEADZONE) {
+			rightX = 0;
 		}
 
-		// Intaking/outtaking
-		if(controller.get_digital(DIGITAL_L1)) {
-			leftIntake.move(MAX_VOLTAGE);
-			rightIntake.move(MAX_VOLTAGE);
-		} else if(controller.get_digital(DIGITAL_R1)) {
-			leftIntake.move(-MAX_VOLTAGE);
-			rightIntake.move(-MAX_VOLTAGE);
-		} else {
-			leftIntake.move(0);
-			rightIntake.move(0);
+		leftMotors.move(leftY + rightX); // Sets left motor voltage
+		rightMotors.move(leftY - rightX); // Sets right motor voltage
+
+		// Main intake
+		if (controller.get_digital(DIGITAL_R1)) {
+			frontIntake.move(127);
+		} else if (controller.get_digital(DIGITAL_R2)) {
+			mainIntake.move(127);
+		} else if (controller.get_digital(DIGITAL_LEFT)) {
+			frontIntake.move(-60);
+			mainIntake.move(-60);
+		}
+
+		// Front intake 
+		else if (controller.get_digital(DIGITAL_UP)){
+			frontIntake.move(60);
+			mainIntake.move(60);
+		} else if (controller.get_digital(DIGITAL_DOWN)){
+			frontIntake.move(-127);
+			mainIntake.move(-127);
+	    } else {
+			frontIntake.move(0);
+			mainIntake.move(0);
 		}
 
 		// Pneumatics
