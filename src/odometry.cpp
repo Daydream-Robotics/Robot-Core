@@ -20,10 +20,10 @@ void update_position_and_angle() {
 
 	// Determine change in local x and in local y
 	double dx_local = (arcs.left + arcs.right) / 2.0;
-	double dy_local = arcs.back - (convertDegToRad(del_theta) * BACK_TRACKING_WHEEL_DISTANCE);
+	double dy_local = arcs.back - (del_theta * BACK_TRACKING_WHEEL_DISTANCE);
 
 	// Compute using midpoint formula
-	double heading_mid = convertDegToRad(theta + (del_theta / 2));
+	double heading_mid = theta + (del_theta / 2);
 
     // Compute change in x and y based on heading and local changes
 	double del_x = std::cos(heading_mid) * dx_local - std::sin(heading_mid) * dy_local;
@@ -35,8 +35,8 @@ void update_position_and_angle() {
 	theta += del_theta;
 
 	// Keep theta between 0 and 360
-	theta = std::fmod(theta, 360.0);
-    if (theta < 0) theta += 360.0;
+	theta = std::fmod(theta, 2 * std::numbers::pi);
+    if (theta < 0) theta += 2 * std::numbers::pi;
 }
 
 
@@ -65,9 +65,7 @@ ArcLengths get_wheel_travel() {
 
 double compute_heading_change(ArcLengths arcs) {
 	// Calculate heading in radians
-	double rads = (arcs.right - arcs.left) / (double) (RIGHT_TRACKING_WHEEL_DISTANCE + LEFT_TRACKING_WHEEL_DISTANCE);
-	// Return heading in degrees
-	return rads * (180.0 / std::numbers::pi);
+	return (arcs.right - arcs.left) / (double) (RIGHT_TRACKING_WHEEL_DISTANCE + LEFT_TRACKING_WHEEL_DISTANCE);
 }
 
 double convertDegToRad (double degree) {

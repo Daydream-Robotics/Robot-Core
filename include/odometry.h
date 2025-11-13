@@ -13,7 +13,7 @@ extern double pos_x;
 // Lateral position (inches)
 extern double pos_y;
 
-// Orientation (degrees) (0 - 360)
+// Orientation (radians) (0 - 2pi)
 extern double theta;
 
 // Tracking Wheels
