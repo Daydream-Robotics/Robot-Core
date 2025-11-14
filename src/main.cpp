@@ -19,48 +19,69 @@ void opcontrol() {
 
 	frontIntake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 	mainIntake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+	backIntake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 
 	bool pistonToggle = false, pistonLatch = false;
 
 	while(true){
-		// Arcade control scheme
-		int leftY = controller.get_analog(ANALOG_LEFT_Y);    // Gets amount forward/backward from left joystick
-		int rightX = controller.get_analog(ANALOG_RIGHT_X);  // Gets the turn left/right from right joystick
+		// Get joystick values
+		int leftY = controller.get_analog(ANALOG_LEFT_Y);
+		int rightY = controller.get_analog(ANALOG_RIGHT_Y);
 
-		if(abs(leftY) < DEADZONE) {
-			leftY = 0;
+		// Dead zone for both motors
+		if (!controller.get_digital(DIGITAL_UP) && !controller.get_digital(DIGITAL_DOWN)) {
+			// Dead zone for both motors
+			if(abs(leftY) > DEADZONE) {
+				leftMotors.move(leftY);
+			} else {
+				leftMotors.move(STOP);
+			}
+
+			if(abs(rightY) > DEADZONE) {
+				rightMotors.move(rightY);
+			} else { 
+				rightMotors.move(STOP);
+			}
+		} else {
+			if (controller.get_digital(DIGITAL_UP)) {
+				leftMotors.move(LOW_VOLTAGE);
+				rightMotors.move(LOW_VOLTAGE);
+			} else if (controller.get_digital(DIGITAL_DOWN)){
+				leftMotors.move(-LOW_VOLTAGE);
+				rightMotors.move(-LOW_VOLTAGE);
+			}
 		}
-
-		if(abs(rightX) < DEADZONE) {
-			rightX = 0;
-		}
-
-		leftMotors.move(leftY + rightX); // Sets left motor voltage
-		rightMotors.move(leftY - rightX); // Sets right motor voltage
 
 		// Main intake
 		if (controller.get_digital(DIGITAL_R1)) {
-			frontIntake.move(127);
-		} else if (controller.get_digital(DIGITAL_R2)) {
-			mainIntake.move(127);
-		} else if (controller.get_digital(DIGITAL_LEFT)) {
-			frontIntake.move(-60);
-			mainIntake.move(-60);
+			frontIntake.move(HIGH_VOLTAGE);
+			mainIntake.move(HIGH_VOLTAGE);
+		} else if (controller.get_digital(DIGITAL_R2)){
+			frontIntake.move(-HIGH_VOLTAGE);
+			mainIntake.move(-HIGH_VOLTAGE);
+	    } else if (controller.get_digital(DIGITAL_L2)) {
+			frontIntake.move(-MID_VOLTAGE);
+			mainIntake.move(-MID_VOLTAGE);
+		} else if (controller.get_digital(DIGITAL_L1)){
+			frontIntake.move(MID_VOLTAGE);
+			mainIntake.move(MID_VOLTAGE);
+		} else if (controller.get_digital(DIGITAL_A)) {
+			mainIntake.move(MID_VOLTAGE);
+		} else {
+			frontIntake.move(STOP);
+			mainIntake.move(STOP);
 		}
 
-		// Front intake 
-		else if (controller.get_digital(DIGITAL_UP)){
-			frontIntake.move(60);
-			mainIntake.move(60);
-		} else if (controller.get_digital(DIGITAL_DOWN)){
-			frontIntake.move(-127);
-			mainIntake.move(-127);
-	    } else {
-			frontIntake.move(0);
-			mainIntake.move(0);
+		// Top outtake (testing)
+		if(controller.get_digital(DIGITAL_X)) {
+			backIntake.move(MID_VOLTAGE);
+		} else if (controller.get_digital(DIGITAL_B)) {
+			backIntake.move(-MID_VOLTAGE);
+		} else {
+			backIntake.move(STOP);
 		}
 
-		// Pneumatics
+		// Match unloader
 		if (pistonToggle)
 			piston.set_value(true); // turns clamp solenoid on
 		else

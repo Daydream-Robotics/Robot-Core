@@ -7,5 +7,6 @@ extern pros::MotorGroup rightMotors;
 
 extern pros::Motor mainIntake;
 extern pros::Motor frontIntake;
+extern pros::Motor backIntake;
 
 extern pros::adi::Pneumatics piston;
