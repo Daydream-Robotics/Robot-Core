@@ -6,6 +6,8 @@ pros::Rotation LTWheel(LEFT_TRACKING_WHEEL_PORT);
 pros::Rotation RTWheel(RIGHT_TRACKING_WHEEL_PORT);
 pros::Rotation BTWheel(BACK_TRACKING_WHEEL_PORT);
 
+pros::IMU imu(IMU_PORT);
+
 double pos_x = 0;
 double pos_y = 0;
 double theta = 0;
@@ -15,8 +17,11 @@ void update_position_and_angle() {
 	// Calculate distance travelled by each tracking wheel
 	ArcLengths arcs = get_wheel_travel();
 
+	// Get orientation from
+	theta = convertDegToRad(imu.get_yaw());
+
 	// Determine change in heading 
-	double del_theta = compute_heading_change(arcs);
+	double del_theta = theta - prevTheta;
 
 	// Determine change in local x and in local y
 	double dx_local = (arcs.left + arcs.right) / 2.0;
@@ -34,9 +39,7 @@ void update_position_and_angle() {
 	pos_y += del_y;
 	theta += del_theta;
 
-	// Keep theta between 0 and 360
-	theta = std::fmod(theta, 2 * std::numbers::pi);
-    if (theta < 0) theta += 2 * std::numbers::pi;
+	prevTheta = theta;
 }
 
 
