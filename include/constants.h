@@ -22,4 +22,15 @@ constexpr int IMU_PORT = 10;
 
 constexpr int DEADZONE = 3;
 
+/* - - - - - - - - - - - - - - [PIDS] - - - - - - - - - - - - - - */
+
+constexpr double TURN_KP = 1.0;
+constexpr double TURN_KI = 0.0;
+constexpr double TURN_KD = 0.0;
+
+constexpr double DRIVE_KP = 0.0;
+constexpr double DRIVE_KI = 0.0;
+constexpr double DRIVE_KD = 0.0;
+
+
 #endif

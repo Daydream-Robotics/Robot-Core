@@ -1,6 +1,7 @@
 #include "main.h"
 #include "subsystems.h"
 #include "constants.h"
+#include "pids.h"
 
 void initialize() {
 	pros::lcd::initialize();
@@ -33,6 +34,11 @@ void opcontrol() {
 			rightMotors.move(rightY);
 		} else { 
 			rightMotors.move(0);
+		}
+
+		// Quat PID testing
+		if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
+			turn_pid(90);
 		}
 
 		// Delay added to prevent crashing
