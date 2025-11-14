@@ -61,13 +61,13 @@ void opcontrol() {
 			frontIntake.move(-HIGH_VOLTAGE);
 			mainIntake.move(-HIGH_VOLTAGE);
 	    } else if (controller.get_digital(DIGITAL_L2)) {
-			frontIntake.move(-MID_VOLTAGE);
-			mainIntake.move(-MID_VOLTAGE);
+			frontIntake.move(-HIGH_VOLTAGE);
+			mainIntake.move(-HIGH_VOLTAGE);
 		} else if (controller.get_digital(DIGITAL_L1)){
-			frontIntake.move(MID_VOLTAGE);
-			mainIntake.move(MID_VOLTAGE);
+			frontIntake.move(HIGH_VOLTAGE);
+			mainIntake.move(HIGH_VOLTAGE);
 		} else if (controller.get_digital(DIGITAL_A)) {
-			mainIntake.move(MID_VOLTAGE);
+			mainIntake.move(HIGH_VOLTAGE);
 		} else {
 			frontIntake.move(STOP);
 			mainIntake.move(STOP);
@@ -75,9 +75,9 @@ void opcontrol() {
 
 		// Top outtake (testing)
 		if(controller.get_digital(DIGITAL_X)) {
-			backIntake.move(MID_VOLTAGE);
+			backIntake.move(HIGH_VOLTAGE);
 		} else if (controller.get_digital(DIGITAL_B)) {
-			backIntake.move(-MID_VOLTAGE);
+			backIntake.move(-HIGH_VOLTAGE);
 		} else {
 			backIntake.move(STOP);
 		}
@@ -88,7 +88,7 @@ void opcontrol() {
 		else
 			piston.set_value(false); // turns clamp solenoid off
 
-		if (controller.get_digital_new_press(DIGITAL_B)) {
+		if (controller.get_digital_new_press(DIGITAL_LEFT)) {
 			if(!pistonLatch){ // if latch is false, flip toggle one time and set latch to true
 				pistonToggle = !pistonToggle;
 				pistonLatch = true;
