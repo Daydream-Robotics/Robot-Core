@@ -78,13 +78,11 @@ void turn_pid(double target, double weightAdjustment) {
 			turnSpeed = std::clamp(turnSpeed, 20, 55);
 			leftMotors.move((int)copysign(turnSpeed, turn_PID));
 			rightMotors.move(-(int)copysign(turnSpeed, turn_PID));	
+		} else {
+			leftMotors.move(0);
+			rightMotors.move(0);
 		}
-
 		pros::lcd::print(4, "Statement: %d", abs(optimized_angle) > 0.2);
-		// } else {
-		// 	leftMotors.move(0);
-		// 	rightMotors.move(0);
-		// }
 		
 		if(abs(optimized_angle) <= 0.2) {
 			correctCount++;
