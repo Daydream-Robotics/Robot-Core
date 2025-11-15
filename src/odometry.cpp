@@ -44,8 +44,8 @@ void turn_pid(double target, double weightAdjustment) {
 		// 		optimized_angle = temp_angle;
 		// }
 
-		if (optimized_angle > 180) optimized_angle -= 180;
-		else if (optimized_angle < -180) optimized_angle += 180;
+		if (optimized_angle > 180) optimized_angle -= 360;
+		else if (optimized_angle < -180) optimized_angle += 360;
 		if (optimized_angle == 180) optimized_angle = 179.99;
 
 
