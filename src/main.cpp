@@ -31,27 +31,42 @@ void autonomous() {
 
 	// Drive in front of the match loader
 	move_pid({ 34, 0 }, 25, 0, 0, -1);
+	pros::delay(300);
 
 	// Start intake
+	frontIntake.move(HIGH_VOLTAGE);
+	mainIntake.move(HIGH_VOLTAGE);
+	pros::delay(300);
 
 	// Drop pneumatic
+	piston.set_value(true);
+	pros::delay(300);
 
 	// Ram match loader
-	move_pid({ 34, 19 }, 80, 0, 0, 0);
+	move_pid({ 34, 19 }, 50, 0, 0, 7);
+	pros::delay(300);
 
-	// Stay in match loader intaking
-	pros::delay(3000);
+	// Back up from match loader
+	move_pid({ 34, 10 }, 25, 0, 1, -1);
 
 	// Put up pneumatic
+	piston.set_value(false);
+	pros::delay(300);
 
 	// Stop intake
+	frontIntake.move(STOP);
+	mainIntake.move(STOP);
+	pros::delay(300);
 
 	// Drive to match loader
-	move_pid({ 34, -30 }, 25, 0, 1, 0);
+	move_pid({ 34, -30 }, 25, 0, 1, 8);
+	pros::delay(300);
 
 	// Outtake
-
-
+	frontIntake.move(HIGH_VOLTAGE);
+	mainIntake.move(HIGH_VOLTAGE);
+	backIntake.move(HIGH_VOLTAGE);
+	pros::delay(7000);
 
 }
 
@@ -69,7 +84,7 @@ void opcontrol() {
 	while(true){
 
 		// Start autonomous
-		if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L2)) {
+		if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
 			autonomous();
 		}
 
