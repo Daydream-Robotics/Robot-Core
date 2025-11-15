@@ -100,7 +100,7 @@ void turn_pid(double target, double weightAdjustment) {
 	
 }
 
-void move_pid(Position target, double weightAdjustment, int backwards) {
+void move_pid(Position target, int speed, double weightAdjustment, int backwards, int timer) {
 	int correctCount = 0;
 	double move_error = 0, move_total_error = 0, move_derivative = 0, move_prev_error= 0, move_PID = 0;
 	
@@ -116,9 +116,9 @@ void move_pid(Position target, double weightAdjustment, int backwards) {
 
 	// Get angle to target
 	double target_heading = std::atan2(del_y, del_x);
-    // pros::lcd::print(0, "Target: %lf", convertRadToDeg(target_heading));
-
-	//target_heading += theta;
+    
+	const auto start_time = std::chrono::steady_clock::now();
+	const auto timer_duration = std::chrono::seconds(timer);
 
 	// turn to the specified angle
 	turn_pid(convertRadToDeg(target_heading), 0);
@@ -130,9 +130,9 @@ void move_pid(Position target, double weightAdjustment, int backwards) {
 		update_position_and_angle();
 		double dist = getDistance({ pos_x, pos_y }, target);
 
-		//pros::lcd::print(1, "Pos X: %lf", pos_x);
-		//pros::lcd::print(2, "Pos Y: %lf", pos_y);
-		//pros::lcd::print(3, "Dist: %lf", dist);
+		if (timer > 0 && ((std::chrono::steady_clock::now() - start_time) > timer_duration)) {
+			return;
+		}
 
 		// proportion
 		move_error = dist;
@@ -148,20 +148,14 @@ void move_pid(Position target, double weightAdjustment, int backwards) {
 
 		move_PID = (MOVE_KP * move_error) * (backwards ? -1 : 1);
 		move_PID += copysign(0.12 + (weightAdjustment * 0.05), move_PID);
-
-		// pros::lcd::print(2, "PID = %lf", move_PID);
 	
 		if(abs(move_PID) >= 0.5) {
-			leftMotors.move(copysign(25, move_PID));
-			rightMotors.move(copysign(25, move_PID));
+			leftMotors.move(copysign(speed, move_PID));
+			rightMotors.move(copysign(speed, move_PID));
 		} else if(dist > 0.15) {
-			leftMotors.move(move_PID * 25);
-			rightMotors.move(move_PID * 25);
+			leftMotors.move(move_PID * speed);
+			rightMotors.move(move_PID * speed);
 		} 
-		// else {
-		// 	leftMotors.move(0);
-		// 	rightMotors.move(0);
-		// }
 		
 		if(dist <= 4) {
 			correctCount++;

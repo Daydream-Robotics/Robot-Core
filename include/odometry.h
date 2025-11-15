@@ -8,6 +8,7 @@
 #define ODOMETRY_H
 
 #include <cmath>
+#include <chrono>
 
 // Longitudinal position (inches)
 extern double pos_x;
@@ -66,8 +67,8 @@ double getDistance (Position p1, Position p2);
 // Turn to specified target angle
 void turn_pid(double target, double weightAdjustment);
 
-// Move to specified position (if backward == 1, then reverse instead)
-void move_pid(Position target, double weightAdjustment, int backward);
+// Move to specified position (if backward == 1, then reverse instead) (if timer == -1, then there is no timer)
+void move_pid(Position target, int speed, double weightAdjustment, int backwards, int timer);
 
 // Get yaw from imu
 double get_yaw_quaternion();
