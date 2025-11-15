@@ -1,7 +1,6 @@
 #include "main.h"
 #include "subsystems.h"
 #include "constants.h"
-#include "pids.h"
 
 void initialize() {
 	pros::lcd::initialize();
@@ -63,30 +62,36 @@ void opcontrol() {
 	    } else if (controller.get_digital(DIGITAL_L2)) {
 			frontIntake.move(-HIGH_VOLTAGE);
 			mainIntake.move(-HIGH_VOLTAGE);
+			backIntake.move(-HIGH_VOLTAGE);
 		} else if (controller.get_digital(DIGITAL_L1)){
 			frontIntake.move(HIGH_VOLTAGE);
 			mainIntake.move(HIGH_VOLTAGE);
+			backIntake.move(HIGH_VOLTAGE);
 		} else if (controller.get_digital(DIGITAL_A)) {
 			mainIntake.move(HIGH_VOLTAGE);
 		} else {
 			frontIntake.move(STOP);
 			mainIntake.move(STOP);
-		}
-
-		// Top outtake (testing)
-		if(controller.get_digital(DIGITAL_X)) {
-			backIntake.move(HIGH_VOLTAGE);
-		} else if (controller.get_digital(DIGITAL_B)) {
-			backIntake.move(-HIGH_VOLTAGE);
-		} else {
 			backIntake.move(STOP);
 		}
 
+		// // Top outtake (testing)
+		// if(controller.get_digital(DIGITAL_X)) {
+		// 	backIntake.move(HIGH_VOLTAGE);
+		// } else if (controller.get_digital(DIGITAL_B)) {
+		// 	backIntake.move(-HIGH_VOLTAGE);
+		// } else {
+		// 	backIntake.move(STOP);
+		// }
+
 		// Match unloader
-		if (pistonToggle)
+		if (pistonToggle) {
 			piston.set_value(true); // turns clamp solenoid on
-		else
+		} else {
 			piston.set_value(false); // turns clamp solenoid off
+		}
+
+		pros::delay(10);
 
 		if (controller.get_digital_new_press(DIGITAL_LEFT)) {
 			if(!pistonLatch){ // if latch is false, flip toggle one time and set latch to true
@@ -96,11 +101,6 @@ void opcontrol() {
 		}
 		else
 			pistonLatch = false; // once button is released then release the latch too
-
-		// Quat PID testing
-		if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
-			turn_pid(90);
-		}
 
 		// Delay added to prevent crashing
 		pros::delay(20);

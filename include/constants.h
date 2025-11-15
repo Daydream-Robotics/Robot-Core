@@ -18,7 +18,7 @@ constexpr int BACK_TRACKING_WHEEL_PORT = 13;
 
 constexpr int FRONT_INTAKE_PORT = -6;
 constexpr int MAIN_INTAKE_PORT = 9;
-constexpr int BACK_INTAKE_PORT = 8;
+constexpr int BACK_INTAKE_PORT = -8;
 
 constexpr char IMU_PORT = 11;
 

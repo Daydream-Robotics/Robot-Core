@@ -1,13 +1,8 @@
 #include "main.h"
-#include "subsystems.h"
-#include "constants.h"
 
-double heading;
-double optimized_angle;
-double temp_angle;
-double turn_error, turn_total_error, turn_derivative, turn_prev_error, turn_PID;
 
-double get_yaw_quaternion() {
+// Get raw yaw/quat value
+double getYawQuaternion() {
 	pros::quaternion_s_t qt = imu.get_quaternion();
 
 	//error fetching quat, retry
@@ -26,14 +21,14 @@ double get_yaw_quaternion() {
 	return ((yaw * (180 / M_PI)) + 180);
 }
 
-void turn_pid(double target, double weightAdjustment = 0) {
+void turnPID(double target, double weightAdjustment = 0) {
 	int correctCount = 0;
-	heading = get_yaw_quaternion();
+	heading = getYawQuaternion();
 	// pros::lcd::print(1, "Heading = %lf, Target = %lf", heading, target);
 	
 	while (correctCount <= 10) {
 		
-		heading = get_yaw_quaternion() - 180;
+		heading = getYawQuaternion() - 180;
 		optimized_angle = target - heading;
 			
 		pros::lcd::print(1, "Heading = %lf, Target = %lf", heading, target);
@@ -63,17 +58,17 @@ void turn_pid(double target, double weightAdjustment = 0) {
 		// get prev error for next instance
 		turn_prev_error = turn_error;
 
-		turn_PID = ((TURN_KP * turn_error) / 360);
-		turn_PID += copysign(0.12 + (weightAdjustment * 0.05), turn_PID);
+		turn_PID = ((turn_kP * turn_error) / 360);
+		turn_PID += copysign(0.12 + (weightAdjustment * 0.05), turn_PID); // want to remove
 
 		pros::lcd::print(2, "PID = %lf", turn_PID);
 	
-		if(abs(turn_PID) >= 0.5) {
-			leftMotors.move(turn_PID * 64);
-			rightMotors.move(-turn_PID * 64);
-		} else if(abs(optimized_angle) > 0.15) {
+		if(abs(optimized_angle) > 0.15) {
 			leftMotors.move(turn_PID * 127);
 			rightMotors.move(-turn_PID * 127);
+		} else if(abs(turn_PID) <= 0.4) {
+			leftMotors.move(copysign(0.4, turn_PID * 127));
+			rightMotors.move(copysign(0.4, -turn_PID * 127));
 		} else {
 			leftMotors.move(0);
 			rightMotors.move(0);
@@ -81,8 +76,7 @@ void turn_pid(double target, double weightAdjustment = 0) {
 		
 		if(abs(optimized_angle) <= 0.2) {
 			correctCount++;
-		}
-
+		}		
 		pros::delay(10);
 	}
 
