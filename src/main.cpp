@@ -39,7 +39,7 @@ void autonomous() {
 
 	move_pid({ 40, 0 }, 0, 0);
 	pros::delay(500);
-	move_pid({ 50, 60 }, 0, 1);
+	move_pid({ 50, 10 }, 0, 1);
 	pros::delay(500);
 	move_pid({ 0, 0 }, 0, 1);
 	pros::delay(500);

@@ -75,12 +75,9 @@ void turn_pid(double target, double weightAdjustment) {
 		int turnSpeed = turn_PID * 127;
 	
 		if(abs(optimized_angle) > 0.2) {
-			turnSpeed = std::clamp(turnSpeed, 20, 55);
+			turnSpeed = std::clamp(std::abs(turnSpeed), 20, 55);
 			leftMotors.move((int)copysign(turnSpeed, turn_PID));
 			rightMotors.move(-(int)copysign(turnSpeed, turn_PID));	
-		} else {
-			leftMotors.move(0);
-			rightMotors.move(0);
 		}
 		pros::lcd::print(4, "Statement: %d", abs(optimized_angle) > 0.2);
 		
@@ -88,9 +85,10 @@ void turn_pid(double target, double weightAdjustment) {
 			correctCount++;
 		}
 
+		//pros::lcd::print(4, "Correct Count: %d", correctCount);
 		pros::lcd::print(5, "Cur angle: %lf", heading);
-		// pros::lcd::print(5, "Turnspeed: %d", turnSpeed);
-		// //pros::lcd::print(6, "Optimized angle: %lf", optimized_angle);
+		pros::lcd::print(6, "Turnspeed: %d", turnSpeed);
+		//pros::lcd::print(7, "Optimized angle: %lf", optimized_angle);
 		// pros::lcd::print(7, "Move value: %d", (int)copysign(turnSpeed, turn_PID));
 		pros::delay(10);
 	}
@@ -118,21 +116,23 @@ void move_pid(Position target, double weightAdjustment, int backwards) {
 
 	// Get angle to target
 	double target_heading = std::atan2(del_y, del_x);
-    pros::lcd::print(0, "Target: %lf", convertRadToDeg(target_heading));
+    // pros::lcd::print(0, "Target: %lf", convertRadToDeg(target_heading));
 
 	//target_heading += theta;
 
 	// turn to the specified angle
 	turn_pid(convertRadToDeg(target_heading), 0);
+
+	pros::lcd::print(1, "Left Turn_PID");
 	
 	while (correctCount <= 2) {
 
 		update_position_and_angle();
 		double dist = getDistance({ pos_x, pos_y }, target);
 
-		pros::lcd::print(1, "Pos X: %lf", pos_x);
-		pros::lcd::print(2, "Pos Y: %lf", pos_y);
-		pros::lcd::print(3, "Dist: %lf", dist);
+		//pros::lcd::print(1, "Pos X: %lf", pos_x);
+		//pros::lcd::print(2, "Pos Y: %lf", pos_y);
+		//pros::lcd::print(3, "Dist: %lf", dist);
 
 		// proportion
 		move_error = dist;
