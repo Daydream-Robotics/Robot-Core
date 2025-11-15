@@ -9,7 +9,7 @@
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
-constexpr int LEFT_TRACKING_WHEEL_PORT = -19;
+constexpr int LEFT_TRACKING_WHEEL_PORT = -18;
 constexpr int RIGHT_TRACKING_WHEEL_PORT = 13;
 constexpr int BACK_TRACKING_WHEEL_PORT = 15;
 
@@ -17,7 +17,7 @@ constexpr int BACK_TRACKING_WHEEL_PORT = 15;
 #define RIGHT_DRIVE_WHEEL_PORTS {13, -17, 14, 12}
 
 // ESTIMATED
-constexpr int IMU_PORT = 10;
+constexpr int IMU_PORT = 11;
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 

@@ -10,6 +10,7 @@ pros::IMU imu(IMU_PORT);
 
 double pos_x = 0;
 double pos_y = 0;
+double prevTheta;
 double theta = 0;
 
 double get_yaw_quaternion() {
@@ -31,29 +32,32 @@ double get_yaw_quaternion() {
 	return ((yaw * (180 / M_PI)) + 180);
 }
 
+double normalizeAngle(double a) {
+    // robust normalize using atan2(sin,cos)
+    return std::atan2(std::sin(a), std::cos(a));
+}
+
 void update_position_and_angle() {
 	// Calculate distance travelled by each tracking wheel
 	ArcLengths arcs = get_wheel_travel();
 
-	// Get orientation from
-	theta = convertDegToRad(get_yaw_quaternion());
+	// Get orientation from IMU
+	theta = convertDegToRad(get_yaw_quaternion() - 180);
+	theta = normalizeAngle(theta);
 
 	// Determine change in heading 
-	double del_theta = theta - prevTheta;
-
-	// Bound the change in angle between [-pi, pi]
-	del_theta = fmod(del_theta, M_PI);
-	if (del_theta < -M_PI) {
-		del_theta += M_PI;
-	}
+	double del_theta = normalizeAngle(theta - prevTheta);
 
 	// Determine change in local x and in local y
 	double dx_local = (arcs.left + arcs.right) / 2.0;
 	double dy_local = arcs.back - (del_theta * BACK_TRACKING_WHEEL_DISTANCE);
 
+	double theta_mid = prevTheta + del_theta / 2.0;
+    theta_mid = normalizeAngle(theta_mid);
+
     // Compute change in x and y based on heading and local changes
-	double del_x = std::cos(theta) * dx_local - std::sin(theta) * dy_local;
-	double del_y = std::sin(theta) * dx_local + std::cos(theta) * dy_local;
+	double del_x = std::cos(theta_mid) * dx_local - std::sin(theta_mid) * dy_local;
+	double del_y = std::sin(theta_mid) * dx_local + std::cos(theta_mid) * dy_local;
 
 	// Increment position and angle by calculated changes
 	pos_x += del_x;

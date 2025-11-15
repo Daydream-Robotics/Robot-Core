@@ -28,6 +28,7 @@ void opcontrol() {
 
 	while(true){
 		update_position_and_angle();
+		//controller.print(0, 0, "0: %.1lf", theta * (180.0 / M_PI));
 		controller.print(0, 0, "X: %.1lf Y: %.1lf O: %.1lf", pos_x, pos_y, theta * (180.0 / std::numbers::pi));
 		// Get joystick values
 		int leftY = controller.get_analog(ANALOG_LEFT_Y);

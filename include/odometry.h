@@ -38,6 +38,9 @@ typedef struct ArcLengths {
 // Calculate and update global position and orientation variables
 void update_position_and_angle(void);
 
+// Normalize the angle btwn pi and -pi
+double normalizeAngle(double a);
+
 // Get arc lengths travelled and update encoder values
 ArcLengths get_wheel_travel(void);
 
