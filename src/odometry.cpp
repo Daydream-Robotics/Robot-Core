@@ -120,8 +120,10 @@ void move_pid(Position target, int speed, double weightAdjustment, int backwards
 	const auto start_time = std::chrono::steady_clock::now();
 	const auto timer_duration = std::chrono::seconds(timer);
 
-	// turn to the specified angle
-	turn_pid(convertRadToDeg(target_heading), 0);
+	if (!backwards){
+		// turn to the specified angle
+		turn_pid(convertRadToDeg(target_heading), 0);
+	}
 
 	pros::lcd::print(1, "Left Turn_PID");
 	
