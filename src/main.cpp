@@ -29,11 +29,23 @@ void autonomous() {
 		pros::delay(20);
 	}
 
-	move_pid({ 10, 20 }, 0);
-	pros::delay(1000);
-	move_pid({ 25, 50 }, 0);
-	pros::delay(1000);
-	move_pid({ 0, 0 }, 0);
+	// move_pid({ 10, 20 }, 0, 0);
+	// pros::delay(1000);
+	// move_pid({ 25, 50 }, 0, 1);
+	// pros::delay(1000);
+	// move_pid({ 0, 0 }, 0, 1);
+	// pros::delay(500);
+	// turn_pid(0, 0);
+
+	move_pid({ 40, 0 }, 0, 0);
+	pros::delay(500);
+	move_pid({ 50, 60 }, 0, 1);
+	pros::delay(500);
+	move_pid({ 0, 0 }, 0, 1);
+	pros::delay(500);
+	move_pid({ 20, 20 }, 0, 1);
+	pros::delay(500);
+	move_pid({0, 0}, 0, 1);
 
 }
 

@@ -70,23 +70,25 @@ void turn_pid(double target, double weightAdjustment) {
 		int turnSpeed = turn_PID * 127;
 	
 		if(abs(optimized_angle) > 0.2) {
-			int lowerBound = std::max(abs(turnSpeed), 2);
-			turnSpeed = std::min(lowerBound, 64);
+			turnSpeed = std::clamp(turnSpeed, 20, 55);
 			leftMotors.move((int)copysign(turnSpeed, turn_PID));
-			rightMotors.move(-(int)copysign(turnSpeed, turn_PID));
-		} else {
-			leftMotors.move(0);
-			rightMotors.move(0);
+			rightMotors.move(-(int)copysign(turnSpeed, turn_PID));	
 		}
+
+		pros::lcd::print(4, "Statement: %d", abs(optimized_angle) > 0.2);
+		// } else {
+		// 	leftMotors.move(0);
+		// 	rightMotors.move(0);
+		// }
 		
 		if(abs(optimized_angle) <= 0.2) {
 			correctCount++;
 		}
 
-		pros::lcd::print(4, "Cur angle: %lf", heading);
-		pros::lcd::print(5, "Turnspeed: %d", turnSpeed);
-		//pros::lcd::print(6, "Optimized angle: %lf", optimized_angle);
-		pros::lcd::print(7, "Move value: %d", (int)copysign(turnSpeed, turn_PID));
+		pros::lcd::print(5, "Cur angle: %lf", heading);
+		// pros::lcd::print(5, "Turnspeed: %d", turnSpeed);
+		// //pros::lcd::print(6, "Optimized angle: %lf", optimized_angle);
+		// pros::lcd::print(7, "Move value: %d", (int)copysign(turnSpeed, turn_PID));
 		pros::delay(10);
 	}
 
@@ -97,7 +99,7 @@ void turn_pid(double target, double weightAdjustment) {
 	
 }
 
-void move_pid(Position target, double weightAdjustment) {
+void move_pid(Position target, double weightAdjustment, int backwards) {
 	int correctCount = 0;
 	double move_error = 0, move_total_error = 0, move_derivative = 0, move_prev_error= 0, move_PID = 0;
 	
@@ -105,6 +107,11 @@ void move_pid(Position target, double weightAdjustment) {
 	update_position_and_angle();
 	double del_x = target.x - pos_x;
 	double del_y = target.y - pos_y;
+
+	if (backwards) {
+		del_x *= -0.999;
+		del_y *= -0.999;
+	}
 
 	// Get angle to target
 	double target_heading = std::atan2(del_y, del_x);
@@ -136,7 +143,7 @@ void move_pid(Position target, double weightAdjustment) {
 		// get prev error for next instance
 		move_prev_error = move_error;
 
-		move_PID = (MOVE_KP * move_error);
+		move_PID = (MOVE_KP * move_error) * (backwards ? -1 : 1);
 		move_PID += copysign(0.12 + (weightAdjustment * 0.05), move_PID);
 
 		// pros::lcd::print(2, "PID = %lf", move_PID);
@@ -147,10 +154,11 @@ void move_pid(Position target, double weightAdjustment) {
 		} else if(dist > 0.15) {
 			leftMotors.move(move_PID * 25);
 			rightMotors.move(move_PID * 25);
-		} else {
-			leftMotors.move(0);
-			rightMotors.move(0);
-		}
+		} 
+		// else {
+		// 	leftMotors.move(0);
+		// 	rightMotors.move(0);
+		// }
 		
 		if(dist <= 4) {
 			correctCount++;

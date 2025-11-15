@@ -66,8 +66,8 @@ double getDistance (Position p1, Position p2);
 // Turn to specified target angle
 void turn_pid(double target, double weightAdjustment);
 
-// Move to specified position
-void move_pid(Position target, double weightAdjustment);
+// Move to specified position (if backward == 1, then reverse instead)
+void move_pid(Position target, double weightAdjustment, int backward);
 
 // Get yaw from imu
 double get_yaw_quaternion();
