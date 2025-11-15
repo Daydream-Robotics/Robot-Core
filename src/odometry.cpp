@@ -34,15 +34,20 @@ void turn_pid(double target, double weightAdjustment) {
 			
 		//pros::lcd::print(1, "Heading = %lf, Target = %lf", heading, target);
 
-		if(target > heading){
-			temp_angle = ((360 - target) + heading) * -1;
-			if(abs(optimized_angle) > abs(temp_angle))
-				optimized_angle = temp_angle;
-		} else {
-			temp_angle = (360 - heading) + target;
-			if(abs(optimized_angle) > abs(temp_angle))
-				optimized_angle = temp_angle;
-		}
+		// if(target > heading){
+		// 	temp_angle = -360 - heading + target;
+		// 	if(abs(optimized_angle) > abs(temp_angle))
+		// 		optimized_angle = temp_angle;
+		// } else {
+		// 	temp_angle = 360 - heading + target;
+		// 	if(abs(optimized_angle) > abs(temp_angle))
+		// 		optimized_angle = temp_angle;
+		// }
+
+		if (optimized_angle > 180) optimized_angle -= 180;
+		else if (optimized_angle < -180) optimized_angle += 180;
+		if (optimized_angle == 180) optimized_angle = 179.99;
+
 
 		// proportion
 		turn_error = optimized_angle;
