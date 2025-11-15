@@ -1,6 +1,7 @@
 #include "main.h"
 #include "odometry.h"
 #include "constants.h"
+#include "subsystems.h"
 
 pros::Rotation LTWheel(LEFT_TRACKING_WHEEL_PORT);
 pros::Rotation RTWheel(RIGHT_TRACKING_WHEEL_PORT);
@@ -12,6 +13,139 @@ double pos_x = 0;
 double pos_y = 0;
 double prevTheta;
 double theta = 0;
+double heading;
+double optimized_angle;
+double temp_angle;
+double turn_error, turn_total_error, turn_derivative, turn_prev_error, turn_PID;
+double move_error, move_total_error, move_derivative, move_prev_error, move_PID;
+
+void turn_pid(double target, double weightAdjustment = 0) {
+	int correctCount = 0;
+	heading = get_yaw_quaternion();
+	// pros::lcd::print(1, "Heading = %lf, Target = %lf", heading, target);
+	
+	while (correctCount <= 10) {
+		
+		heading = get_yaw_quaternion() - 180;
+		optimized_angle = target - heading;
+			
+		pros::lcd::print(1, "Heading = %lf, Target = %lf", heading, target);
+
+		if(target > heading){
+			temp_angle = ((360 - target) + heading) * -1;
+			if(abs(optimized_angle) > abs(temp_angle))
+				optimized_angle = temp_angle;
+		}
+		else {
+			temp_angle = (360 - heading) + target;
+			if(abs(optimized_angle) > abs(temp_angle))
+				optimized_angle = temp_angle;
+		}
+
+		// proportion
+		turn_error = optimized_angle;
+
+		pros::lcd::print(3, "Optimized = %lf", optimized_angle);
+
+		// integral
+		turn_total_error += turn_error;
+
+		// derivative
+		turn_derivative = turn_error - turn_prev_error;
+		
+		// get prev error for next instance
+		turn_prev_error = turn_error;
+
+		turn_PID = ((TURN_KP * turn_error) / 360);
+		turn_PID += copysign(0.12 + (weightAdjustment * 0.05), turn_PID);
+
+		pros::lcd::print(2, "PID = %lf", turn_PID);
+	
+		if(abs(turn_PID) >= 0.5) {
+			leftMotors.move(turn_PID * 64);
+			rightMotors.move(-turn_PID * 64);
+		} else if(abs(optimized_angle) > 0.15) {
+			leftMotors.move(turn_PID * 127);
+			rightMotors.move(-turn_PID * 127);
+		} else {
+			leftMotors.move(0);
+			rightMotors.move(0);
+		}
+		
+		if(abs(optimized_angle) <= 0.2) {
+			correctCount++;
+		}
+
+		pros::delay(10);
+	}
+
+	leftMotors.move(0);
+	rightMotors.move(0);
+
+	pros::delay(250);
+	
+}
+
+void move_pid(Position target, double weightAdjustment = 0) {
+	int correctCount = 0;
+	
+	// Alter target to be relative position as origin
+	target.x -= pos_x;
+	target.y -= pos_y;
+
+	// FIX: angle bounds
+
+	// Get angle to target
+	double target_heading = std::atan(target.y / target.x);
+
+	// turn to the specified angle
+	turn_pid(convertRadToDeg(target_heading));
+	
+	while (correctCount <= 10) {
+
+		double dist = getDistance({ pos_x, pos_y }, target);
+
+		// proportion
+		move_error = dist;
+
+		// integral
+		move_total_error += move_error;
+
+		// derivative
+		move_derivative = move_error - move_prev_error;
+		
+		// get prev error for next instance
+		move_prev_error = move_error;
+
+		move_PID = (MOVE_KP * move_error);
+		move_PID += copysign(0.12 + (weightAdjustment * 0.05), move_PID);
+
+		// pros::lcd::print(2, "PID = %lf", move_PID);
+	
+		if(abs(move_PID) >= 0.5) {
+			leftMotors.move(move_PID * 64);
+			rightMotors.move(move_PID * 64);
+		} else if(abs(optimized_angle) > 0.15) {
+			leftMotors.move(move_PID * 127);
+			rightMotors.move(move_PID * 127);
+		} else {
+			leftMotors.move(0);
+			rightMotors.move(0);
+		}
+		
+		if(abs(dist) <= 0.2) {
+			correctCount++;
+		}
+
+		pros::delay(10);
+	}
+
+	leftMotors.move(0);
+	rightMotors.move(0);
+
+	pros::delay(250);
+	
+}
 
 double get_yaw_quaternion() {
 	pros::quaternion_s_t qt = imu.get_quaternion();
@@ -97,4 +231,12 @@ double compute_heading_change(ArcLengths arcs) {
 
 double convertDegToRad (double degree) {
 	return degree * (std::numbers::pi / 180.0);
+}
+
+double convertRadToDeg (double rad) {
+	return rad * (180.0 / M_PI);
+}
+
+double getDistance (Position p1, Position p2) {
+	return std::sqrt(std::pow((p2.x - p1.x), 2) + std::pow((p2.y - p1.y), 2));
 }

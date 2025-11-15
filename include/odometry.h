@@ -35,6 +35,11 @@ typedef struct ArcLengths {
     double back;
 } ArcLengths;
 
+typedef struct Position {
+    double x;
+    double y;
+} Position;
+
 // Calculate and update global position and orientation variables
 void update_position_and_angle(void);
 
@@ -49,5 +54,17 @@ double compute_heading_change(ArcLengths arcs);
 
 // Convert degrees to radians
 double convertDegToRad(double degrees);
+
+// Convert radians to degrees
+double convertRadToDeg (double rad);
+
+// Find distance between two positions
+double getDistance (Position p1, Position p2);
+
+// Turn to specified target angle
+void turn_pid(double target, double weightAdjustment = 0);
+
+// Move to specified position
+void move_pid(Position target, double weightAdjustment = 0);
 
 #endif
