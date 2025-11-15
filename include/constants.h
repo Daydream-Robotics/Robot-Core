@@ -16,12 +16,25 @@ constexpr int BACK_TRACKING_WHEEL_PORT = 15;
 #define LEFT_DRIVE_WHEEL_PORTS {-1, 2, -3, -4}
 #define RIGHT_DRIVE_WHEEL_PORTS {13, -17, 14, 12}
 
-// ESTIMATED
-constexpr int IMU_PORT = 11;
+constexpr int FRONT_INTAKE_PORT = -6;
+constexpr int MAIN_INTAKE_PORT = 9;
+constexpr int BACK_INTAKE_PORT = -8;
+
+constexpr char IMU_PORT = 11;
+
+constexpr char PNEUMATIC_PORT = 'A';
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
 constexpr int DEADZONE = 3;
+
+/* - - - - - - - - - - - - - - [GENERAL] - - - - - - - - - - - - - - */
+
+constexpr int MAX_VOLTAGE = 127;
+constexpr int HIGH_VOLTAGE = 100;
+constexpr int MID_VOLTAGE = 60;
+constexpr int LOW_VOLTAGE = 40;
+constexpr int STOP = 0;
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 
