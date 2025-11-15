@@ -29,15 +29,29 @@ void autonomous() {
 		pros::delay(20);
 	}
 
-	// move_pid({ 10, 20 }, 0, 0);
-	// pros::delay(1000);
-	// move_pid({ 25, 50 }, 0, 1);
-	// pros::delay(1000);
-	// move_pid({ 0, 0 }, 0, 1);
-	// pros::delay(500);
-	// turn_pid(0, 0);
+	// Drive in front of the match loader
+	move_pid({ 34, 0 }, 25, 0, 0, -1);
 
-	move_pid({ 160, 0 }, 80, 0, 0, 2);
+	// Start intake
+
+	// Drop pneumatic
+
+	// Ram match loader
+	move_pid({ 34, 19 }, 80, 0, 0, 0);
+
+	// Stay in match loader intaking
+	pros::delay(3000);
+
+	// Put up pneumatic
+
+	// Stop intake
+
+	// Drive to match loader
+	move_pid({ 34, -30 }, 25, 0, 1, 0);
+
+	// Outtake
+
+
 
 }
 
