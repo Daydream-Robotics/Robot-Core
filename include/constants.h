@@ -34,11 +34,11 @@ constexpr double BACK_TRACKING_WHEEL_DIAMETER = 2.75;
 
 /* - - - - - - - - - - - - - - [PIDS] - - - - - - - - - - - - - - */
 
-constexpr double TURN_KP = 1.0;
-constexpr double TURN_KI = 0.0;
-constexpr double TURN_KD = 0.0;
+constexpr double TURN_KP = 3.7;
+constexpr double TURN_KI = 0.00003;
+constexpr double TURN_KD = 0.14;
 
-constexpr double MOVE_KP = 1.0;
+constexpr double MOVE_KP = 1.5;
 constexpr double MOVE_KI = 0.0;
 constexpr double MOVE_KD = 0.0;
 
