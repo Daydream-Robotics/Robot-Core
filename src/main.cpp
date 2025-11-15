@@ -83,11 +83,6 @@ void opcontrol() {
 
 	while(true){
 
-		// Start autonomous
-		if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
-			autonomous();
-		}
-
 		update_position_and_angle();
 		//controller.print(0, 0, "0: %.1lf", theta * (180.0 / M_PI));
 		controller.print(0, 0, "X: %.1lf Y: %.1lf O: %.1lf", pos_x, pos_y, theta * (180.0 / std::numbers::pi));
