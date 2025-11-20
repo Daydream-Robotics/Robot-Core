@@ -15,6 +15,10 @@ void initialize() {
 	BTWheel.reset_position();
 
 	imu.reset();
+
+	while (imu.is_calibrating()) {
+		pros::delay(20);
+	}
 }
 
 void disabled() {}
@@ -25,48 +29,50 @@ void autonomous() {
 	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 
-	while (imu.is_calibrating()) {
-		pros::delay(20);
-	}
+	turn_pid(-90, 0);
 
-	// Drive in front of the match loader
-	move_pid({ 34, 0 }, 25, 0, 0, -1);
-	pros::delay(300);
+	pros::delay(5000);
 
-	// Start intake
-	frontIntake.move(HIGH_VOLTAGE);
-	mainIntake.move(HIGH_VOLTAGE);
-	pros::delay(300);
+	turn_pid(90, 0);
 
-	// Drop pneumatic
-	piston.set_value(true);
-	pros::delay(300);
+	// // Drive in front of the match loader
+	// move_pid({ 34, 0 }, 25, 0, 0, -1);
+	// pros::delay(300);
 
-	// Ram match loader
-	move_pid({ 34, 19 }, 50, 0, 0, 7);
-	pros::delay(300);
+	// // Start intake
+	// frontIntake.move(HIGH_VOLTAGE);
+	// mainIntake.move(HIGH_VOLTAGE);
+	// pros::delay(300);
 
-	// Back up from match loader
-	move_pid({ 34, 10 }, 25, 0, 1, -1);
+	// // Drop pneumatic
+	// piston.set_value(true);
+	// pros::delay(300);
 
-	// Put up pneumatic
-	piston.set_value(false);
-	pros::delay(300);
+	// // Ram match loader
+	// move_pid({ 34, 19 }, 50, 0, 0, 7);
+	// pros::delay(300);
 
-	// Stop intake
-	frontIntake.move(STOP);
-	mainIntake.move(STOP);
-	pros::delay(300);
+	// // Back up from match loader
+	// move_pid({ 34, 10 }, 25, 0, 1, -1);
 
-	// Drive to match loader
-	move_pid({ 34, -30 }, 25, 0, 1, 8);
-	pros::delay(300);
+	// // Put up pneumatic
+	// piston.set_value(false);
+	// pros::delay(300);
 
-	// Outtake
-	frontIntake.move(HIGH_VOLTAGE);
-	mainIntake.move(HIGH_VOLTAGE);
-	backIntake.move(HIGH_VOLTAGE);
-	pros::delay(7000);
+	// // Stop intake
+	// frontIntake.move(STOP);
+	// mainIntake.move(STOP);
+	// pros::delay(300);
+
+	// // Drive to match loader
+	// move_pid({ 34, -30 }, 25, 0, 1, 8);
+	// pros::delay(300);
+
+	// // Outtake
+	// frontIntake.move(HIGH_VOLTAGE);
+	// mainIntake.move(HIGH_VOLTAGE);
+	// backIntake.move(HIGH_VOLTAGE);
+	// pros::delay(7000);
 
 }
 
@@ -85,11 +91,12 @@ void opcontrol() {
 
 		// Start autonomous
 		if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
-			autonomous();
+			turn_pid(90, 0);
+		} else if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
+			turn_pid(0, 0);
 		}
 
 		update_position_and_angle();
-		//controller.print(0, 0, "0: %.1lf", theta * (180.0 / M_PI));
 		controller.print(0, 0, "X: %.1lf Y: %.1lf O: %.1lf", pos_x, pos_y, theta * (180.0 / std::numbers::pi));
 		// Get joystick values
 		int leftY = controller.get_analog(ANALOG_LEFT_Y);
