@@ -93,6 +93,13 @@ void opcontrol() {
 		if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
 			turn_pid(90, 0);
 		} else if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
+			move_dist_pid(75, 45);
+			turn_pid(90, 0);
+			move_dist_pid(75, 45);
+			turn_pid(180, 0);
+			move_dist_pid(75, 45);
+			turn_pid(-90, 0);
+			move_dist_pid(75, 45);
 			turn_pid(0, 0);
 		}
 
