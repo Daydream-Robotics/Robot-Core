@@ -29,15 +29,12 @@ void autonomous() {
 	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 
-	turn_pid(-90, 0);
-
-	pros::delay(5000);
-
-	turn_pid(90, 0);
-
 	// // Drive in front of the match loader
 	// move_pid({ 34, 0 }, 25, 0, 0, -1);
 	// pros::delay(300);
+
+	move_dist_pid(33.5, 50);
+	turn_pid(90, 0);
 
 	// // Start intake
 	// frontIntake.move(HIGH_VOLTAGE);
@@ -45,8 +42,8 @@ void autonomous() {
 	// pros::delay(300);
 
 	// // Drop pneumatic
-	// piston.set_value(true);
-	// pros::delay(300);
+	piston.set_value(true);
+	pros::delay(300);
 
 	// // Ram match loader
 	// move_pid({ 34, 19 }, 50, 0, 0, 7);
@@ -91,7 +88,7 @@ void opcontrol() {
 
 		// Start autonomous
 		if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
-			turn_pid(90, 0);
+			autonomous();
 		} else if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
 			move_dist_pid(75, 45);
 			turn_pid(90, 0);
