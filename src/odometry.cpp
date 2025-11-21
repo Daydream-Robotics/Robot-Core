@@ -201,10 +201,10 @@ void move_dist_pid(double targetDistance, int speed) {
 	
 		if(std::abs(move_PID) >= 0.5) {
 			leftMotors.move(copysign(speed, move_PID));
-			rightMotors.move(copysign(speed, move_PID));
+			rightMotors.move(copysign(speed - 4, move_PID));
 		} else if(dist > 0.15) {
 			leftMotors.move(move_PID * speed);
-			rightMotors.move(move_PID * speed);
+			rightMotors.move(move_PID * speed - 4);
 		} 
 		
 		if(std::abs(targetDistance - dist) <= 1) {
