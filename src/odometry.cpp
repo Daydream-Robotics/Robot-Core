@@ -75,7 +75,7 @@ void turn_pid(double target, double weightAdjustment) {
 		int turnSpeed = turn_PID * 127;
 	
 		if(abs(optimized_angle) > 0.2) {
-			turnSpeed = std::clamp(std::abs(turnSpeed), 20, 55);
+			turnSpeed = std::clamp(std::abs(turnSpeed), 20, 35);
 			leftMotors.move((int)copysign(turnSpeed, turn_PID));
 			rightMotors.move(-(int)copysign(turnSpeed, turn_PID));	
 		}
@@ -169,6 +169,56 @@ void move_pid(Position target, int speed, double weightAdjustment, int backwards
 
 	pros::delay(250);
 	
+}
+
+void move_dist_pid(double targetDistance, int speed) {
+	int correctCount = 0;
+	double move_error = 0, move_total_error = 0, move_derivative = 0, move_prev_error= 0, move_PID = 0;
+	
+	// Alter target to be relative position as origin
+	update_position_and_angle();
+	Position init_pos(pos_x, pos_y);
+
+	while (correctCount <= 5) {
+
+		update_position_and_angle();
+		double dist = getDistance(init_pos, { pos_x, pos_y });
+
+		// proportion
+		move_error = std::abs(targetDistance - dist);
+
+		// integral
+		move_total_error += move_error;
+
+		// derivative
+		move_derivative = move_error - move_prev_error;
+		
+		// get prev error for next instance
+		move_prev_error = move_error;
+
+		move_PID = (MOVE_KP * move_error);
+		move_PID += copysign(0.12, move_PID);
+	
+		if(std::abs(move_PID) >= 0.5) {
+			leftMotors.move(copysign(speed, move_PID));
+			rightMotors.move(copysign(speed, move_PID));
+		} else if(dist > 0.15) {
+			leftMotors.move(move_PID * speed);
+			rightMotors.move(move_PID * speed);
+		} 
+		
+		if(std::abs(targetDistance - dist) <= 1) {
+			correctCount++;
+		}
+
+		pros::delay(10);
+	}
+
+	leftMotors.move(0);
+	rightMotors.move(0);
+
+	pros::delay(250);
+
 }
 
 double get_yaw_quaternion() {
