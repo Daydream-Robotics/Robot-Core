@@ -70,6 +70,9 @@ void turn_pid(double target, double weightAdjustment);
 // Move to specified position (if backward == 1, then reverse instead) (if timer == -1, then there is no timer)
 void move_pid(Position target, int speed, double weightAdjustment, int backwards, int timer);
 
+// Move a specified distance
+void move_dist_pid(double targetDistance, int speed);
+
 // Get yaw from imu
 double get_yaw_quaternion();
 
