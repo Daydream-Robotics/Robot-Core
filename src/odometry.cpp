@@ -72,22 +72,26 @@ void turn_pid(double target, double weightAdjustment) {
 
 		//pros::lcd::print(2, "PID = %lf", turn_PID);
 
-		int turnSpeed = turn_PID * 127;
+		int turnSpeed = turn_PID * 50;
 	
 		if(abs(optimized_angle) > 0.2) {
-			turnSpeed = std::clamp(std::abs(turnSpeed), 20, 35);
-			leftMotors.move((int)copysign(turnSpeed, turn_PID));
-			rightMotors.move(-(int)copysign(turnSpeed, turn_PID));	
+			turnSpeed = std::clamp(std::abs(turnSpeed), 2, 50);
+			// leftMotors.move((int)copysign(turnSpeed, turn_PID));
+			// rightMotors.move(-(int)copysign(turnSpeed, turn_PID));	
+
+			leftMotors.move_velocity((int)copysign(turnSpeed, turn_PID));
+			rightMotors.move_velocity(-(int)copysign(turnSpeed, turn_PID));
+
 		}
-		pros::lcd::print(4, "Statement: %d", abs(optimized_angle) > 0.2);
+		// pros::lcd::print(4, "Statement: %d", abs(optimized_angle) > 0.2);
 		
 		if(abs(optimized_angle) <= 0.2) {
 			correctCount++;
 		}
 
 		//pros::lcd::print(4, "Correct Count: %d", correctCount);
-		pros::lcd::print(5, "Cur angle: %lf", heading);
-		pros::lcd::print(6, "Turnspeed: %d", turnSpeed);
+		// pros::lcd::print(5, "Cur angle: %lf", heading);
+		// pros::lcd::print(6, "Turnspeed: %d", turnSpeed);
 		//pros::lcd::print(7, "Optimized angle: %lf", optimized_angle);
 		// pros::lcd::print(7, "Move value: %d", (int)copysign(turnSpeed, turn_PID));
 		pros::delay(10);
