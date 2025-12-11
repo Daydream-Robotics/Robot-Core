@@ -71,7 +71,7 @@ void turn_pid(double target, double weightAdjustment);
 void move_pid(Position target, int speed, double weightAdjustment, int backwards, int timer);
 
 // Move a specified distance
-void move_dist_pid(double targetDistance, int speed);
+void move_dist_pid(double targetDistance, int speed, int timer);
 
 // Get yaw from imu
 double get_yaw_quaternion();

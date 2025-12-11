@@ -177,7 +177,7 @@ void move_pid(Position target, int speed, double weightAdjustment, int backwards
 	
 }
 
-void move_dist_pid(double targetDistance, int speed) {
+void move_dist_pid(double targetDistance, int speed, int timer) {
 	int correctCount = 0;
 	double move_error = 0, move_total_error = 0, move_derivative = 0, move_prev_error= 0, move_PID = 0;
 	
@@ -185,10 +185,19 @@ void move_dist_pid(double targetDistance, int speed) {
 	update_position_and_angle();
 	Position init_pos(pos_x, pos_y);
 
+	const auto start_time = std::chrono::steady_clock::now();
+	const auto timer_duration = std::chrono::seconds(timer);
+
 	while (correctCount <= 5) {
 
 		update_position_and_angle();
 		double dist = getDistance(init_pos, { pos_x, pos_y });
+
+		
+		if (timer > 0 && ((std::chrono::steady_clock::now() - start_time) > timer_duration)) {
+			return;
+		}
+		
 
 		// proportion
 		move_error = std::abs(targetDistance - dist);
@@ -206,11 +215,19 @@ void move_dist_pid(double targetDistance, int speed) {
 		move_PID += copysign(0.12, move_PID);
 	
 		if(std::abs(move_PID) >= 0.5) {
-			leftMotors.move(copysign(speed, move_PID));
-			rightMotors.move(copysign(speed - 5, move_PID));
+			// leftMotors.move(copysign(speed, move_PID));
+			// rightMotors.move(copysign(speed, move_PID));
+
+			leftMotors.move_velocity(speed);
+			rightMotors.move_velocity(speed);
+
 		} else if(dist > 0.15) {
-			leftMotors.move(move_PID * speed);
-			rightMotors.move(move_PID * speed - 5);
+
+			leftMotors.move_velocity(speed);
+			rightMotors.move_velocity(speed);
+
+			// leftMotors.move(move_PID * speed);
+			// rightMotors.move(move_PID * speed);
 		} 
 		
 		if(std::abs(targetDistance - dist) <= 1) {
