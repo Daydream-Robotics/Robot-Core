@@ -29,12 +29,72 @@ void autonomous() {
 	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 
+	// Move away from parking zone
+	move_dist_pid(14.0, 50, -1, true);
+
+	
+	// Turn to farside
+	turn_pid(90, 0);
+
+	// Outtake any balls encountered
+	frontIntake.move(HIGH_VOLTAGE);
+	mainIntake.move(HIGH_VOLTAGE);
+	backIntake.move(HIGH_VOLTAGE);
+
+	// Travel to farside
+	move_dist_pid(91.0, 50, -1, false);
+
+	
+	// Turn to balls and apprach
+	turn_pid(180, 0);
+	move_dist_pid(30, 50, -1, false);
+	
+	// Intake side balls
+	backIntake.move(STOP);
+	move_dist_pid(10, 15, 2, false);
+
+	// Reverse back to matchloader
+	move_dist_pid(12, 50, -1, true);
+
+	// Turn to matchloader
+	turn_pid(90, 0);
+	piston.set_value(true);
+	pros::delay(1000);
+
+	// Attack matchloader
+	move_dist_pid(9, 15, 2, false);
+	pros::delay(4000);
+
+	// Back up
+	move_dist_pid(20, 35, -1, true);
+	piston.set_value(false);
+
+	// Approach Long Goal and Unleash
+	move_dist_pid(5, 15, 1, true);
+	backIntake.move(LOW_VOLTAGE);
+	pros::delay(4000);
+
+	// Back away from long goal
+	move_dist_pid(12, 50, -1, false);
+	turn_pid(0, 0);
+
+	move_dist_pid(80, 50, 0, false);
+
+	// // Approach matchloader
+	//turn_pid(90, 0);
+	// move_dist_pid(14.5, 35, -1, false);
+
+	// piston.set_value(true);
+	// pros::delay(300);
+
+
+
 	// // Drive in front of the match loader
 	// move_pid({ 34, 0 }, 25, 0, 0, -1);
 	// pros::delay(300);
 
-	move_dist_pid(33.5, 50);
-	turn_pid(90, 0);
+	// move_dist_pid(33.5, 50);
+	// turn_pid(90, 0);
 
 	// // Start intake
 	// frontIntake.move(HIGH_VOLTAGE);
@@ -42,8 +102,8 @@ void autonomous() {
 	// pros::delay(300);
 
 	// // Drop pneumatic
-	piston.set_value(true);
-	pros::delay(300);
+	// piston.set_value(true);
+	// pros::delay(300);
 
 	// // Ram match loader
 	// move_pid({ 34, 19 }, 50, 0, 0, 7);
@@ -90,14 +150,6 @@ void opcontrol() {
 		if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
 			autonomous();
 		} else if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
-			move_dist_pid(75, 45);
-			turn_pid(90, 0);
-			move_dist_pid(75, 45);
-			turn_pid(180, 0);
-			move_dist_pid(75, 45);
-			turn_pid(-90, 0);
-			move_dist_pid(75, 45);
-			turn_pid(0, 0);
 		}
 
 		update_position_and_angle();
