@@ -122,7 +122,7 @@ void move_pid(Position target, int speed, double weightAdjustment, int backwards
 	double target_heading = std::atan2(del_y, del_x);
     
 	const auto start_time = std::chrono::steady_clock::now();
-	const auto timer_duration = std::chrono::seconds(timer);
+	const auto timer_duration = std::chrono::milliseconds(timer);
 
 	if (!backwards){
 		// turn to the specified angle
@@ -186,7 +186,7 @@ void move_dist_pid(double targetDistance, int speed, int timer, bool backwards) 
 	Position init_pos(pos_x, pos_y);
 
 	const auto start_time = std::chrono::steady_clock::now();
-	const auto timer_duration = std::chrono::seconds(timer);
+	const auto timer_duration = std::chrono::milliseconds(timer);
 
 	while (correctCount <= 5) {
 
