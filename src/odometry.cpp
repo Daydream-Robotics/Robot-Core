@@ -177,7 +177,7 @@ void move_pid(Position target, int speed, double weightAdjustment, int backwards
 	
 }
 
-void move_dist_pid(double targetDistance, int speed, int timer) {
+void move_dist_pid(double targetDistance, int speed, int timer, bool backwards) {
 	int correctCount = 0;
 	double move_error = 0, move_total_error = 0, move_derivative = 0, move_prev_error= 0, move_PID = 0;
 	
@@ -195,6 +195,10 @@ void move_dist_pid(double targetDistance, int speed, int timer) {
 
 		
 		if (timer > 0 && ((std::chrono::steady_clock::now() - start_time) > timer_duration)) {
+			leftMotors.move_velocity(STOP);
+			rightMotors.move_velocity(STOP);
+
+			pros::delay(250);
 			return;
 		}
 		
@@ -218,13 +222,13 @@ void move_dist_pid(double targetDistance, int speed, int timer) {
 			// leftMotors.move(copysign(speed, move_PID));
 			// rightMotors.move(copysign(speed, move_PID));
 
-			leftMotors.move_velocity(speed);
-			rightMotors.move_velocity(speed);
+			leftMotors.move_velocity(backwards ? -speed : speed);
+			rightMotors.move_velocity(backwards ? -speed : speed);
 
 		} else if(dist > 0.15) {
 
-			leftMotors.move_velocity(speed);
-			rightMotors.move_velocity(speed);
+			leftMotors.move_velocity(backwards ? -speed : speed);
+			rightMotors.move_velocity(backwards ? -speed : speed);
 
 			// leftMotors.move(move_PID * speed);
 			// rightMotors.move(move_PID * speed);
@@ -237,8 +241,8 @@ void move_dist_pid(double targetDistance, int speed, int timer) {
 		pros::delay(10);
 	}
 
-	leftMotors.move(0);
-	rightMotors.move(0);
+	leftMotors.move_velocity(STOP);
+	rightMotors.move_velocity(STOP);
 
 	pros::delay(250);
 
