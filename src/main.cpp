@@ -30,106 +30,44 @@ void autonomous() {
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 
 	// Move away from parking zone
-	move_dist_pid(14.0, 50, -1, true);
+	move_dist_pid(34.5, 50, -1, true);
 
-	
-	// Turn to farside
-	turn_pid(90, 0);
+	// Turn to match loader
+	turn_pid(-90, 0);
 
-	// Outtake any balls encountered
-	frontIntake.move(HIGH_VOLTAGE);
-	mainIntake.move(HIGH_VOLTAGE);
-	backIntake.move(HIGH_VOLTAGE);
-
-	// Travel to farside
-	move_dist_pid(91.0, 50, -1, false);
-
-	
-	// Turn to balls and apprach
-	turn_pid(180, 0);
-	move_dist_pid(30, 50, -1, false);
-	
-	// Intake side balls
-	backIntake.move(STOP);
-	move_dist_pid(10, 15, 2, false);
-
-	// Reverse back to matchloader
-	move_dist_pid(12, 50, -1, true);
-
-	// Turn to matchloader
-	turn_pid(90, 0);
 	piston.set_value(true);
 	pros::delay(1000);
 
-	// Attack matchloader
-	move_dist_pid(9, 15, 2, false);
-	pros::delay(4000);
+	// Intake from matchloader
+	frontIntake.move(HIGH_VOLTAGE);
+	mainIntake.move(HIGH_VOLTAGE);
+
+	// Move to matchloader
+	move_dist_pid(12, 35, 1250, false);
+	pros::delay(2500);
 
 	// Back up
 	move_dist_pid(20, 35, -1, true);
-	piston.set_value(false);
 
 	// Approach Long Goal and Unleash
-	move_dist_pid(5, 15, 1, true);
-	backIntake.move(LOW_VOLTAGE);
-	pros::delay(4000);
+	move_dist_pid(7, 15, 1250, true);
 
-	// Back away from long goal
-	move_dist_pid(12, 50, -1, false);
-	turn_pid(0, 0);
+	mainIntake.move(-MID_VOLTAGE);
+	backIntake.move(-MID_VOLTAGE);
+	pros::delay(300);
 
-	move_dist_pid(80, 50, 0, false);
+	frontIntake.move(MID_VOLTAGE);
+	mainIntake.move(MID_VOLTAGE);
+	backIntake.move(MID_VOLTAGE);
+	pros::delay(800);
+	backIntake.move(STOP);
 
-	// // Approach matchloader
-	//turn_pid(90, 0);
-	// move_dist_pid(14.5, 35, -1, false);
+	move_dist_pid(10, 35, 1500, false);
+	backIntake.move(MID_VOLTAGE);
+	move_dist_pid(10, 34, 1500, false);
 
-	// piston.set_value(true);
-	// pros::delay(300);
-
-
-
-	// // Drive in front of the match loader
-	// move_pid({ 34, 0 }, 25, 0, 0, -1);
-	// pros::delay(300);
-
-	// move_dist_pid(33.5, 50);
-	// turn_pid(90, 0);
-
-	// // Start intake
-	// frontIntake.move(HIGH_VOLTAGE);
-	// mainIntake.move(HIGH_VOLTAGE);
-	// pros::delay(300);
-
-	// // Drop pneumatic
-	// piston.set_value(true);
-	// pros::delay(300);
-
-	// // Ram match loader
-	// move_pid({ 34, 19 }, 50, 0, 0, 7);
-	// pros::delay(300);
-
-	// // Back up from match loader
-	// move_pid({ 34, 10 }, 25, 0, 1, -1);
-
-	// // Put up pneumatic
-	// piston.set_value(false);
-	// pros::delay(300);
-
-	// // Stop intake
-	// frontIntake.move(STOP);
-	// mainIntake.move(STOP);
-	// pros::delay(300);
-
-	// // Drive to match loader
-	// move_pid({ 34, -30 }, 25, 0, 1, 8);
-	// pros::delay(300);
-
-	// // Outtake
-	// frontIntake.move(HIGH_VOLTAGE);
-	// mainIntake.move(HIGH_VOLTAGE);
-	// backIntake.move(HIGH_VOLTAGE);
-	// pros::delay(7000);
+	move_dist_pid(7, 15, 1000, false);
+	pros::delay(2500);
 
 }
 
