@@ -30,7 +30,7 @@ void autonomous() {
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 
 	// Move away from parking zone
-	move_dist_pid(34.5, 50, -1, true);
+	travelDistanceWithHeading(-34.5, 50, 0, -1);
 
 	// Turn to match loader
 	turn_pid(-90, 0);
@@ -43,14 +43,14 @@ void autonomous() {
 	mainIntake.move(HIGH_VOLTAGE);
 
 	// Move to matchloader
-	move_dist_pid(12, 35, 1250, false);
+	travelDistanceWithHeading(12, 35, -90,  1250);
 	pros::delay(2500);
 
 	// Back up
-	move_dist_pid(20, 35, -1, true);
+	travelDistanceWithHeading(-20, 35, -90, -1);
 
 	// Approach Long Goal and Unleash
-	move_dist_pid(7, 15, 1250, true);
+	travelDistanceWithHeading(-7, 15, -90, 1250);
 
 	mainIntake.move(-MID_VOLTAGE);
 	backIntake.move(-MID_VOLTAGE);
@@ -65,8 +65,6 @@ void autonomous() {
 	move_dist_pid(10, 35, 1500, false);
 	backIntake.move(MID_VOLTAGE);
 	move_dist_pid(10, 34, 1500, false);
-
-	move_dist_pid(7, 15, 1000, false);
 	pros::delay(2500);
 
 }
