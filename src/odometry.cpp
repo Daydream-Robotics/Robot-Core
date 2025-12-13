@@ -341,3 +341,135 @@ double convertRadToDeg (double rad) {
 double getDistance (Position p1, Position p2) {
 	return std::sqrt(std::pow((p2.x - p1.x), 2) + std::pow((p2.y - p1.y), 2));
 }
+
+double angleDiffDeg(double a, double b) {
+	double c = a - b;
+	while (c > 180.0) c -= 360.0;
+	while (c <= -180.0) c += 360.0;
+	return c;
+}
+
+void travelDistanceWithHeading(double distance, double speed, double target_heading, int timer) {
+
+	// PID controls
+	double integrator = 0.0;
+	double prev_error = 0.0;
+
+	// Initialization takeoff variables
+	double prev_forward = 0.0;
+	double forward_accel_limit = 200.0; // units: inches/sec^2 or motor-velocity-units/sec^2 — tune to match your units
+	double takeoff_ramp_time = 0.35;    // seconds to ramp-in heading correction
+	double heading_ema_alpha = 0.35;    // EMA smoothing factor for heading (0..1), lower = smoother
+	double heading_deadband = 0.5;      // degrees: ignore tiny heading errors at start
+	double smoothed_heading = 0.0;
+	bool smoothed_heading_initialized = false;
+
+	// Initialize speed variables
+	const double max_speed = std::fabs(speed) * 1.5 + 1.0;
+	const double min_speed = -max_speed;
+
+	// Deceleration parameters
+	const double decel_distance = std::max(0.2, std::fabs(distance) * 0.15);
+	const double stop_threshold = 0.5; // inches
+
+	// Clocking
+	using clock = std::chrono::steady_clock;
+	auto last_t = clock::now();
+
+	// Initialize timer if it exists
+	const auto start_time = last_t;
+	const auto timer_duration = std::chrono::milliseconds(timer);
+
+	// Initial position
+	Position start(pos_x, pos_y);
+	Position current = start;
+
+	double remaining = std::fabs(distance);
+	double direction = (distance >= 0) ? 1.0 : -1.0;
+
+	while (true) {
+		auto now = clock::now();
+
+		std::chrono::duration<double> elapsed_since_motion_start = now - start_time;
+		double motion_t = elapsed_since_motion_start.count();
+		
+		// Check if timer has completed
+		if (timer > 0 && (now - start_time) > timer_duration) {
+			leftMotors.move_velocity(0);
+			rightMotors.move_velocity(0);
+			pros::delay(250);
+			return;
+		}
+		
+		// Calculate infintesimal time
+		std::chrono::duration<double> elapsed = now - last_t;
+		double dt = elapsed.count();
+		// Clamping for small numbers
+		if (dt <= 0) dt = 1e-3;
+		last_t = now;
+
+		update_position_and_angle();
+		double traveled = getDistance(start, { pos_x, pos_y });
+		remaining = std::fabs(distance) - traveled;
+		// Reached destination
+		if (remaining <= stop_threshold) break;
+
+		double raw_heading = get_yaw_quaternion() - 180;
+	
+		if (!smoothed_heading_initialized) {
+			smoothed_heading = raw_heading;
+			smoothed_heading_initialized = true;
+		} else {
+			smoothed_heading = heading_ema_alpha * raw_heading + (1.0 - heading_ema_alpha) * smoothed_heading;
+		}
+
+		double heading_error = angleDiffDeg(target_heading, smoothed_heading);
+
+		if (std::fabs(heading_error) < heading_deadband) {
+			heading_error = 0.0;
+		}
+
+		// PID control
+		integrator += heading_error * dt;
+		integrator = std::clamp(integrator, -MOVE_HEADING_INTEGRATOR_LIMIT, MOVE_HEADING_INTEGRATOR_LIMIT);
+		double deriv = angleDiffDeg(heading_error, prev_error) / dt;
+		prev_error = heading_error;
+		double raw_corr = MOVE_HEADING_KP * heading_error + MOVE_HEADING_KD * deriv + MOVE_HEADING_KI * integrator;
+
+		double corr_ramp_factor = 1.0;
+		if (motion_t < takeoff_ramp_time) {
+			corr_ramp_factor = motion_t / takeoff_ramp_time; // 0 -> 1 linearly
+		}
+		double corr = raw_corr * corr_ramp_factor;
+
+		// Scale down speed as we near target
+		double speed_scale = 1.0;
+		if (remaining < decel_distance) {
+			speed_scale = std::clamp(remaining / decel_distance, 0.2, 1.0);
+		}
+
+		double target_forward = speed * direction * speed_scale;
+		double max_delta = forward_accel_limit * dt;
+		double forward_delta = target_forward - prev_forward;
+		if (forward_delta > max_delta) forward_delta = max_delta;
+		if (forward_delta < -max_delta) forward_delta = -max_delta;
+		double forward = prev_forward + forward_delta;
+		prev_forward = forward;
+
+		// Determine wheel speeds
+		double left_vel = forward + corr;
+		double right_vel = forward - corr;
+		left_vel = std::clamp(left_vel, min_speed, max_speed);
+		right_vel = std::clamp(right_vel, min_speed, max_speed);
+
+		leftMotors.move_velocity(left_vel);
+		rightMotors.move_velocity(right_vel);
+
+		pros::delay(10);
+	}
+
+	leftMotors.move_velocity(0);
+	rightMotors.move_velocity(0);
+	pros::delay(250);
+	return;
+}

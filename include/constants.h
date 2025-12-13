@@ -11,7 +11,7 @@
 
 constexpr int LEFT_TRACKING_WHEEL_PORT = -18;
 constexpr int RIGHT_TRACKING_WHEEL_PORT = 13;
-constexpr int BACK_TRACKING_WHEEL_PORT = 15;
+constexpr int BACK_TRACKING_WHEEL_PORT = 20;
 
 #define LEFT_DRIVE_WHEEL_PORTS {-1, 2, -3, -4}
 #define RIGHT_DRIVE_WHEEL_PORTS {5, -17, 14, 12}
@@ -54,5 +54,10 @@ constexpr double TURN_KD = 0.04; //0.16; // 0.04
 constexpr double MOVE_KP = 1.5;
 constexpr double MOVE_KI = 0.0;
 constexpr double MOVE_KD = 0.0;
+
+constexpr double MOVE_HEADING_KP = 0.1;
+constexpr double MOVE_HEADING_KI = 0.001;
+constexpr double MOVE_HEADING_KD = 0.001;
+constexpr double MOVE_HEADING_INTEGRATOR_LIMIT = 0.5;
 
 #endif
