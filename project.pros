@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "Daydream-24-Sunrise",
+    "project_name": "Production-Competition",
     "target": "v5",
     "templates": {
       "kernel": {
