@@ -30,7 +30,7 @@ void autonomous() {
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 
 	// Move away from parking zone
-	travelDistanceWithHeading(-34.5, 50, 0, -1);
+	travelDistanceWithHeading(-36.75, 50, 0, -1);
 
 	// Turn to match loader
 	turn_pid(-90, 0);
@@ -43,29 +43,42 @@ void autonomous() {
 	mainIntake.move(HIGH_VOLTAGE);
 
 	// Move to matchloader
-	travelDistanceWithHeading(12, 35, -90,  1250);
+	travelDistanceWithHeading(13.5, 35, -90,  1250);
 	pros::delay(2500);
 
+	frontIntake.move(MID_VOLTAGE);
+	mainIntake.move(MID_VOLTAGE);
+
 	// Back up
-	travelDistanceWithHeading(-20, 35, -90, -1);
+	travelDistanceWithHeading(-21.5, 35, -90, -1);
+	piston.set_value(false);
 
 	// Approach Long Goal and Unleash
-	travelDistanceWithHeading(-7, 15, -90, 1250);
+	travelDistanceWithHeading(-7.50, 15, -90, 1150);
+	travelDistanceWithHeading(0.6, 35, -90, -1);
 
-	mainIntake.move(-MID_VOLTAGE);
-	backIntake.move(-MID_VOLTAGE);
-	pros::delay(300);
+	frontIntake.move(STOP);
+	mainIntake.move(-HIGH_VOLTAGE);
+	backIntake.move(-HIGH_VOLTAGE);
+	pros::delay(200);
 
 	frontIntake.move(MID_VOLTAGE);
 	mainIntake.move(MID_VOLTAGE);
 	backIntake.move(MID_VOLTAGE);
-	pros::delay(800);
+	pros::delay(900);
 	backIntake.move(STOP);
 
-	move_dist_pid(10, 35, 1500, false);
+	travelDistanceWithHeading(11.5, 50, -90, -1);
 	backIntake.move(MID_VOLTAGE);
-	move_dist_pid(10, 34, 1500, false);
-	pros::delay(2500);
+	
+	turn_pid(45, 0);
+	frontIntake.move(STOP);
+	mainIntake.move(STOP);
+	backIntake.move(STOP);
+	travelDistanceWithHeading(26, 75, 45, -1);
+
+	turn_pid(90, 0);
+	travelDistanceWithHeading(16, 75, 90, -1);
 
 }
 

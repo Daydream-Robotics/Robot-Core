@@ -72,10 +72,10 @@ void turn_pid(double target, double weightAdjustment) {
 
 		//pros::lcd::print(2, "PID = %lf", turn_PID);
 
-		int turnSpeed = turn_PID * 50;
+		int turnSpeed = turn_PID * 65;
 	
 		if(abs(optimized_angle) > 0.2) {
-			turnSpeed = std::clamp(std::abs(turnSpeed), 2, 50);
+			turnSpeed = std::clamp(std::abs(turnSpeed), 2, 65);
 			// leftMotors.move((int)copysign(turnSpeed, turn_PID));
 			// rightMotors.move(-(int)copysign(turnSpeed, turn_PID));	
 
@@ -219,8 +219,6 @@ void move_dist_pid(double targetDistance, int speed, int timer, bool backwards) 
 		move_PID += copysign(0.12, move_PID);
 	
 		if(std::abs(move_PID) >= 0.5) {
-			// leftMotors.move(copysign(speed, move_PID));
-			// rightMotors.move(copysign(speed, move_PID));
 
 			leftMotors.move_velocity(backwards ? -speed : speed);
 			rightMotors.move_velocity(backwards ? -speed : speed);
@@ -229,9 +227,6 @@ void move_dist_pid(double targetDistance, int speed, int timer, bool backwards) 
 
 			leftMotors.move_velocity(backwards ? -speed : speed);
 			rightMotors.move_velocity(backwards ? -speed : speed);
-
-			// leftMotors.move(move_PID * speed);
-			// rightMotors.move(move_PID * speed);
 		} 
 		
 		if(std::abs(targetDistance - dist) <= 1) {
@@ -357,7 +352,7 @@ void travelDistanceWithHeading(double distance, double speed, double target_head
 
 	// Initialization takeoff variables
 	double prev_forward = 0.0;
-	double forward_accel_limit = 200.0; // units: inches/sec^2 or motor-velocity-units/sec^2 — tune to match your units
+	double forward_accel_limit = 200.0; 
 	double takeoff_ramp_time = 0.35;    // seconds to ramp-in heading correction
 	double heading_ema_alpha = 0.35;    // EMA smoothing factor for heading (0..1), lower = smoother
 	double heading_deadband = 0.5;      // degrees: ignore tiny heading errors at start
