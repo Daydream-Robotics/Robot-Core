@@ -95,14 +95,7 @@ void opcontrol() {
 
 	while(true){
 
-		// Start autonomous
-		if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
-			autonomous();
-		} else if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
-		}
-
 		update_position_and_angle();
-		controller.print(0, 0, "X: %.1lf Y: %.1lf O: %.1lf", pos_x, pos_y, theta * (180.0 / std::numbers::pi));
 		// Get joystick values
 		int leftY = controller.get_analog(ANALOG_LEFT_Y);
 		int rightY = controller.get_analog(ANALOG_RIGHT_Y);
@@ -153,15 +146,6 @@ void opcontrol() {
 			mainIntake.move(STOP);
 			backIntake.move(STOP);
 		}
-
-		// // Top outtake (testing)
-		// if(controller.get_digital(DIGITAL_X)) {
-		// 	backIntake.move(HIGH_VOLTAGE);
-		// } else if (controller.get_digital(DIGITAL_B)) {
-		// 	backIntake.move(-HIGH_VOLTAGE);
-		// } else {
-		// 	backIntake.move(STOP);
-		// }
 
 		// Match unloader
 		if (pistonToggle) {
