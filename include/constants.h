@@ -9,15 +9,55 @@
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
-constexpr int LEFT_TRACKING_WHEEL_PORT = -1;
-constexpr int RIGHT_TRACKING_WHEEL_PORT = 5;
-constexpr int BACK_TRACKING_WHEEL_PORT = 13;
+constexpr int LEFT_TRACKING_WHEEL_PORT = -18;
+constexpr int RIGHT_TRACKING_WHEEL_PORT = 13;
+constexpr int BACK_TRACKING_WHEEL_PORT = 20;
 
-#define LEFT_DRIVE_WHEEL_PORTS {LEFT_TRACKING_WHEEL_PORT, 2, -3, -4}
-#define RIGHT_DRIVE_WHEEL_PORTS {RIGHT_TRACKING_WHEEL_PORT, -17, 14, 12}
+#define LEFT_DRIVE_WHEEL_PORTS {-1, 2, -3, -4}
+#define RIGHT_DRIVE_WHEEL_PORTS {5, -17, 14, 12}
+
+constexpr int FRONT_INTAKE_PORT = -6;
+constexpr int MAIN_INTAKE_PORT = 9;
+constexpr int BACK_INTAKE_PORT = -8;
+
+constexpr char IMU_PORT = 11;
+
+constexpr char PNEUMATIC_PORT = 'A';
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
 constexpr int DEADZONE = 3;
+
+/* - - - - - - - - - - - - - - [GENERAL] - - - - - - - - - - - - - - */
+
+constexpr int MAX_VOLTAGE = 127;
+constexpr int HIGH_VOLTAGE = 100;
+constexpr int MID_VOLTAGE = 60;
+constexpr int LOW_VOLTAGE = 40;
+constexpr int STOP = 0;
+
+/* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
+
+constexpr double LEFT_TRACKING_WHEEL_DISTANCE = 1.58;
+constexpr double RIGHT_TRACKING_WHEEL_DISTANCE = 1.58;
+constexpr double BACK_TRACKING_WHEEL_DISTANCE = 1.188;
+
+constexpr double TRACKING_WHEEL_DIAMETER = 2.00;
+constexpr double BACK_TRACKING_WHEEL_DIAMETER = 2.75;
+
+/* - - - - - - - - - - - - - - [PIDS] - - - - - - - - - - - - - - */
+
+constexpr double TURN_KP = 3.5;
+constexpr double TURN_KI = 0.0000000;//0.00001;
+constexpr double TURN_KD = 0.04; //0.16; // 0.04
+
+constexpr double MOVE_KP = 1.5;
+constexpr double MOVE_KI = 0.0;
+constexpr double MOVE_KD = 0.0;
+
+constexpr double MOVE_HEADING_KP = 0.1;
+constexpr double MOVE_HEADING_KI = 0.001;
+constexpr double MOVE_HEADING_KD = 0.001;
+constexpr double MOVE_HEADING_INTEGRATOR_LIMIT = 0.5;
 
 #endif
