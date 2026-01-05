@@ -9,20 +9,21 @@
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
-constexpr int LEFT_TRACKING_WHEEL_PORT = -18;
-constexpr int RIGHT_TRACKING_WHEEL_PORT = 13;
-constexpr int BACK_TRACKING_WHEEL_PORT = 20;
+constexpr int LEFT_TRACKING_WHEEL_PORT = 0;
+constexpr int RIGHT_TRACKING_WHEEL_PORT = 0;
+constexpr int BACK_TRACKING_WHEEL_PORT = 0;
 
-#define LEFT_DRIVE_WHEEL_PORTS {-1, 2, -3, -4}
-#define RIGHT_DRIVE_WHEEL_PORTS {5, -17, 14, 12}
+#define LEFT_DRIVE_WHEEL_PORTS {-13, -11, -1}
+#define RIGHT_DRIVE_WHEEL_PORTS {17, 18, 19}
 
-constexpr int FRONT_INTAKE_PORT = -6;
-constexpr int MAIN_INTAKE_PORT = 9;
-constexpr int BACK_INTAKE_PORT = -8;
+constexpr int FRONT_INTAKE_PORT = 4;
+constexpr int BACK_INTAKE_PORT = -3;
 
-constexpr char IMU_PORT = 11;
+constexpr char IMU_PORT = 7;
 
-constexpr char PNEUMATIC_PORT = 'A';
+constexpr char UNLOADER_PORT = 'A';
+constexpr char CENTER_SCORE_PORT = 'B';
+constexpr char DESCORE_PORT = 'C';
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
@@ -59,5 +60,10 @@ constexpr double MOVE_HEADING_KP = 0.1;
 constexpr double MOVE_HEADING_KI = 0.001;
 constexpr double MOVE_HEADING_KD = 0.001;
 constexpr double MOVE_HEADING_INTEGRATOR_LIMIT = 0.5;
+
+enum class DriveType {
+    SPLIT_ARCADE,
+    TANK
+};
 
 #endif

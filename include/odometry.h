@@ -10,27 +10,6 @@
 #include <cmath>
 #include <chrono>
 
-// Longitudinal position (inches)
-extern double pos_x;
-
-// Lateral position (inches)
-extern double pos_y;
-
-// Orientation (radians) (0 - 2pi)
-extern double theta;
-
-// Previous Orientation (radians) (0 - 2pi)
-extern double prevTheta;
-
-// Tracking Wheels
-extern pros::Rotation LTWheel;
-extern pros::Rotation RTWheel;
-extern pros::Rotation BTWheel;
-
-// IMU Sensor
-extern pros::IMU imu;
-
-
 // Struct for holding lengths travelled by wheels
 typedef struct ArcLengths {
     double left;

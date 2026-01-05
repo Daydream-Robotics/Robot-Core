@@ -5,13 +5,6 @@
 
 #include "stdlib.h"
 
-
-pros::Rotation LTWheel(LEFT_TRACKING_WHEEL_PORT);
-pros::Rotation RTWheel(RIGHT_TRACKING_WHEEL_PORT);
-pros::Rotation BTWheel(BACK_TRACKING_WHEEL_PORT);
-
-pros::IMU imu(IMU_PORT);
-
 double pos_x = 0;
 double pos_y = 0;
 double prevTheta;
