@@ -246,8 +246,8 @@ void update_position_and_angle() {
 	double del_theta = normalizeAngle(theta - prevTheta);
 
 	// Determine change in local x and in local y
-	double dx_local = (arcs.left + arcs.right) / 2.0;
-	double dy_local = arcs.back - (del_theta * BACK_TRACKING_WHEEL_DISTANCE);
+	double dx_local = arcs.parallel;
+	double dy_local = arcs.perpendicular - (del_theta * PERPINDICULAR_TRACKING_WHEEL_DISTANCE);
 
 	double theta_mid = prevTheta + del_theta / 2.0;
     theta_mid = normalizeAngle(theta_mid);
@@ -267,29 +267,21 @@ void update_position_and_angle() {
 ArcLengths get_wheel_travel() {
 
     // Get current centidegree position of tracking wheels
-	int currLeft = LTWheel.get_position();
-	int currRight = RTWheel.get_position();
-	int currBack = BTWheel.get_position();
+	int currParallel = parallelTrackingWheel.get_position();
+	int currPerpendicular = perpendicularTrackingWheel.get_position();
 
 	// Convert centidegrees to degrees and find distance travelled by wheel
-	double del_L = (currLeft / 36000.0) * TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
-	double del_R = (currRight / 36000.0) * TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
-	double del_B = (currBack / 36000.0) * BACK_TRACKING_WHEEL_DIAMETER * std::numbers::pi;
+	double delParallel = (currParallel / 36000.0) * PARALLEL_TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
+	double delPerpendicular = (currPerpendicular / 36000.0) * PERPENDICULAR_TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
 
 	// Create a structure of lengths
-	ArcLengths del(del_L, del_R, del_B);
+	ArcLengths del(delParallel, delPerpendicular);
 
 	// Reset tracking for next measurements
-	LTWheel.reset_position();
-	RTWheel.reset_position();
-	BTWheel.reset_position();
+	parallelTrackingWheel.reset_position();
+	perpendicularTrackingWheel.reset_position();
 
 	return del;
-}
-
-double compute_heading_change(ArcLengths arcs) {
-	// Calculate heading in radians
-	return (arcs.right - arcs.left) / (double) (RIGHT_TRACKING_WHEEL_DISTANCE + LEFT_TRACKING_WHEEL_DISTANCE);
 }
 
 double convertDegToRad (double degree) {
