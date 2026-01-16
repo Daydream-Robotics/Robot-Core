@@ -34,7 +34,7 @@ void opcontrol() {
 
 		/* - - - - - - - - - - - - - - [MATCH UNLOADER] - - - - - - - - - - - - - - */
 
-		if (controller.get_digital_new_press(DIGITAL_X)) {
+		if (controller.get_digital_new_press(DIGITAL_L1)) {
 			unloader.toggle();
 		}
 
@@ -44,9 +44,13 @@ void opcontrol() {
 			centerScore.toggle();
 		}
 
+		// if (controller.get_digital(DIGITAL_B)) {
+		// 	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE);
+		// }
+
 		/* - - - - - - - - - - - - - - [DESCORE TOGGLE] - - - - - - - - - - - - - - */
 
-		if (controller.get_digital_new_press(DIGITAL_B)) {
+		if (controller.get_digital_new_press(DIGITAL_L2)) {
 			descorer.toggle();
 		}
 
@@ -54,12 +58,12 @@ void opcontrol() {
 
 		// Main intake
 		if (controller.get_digital(DIGITAL_R1)) { // intake
-			move_intake(HIGH_VOLTAGE, -HIGH_VOLTAGE);
+			move_intake(HIGH_VOLTAGE);
 		} else if (controller.get_digital(DIGITAL_R2)){ // outtake
-			move_intake(-HIGH_VOLTAGE);
-		} else if (controller.get_digital(DIGITAL_L1)){ // score
 			move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE);
-		} else if (controller.get_digital(DIGITAL_L2)) { // full outtake
+		} else if (controller.get_digital(DIGITAL_L1)){ // score
+			//descorer.toggle();
+		} else if (controller.get_digital(DIGITAL_B)) { // full outtake
 			move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE);
 		} else {
 			move_intake(STOP);
@@ -75,12 +79,14 @@ void move_intake(int front, int back, double seconds) {
 	// check for stalling later and stop motors if stalling
 
 	frontIntake.move(front);
+	midIntake.move(front);
 	backIntake.move(back);
 
 	if (seconds != 0) {
 		pros::delay(seconds * 1000);
 
 		frontIntake.move(STOP);
+		midIntake.move(STOP);
 		backIntake.move(STOP);
 	}
 }
