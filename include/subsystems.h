@@ -10,6 +10,7 @@ extern pros::MotorGroup leftMotors;
 extern pros::MotorGroup rightMotors;
 
 extern pros::Motor frontIntake;
+extern pros::Motor midIntake;
 extern pros::Motor backIntake;
 
 extern pros::IMU imu;
