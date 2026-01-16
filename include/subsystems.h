@@ -2,9 +2,8 @@
 
 extern pros::Controller controller;
 
-extern pros::Rotation LTWheel;
-extern pros::Rotation RTWheel;
-extern pros::Rotation BTWheel;
+extern pros::Rotation parallelTrackingWheel;
+extern pros::Rotation perpendicularTrackingWheel;
 
 extern pros::MotorGroup leftMotors;
 extern pros::MotorGroup rightMotors;

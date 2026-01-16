@@ -12,9 +12,8 @@
 
 // Struct for holding lengths travelled by wheels
 typedef struct ArcLengths {
-    double left;
-    double right;
-    double back;
+    double parallel;
+    double perpendicular;
 } ArcLengths;
 
 typedef struct Position {
