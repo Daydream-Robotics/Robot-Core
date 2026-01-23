@@ -261,6 +261,8 @@ void update_position_and_angle() {
 	pos_y += del_y;
 
 	prevTheta = theta;
+
+	controller.print(0, 0, "X: %.2f Y: %.2f O: %.2f", pos_x, pos_y, theta);
 }
 
 

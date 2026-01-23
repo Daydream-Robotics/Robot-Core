@@ -9,8 +9,8 @@
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
-constexpr int PARALLEL_TRACKING_WHEEL_PORT = 0;
-constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 0;
+constexpr int PARALLEL_TRACKING_WHEEL_PORT = 10;
+constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 6;
 
 #define LEFT_DRIVE_WHEEL_PORTS {-13, -11, -1, 2}
 #define RIGHT_DRIVE_WHEEL_PORTS {17, 18, 19, -20}
@@ -39,7 +39,7 @@ constexpr int STOP = 0;
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 
-constexpr double PERPINDICULAR_TRACKING_WHEEL_DISTANCE = 1.188;
+constexpr double PERPINDICULAR_TRACKING_WHEEL_DISTANCE = 2.588;
 
 constexpr double PARALLEL_TRACKING_WHEEL_DIAMETER = 2.00;
 constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.75;

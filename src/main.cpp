@@ -14,7 +14,16 @@ void disabled() {}
 
 void competition_initialize() {}
 
-void autonomous() {}
+void autonomous() {
+	travelDistanceWithHeading(40, 50, 0, -1);
+	turn_pid(-90, 0);
+	travelDistanceWithHeading(20, 50, -90, 0);
+	turn_pid(0, 0);
+	travelDistanceWithHeading(-35, 70, 0, -1);
+	turn_pid(90, 0);
+	travelDistanceWithHeading(20, 50, 90, -1);
+	turn_pid(0, 0);
+}
 
 void opcontrol() {
 	// Set chassis brake mode to coast
