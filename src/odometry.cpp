@@ -328,6 +328,7 @@ void travelDistanceWithHeading(double distance, double speed, double target_head
 	const double decel_distance = std::max(0.2, std::fabs(distance) * 0.15);
 	const double stop_threshold = 0.5; // inches
 
+	
 	// Clocking
 	using clock = std::chrono::steady_clock;
 	auto last_t = clock::now();
@@ -342,6 +343,10 @@ void travelDistanceWithHeading(double distance, double speed, double target_head
 
 	double remaining = std::fabs(distance);
 	double direction = (distance >= 0) ? 1.0 : -1.0;
+
+	const double headingRad = convertDegToRad(target_heading);
+	const Position headingUnitVector { direction * std::sin(headingRad), direction * -std::cos(headingRad) };
+
 
 	while (true) {
 		auto now = clock::now();
@@ -365,38 +370,14 @@ void travelDistanceWithHeading(double distance, double speed, double target_head
 		last_t = now;
 
 		update_position_and_angle();
-		double traveled = getDistance(start, { pos_x, pos_y });
+
+		Position delta = { pos_x - start.x, pos_y - start.y};
+
+
+		double traveled = delta.x * headingUnitVector.x + delta.y * headingUnitVector.y;
 		remaining = std::fabs(distance) - traveled;
 		// Reached destination
 		if (remaining <= stop_threshold) break;
-
-		double raw_heading = get_yaw_quaternion() - 180;
-	
-		if (!smoothed_heading_initialized) {
-			smoothed_heading = raw_heading;
-			smoothed_heading_initialized = true;
-		} else {
-			smoothed_heading = heading_ema_alpha * raw_heading + (1.0 - heading_ema_alpha) * smoothed_heading;
-		}
-
-		double heading_error = angleDiffDeg(target_heading, smoothed_heading);
-
-		if (std::fabs(heading_error) < heading_deadband) {
-			heading_error = 0.0;
-		}
-
-		// PID control
-		integrator += heading_error * dt;
-		integrator = std::clamp(integrator, -MOVE_HEADING_INTEGRATOR_LIMIT, MOVE_HEADING_INTEGRATOR_LIMIT);
-		double deriv = angleDiffDeg(heading_error, prev_error) / dt;
-		prev_error = heading_error;
-		double raw_corr = MOVE_HEADING_KP * heading_error + MOVE_HEADING_KD * deriv + MOVE_HEADING_KI * integrator;
-
-		double corr_ramp_factor = 1.0;
-		if (motion_t < takeoff_ramp_time) {
-			corr_ramp_factor = motion_t / takeoff_ramp_time; // 0 -> 1 linearly
-		}
-		double corr = raw_corr * corr_ramp_factor;
 
 		// Scale down speed as we near target
 		double speed_scale = 1.0;
@@ -412,6 +393,37 @@ void travelDistanceWithHeading(double distance, double speed, double target_head
 		double forward = prev_forward + forward_delta;
 		prev_forward = forward;
 
+
+		double raw_heading = get_yaw_quaternion() - 180;
+	
+		if (!smoothed_heading_initialized) {
+			smoothed_heading = raw_heading;
+			smoothed_heading_initialized = true;
+		} else {
+			smoothed_heading += heading_ema_alpha * angleDiffDeg(raw_heading, smoothed_heading);
+		}
+
+		double heading_error = angleDiffDeg(target_heading, smoothed_heading);
+
+		if (std::fabs(heading_error) < heading_deadband) {
+			heading_error = 0.0;
+		}
+
+		// PID control
+		integrator += heading_error * dt * speed_scale;
+		integrator = std::clamp(integrator, -MOVE_HEADING_INTEGRATOR_LIMIT, MOVE_HEADING_INTEGRATOR_LIMIT);
+		double deriv = (heading_error - prev_error) / dt;
+		prev_error = heading_error;
+		double raw_corr = MOVE_HEADING_KP * heading_error + MOVE_HEADING_KD * deriv + MOVE_HEADING_KI * integrator;
+
+		double corr_ramp_factor = 1.0;
+		if (motion_t < takeoff_ramp_time) {
+			corr_ramp_factor = motion_t / takeoff_ramp_time; // 0 -> 1 linearly
+		}
+		double corr = raw_corr * corr_ramp_factor;
+
+
+		
 		// Determine wheel speeds
 		double left_vel = forward + corr;
 		double right_vel = forward - corr;

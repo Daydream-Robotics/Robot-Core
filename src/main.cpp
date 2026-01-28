@@ -8,6 +8,7 @@
 
 void initialize() {
 	pros::lcd::initialize();
+	pros::lcd::print(0, "Reg: Initialize");
 	imu.reset();
 	while (imu.is_calibrating()) {
 		pros::delay(20);
@@ -26,7 +27,7 @@ void autonomous() {
 	pros::delay(250);
 
 	// Backup to match loader
-	travelDistanceWithHeading(-50.75, 70, 0, -1);
+	travelDistanceWithHeading(-53.5, 70, 0, -1);
 
 	// Face match loader
 	move_intake(STOP);
@@ -34,13 +35,20 @@ void autonomous() {
 
 	// Match load
 	unloader.toggle();
-	// travelDistanceWithHeading(20, 45, 90, 2500);
+	travelDistanceWithHeading(14, 50, 90, 1350);
+	move_intake(HIGH_VOLTAGE, STOP);
+	travelDistanceWithHeading(100, 15, 90, 1000);
+	pros::delay(100);
+	travelDistanceWithHeading(100, 15, 90, 1000);
+	pros::delay(100);
+	travelDistanceWithHeading(100, 15, 90, 1000);
 
-	// // Reverse to Long Goal
-	// travelDistanceWithHeading(-50, 60, 90, -1);
 
-	// // Score on Long Goal
-	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, 3);
+	// Reverse to Long Goal
+	travelDistanceWithHeading(-50, 60, 90, 2000);
+
+	// Score on Long Goal
+	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, 3);
 
 }
 
