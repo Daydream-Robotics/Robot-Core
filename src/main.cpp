@@ -8,6 +8,10 @@
 
 void initialize() {
 	pros::lcd::initialize();
+	imu.reset();
+	while (imu.is_calibrating()) {
+		pros::delay(20);
+	}
 }
 
 void disabled() {}
@@ -15,14 +19,29 @@ void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
-	travelDistanceWithHeading(40, 50, 0, -1);
-	turn_pid(-90, 0);
-	travelDistanceWithHeading(20, 50, -90, 0);
-	turn_pid(0, 0);
-	travelDistanceWithHeading(-35, 70, 0, -1);
+
+	// Intake pre-loads
+	move_intake(HIGH_VOLTAGE);
+	travelDistanceWithHeading(8, 40, 0, -1);
+	pros::delay(250);
+
+	// Backup to match loader
+	travelDistanceWithHeading(-50.75, 70, 0, -1);
+
+	// Face match loader
+	move_intake(STOP);
 	turn_pid(90, 0);
-	travelDistanceWithHeading(20, 50, 90, -1);
-	turn_pid(0, 0);
+
+	// Match load
+	unloader.toggle();
+	// travelDistanceWithHeading(20, 45, 90, 2500);
+
+	// // Reverse to Long Goal
+	// travelDistanceWithHeading(-50, 60, 90, -1);
+
+	// // Score on Long Goal
+	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, 3);
+
 }
 
 void opcontrol() {
