@@ -27,7 +27,7 @@ void autonomous() {
 	pros::delay(250);
 
 	// Backup to match loader
-	travelDistanceWithHeading(-53.5, 70, 0, -1);
+	travelDistanceWithHeading(-54.25, 70, 0, -1);
 
 	// Face match loader
 	move_intake(STOP);
@@ -35,13 +35,13 @@ void autonomous() {
 
 	// Match load
 	unloader.toggle();
-	travelDistanceWithHeading(14, 50, 90, 1350);
+	travelDistanceWithHeading(14, 70, 90, 1350);
 	move_intake(HIGH_VOLTAGE, STOP);
-	travelDistanceWithHeading(100, 15, 90, 1000);
+	travelDistanceWithHeading(100, 35, 90, 1000);
 	pros::delay(100);
-	travelDistanceWithHeading(100, 15, 90, 1000);
-	pros::delay(100);
-	travelDistanceWithHeading(100, 15, 90, 1000);
+	travelDistanceWithHeading(100, 25, 90, 1000);
+	pros::delay(200);
+	travelDistanceWithHeading(100, 35, 90, 1000);
 
 
 	// Reverse to Long Goal

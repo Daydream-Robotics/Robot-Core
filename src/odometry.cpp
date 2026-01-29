@@ -421,8 +421,6 @@ void travelDistanceWithHeading(double distance, double speed, double target_head
 			corr_ramp_factor = motion_t / takeoff_ramp_time; // 0 -> 1 linearly
 		}
 		double corr = raw_corr * corr_ramp_factor;
-
-
 		
 		// Determine wheel speeds
 		double left_vel = forward + corr;
