@@ -62,7 +62,7 @@ void autonomous() {
 	
 	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE);
 	// Park
-	travelDistanceWithHeading(40, 100, 115, 1700);
+	travelDistanceWithHeading(40, 100, 115, 1900);
 	
 	move_intake(STOP, STOP);
 
