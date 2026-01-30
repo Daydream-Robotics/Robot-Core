@@ -21,20 +21,23 @@ void competition_initialize() {}
 
 void autonomous() {
 
+	// Delay to sync with 15" bot
+	pros::delay(30000);
+
 	// Intake pre-loads
 	move_intake(HIGH_VOLTAGE);
 	travelDistanceWithHeading(8, 40, 0, -1);
 	pros::delay(250);
 
 	// Backup to match loader
-	travelDistanceWithHeading(-54.25, 70, 0, -1);
+	travelDistanceWithHeading(-35.25, 70, 0, -1);
 
 	// Face match loader
 	move_intake(STOP);
 	turn_pid(90, 0);
 
 	// Match load
-	unloader.toggle();
+	unloader.set_value(true);
 	travelDistanceWithHeading(14, 70, 90, 1350);
 	move_intake(HIGH_VOLTAGE, STOP);
 	travelDistanceWithHeading(100, 35, 90, 1000);
@@ -47,8 +50,22 @@ void autonomous() {
 	// Reverse to Long Goal
 	travelDistanceWithHeading(-50, 60, 90, 2000);
 
+	move_intake(-MID_VOLTAGE, -MID_VOLTAGE, 0.2);
 	// Score on Long Goal
 	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, 3);
+	unloader.set_value(false);
+
+
+	// Backup and face side balls
+	travelDistanceWithHeading(16, 70, 90, -1);
+	turn_pid(0, 0);
+	
+	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE);
+	// Park
+	travelDistanceWithHeading(40, 100, 115, 1700);
+	
+	move_intake(STOP, STOP);
+
 
 }
 
@@ -80,9 +97,9 @@ void opcontrol() {
 			centerScore.toggle();
 		}
 
-		// if (controller.get_digital(DIGITAL_B)) {
-		// 	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE);
-		// }
+		if (controller.get_digital(DIGITAL_B)) {
+			move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE);
+		}
 
 		/* - - - - - - - - - - - - - - [DESCORE TOGGLE] - - - - - - - - - - - - - - */
 

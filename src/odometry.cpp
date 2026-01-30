@@ -7,7 +7,6 @@
 
 double pos_x = 0;
 double pos_y = 0;
-double prevTheta;
 double theta = 0;
 double heading;
 double optimized_angle;
@@ -238,6 +237,8 @@ void update_position_and_angle() {
 	// Calculate distance travelled by each tracking wheel
 	ArcLengths arcs = get_wheel_travel();
 
+	static double prevTheta = convertDegToRad(get_yaw_quaternion() - 180);
+
 	// Get orientation from IMU
 	theta = convertDegToRad(get_yaw_quaternion() - 180);
 	theta = normalizeAngle(theta);
@@ -268,20 +269,26 @@ void update_position_and_angle() {
 
 ArcLengths get_wheel_travel() {
 
+	static double lastParallel = parallelTrackingWheel.get_position();
+	static double lastPerpendicular = perpendicularTrackingWheel.get_position();
+
     // Get current centidegree position of tracking wheels
 	int currParallel = parallelTrackingWheel.get_position();
 	int currPerpendicular = perpendicularTrackingWheel.get_position();
 
+	double dTicksL = currParallel - lastParallel; 
+	double dTicksS = currPerpendicular - lastPerpendicular;
+
+
 	// Convert centidegrees to degrees and find distance travelled by wheel
-	double delParallel = (currParallel / 36000.0) * PARALLEL_TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
-	double delPerpendicular = (currPerpendicular / 36000.0) * PERPENDICULAR_TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
+	double delParallel = (dTicksL / 36000.0) * PARALLEL_TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
+	double delPerpendicular = (dTicksS / 36000.0) * PERPENDICULAR_TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
+
+	lastParallel = currParallel;
+	lastPerpendicular = currPerpendicular;
 
 	// Create a structure of lengths
 	ArcLengths del(delParallel, delPerpendicular);
-
-	// Reset tracking for next measurements
-	parallelTrackingWheel.reset_position();
-	perpendicularTrackingWheel.reset_position();
 
 	return del;
 }
@@ -345,7 +352,7 @@ void travelDistanceWithHeading(double distance, double speed, double target_head
 	double direction = (distance >= 0) ? 1.0 : -1.0;
 
 	const double headingRad = convertDegToRad(target_heading);
-	const Position headingUnitVector { direction * std::sin(headingRad), direction * -std::cos(headingRad) };
+	const Position headingUnitVector { direction * -std::cos(headingRad), direction * -std::sin(headingRad) };
 
 
 	while (true) {
@@ -375,7 +382,8 @@ void travelDistanceWithHeading(double distance, double speed, double target_head
 
 
 		double traveled = delta.x * headingUnitVector.x + delta.y * headingUnitVector.y;
-		remaining = std::fabs(distance) - traveled;
+
+		remaining = std::fabs(distance) - std::fabs(traveled);
 		// Reached destination
 		if (remaining <= stop_threshold) break;
 

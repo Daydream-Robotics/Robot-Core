@@ -17,13 +17,13 @@ constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 6;
 
 constexpr int FRONT_INTAKE_PORT = -5;
 constexpr int MID_INTAKE_PORT = 4;
-constexpr int BACK_INTAKE_PORT = -3;
+constexpr int BACK_INTAKE_PORT = -8;
 
 constexpr char IMU_PORT = 7;
 
-constexpr char UNLOADER_PORT = 'C';
-constexpr char CENTER_SCORE_PORT = 'A';
-constexpr char DESCORE_PORT = 'B';
+constexpr char UNLOADER_PORT = 'A'; // A
+constexpr char CENTER_SCORE_PORT = 'B'; // B
+constexpr char DESCORE_PORT = 'C'; // C
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
