@@ -24,6 +24,9 @@ void autonomous() {
 	// Delay to sync with 15" bot
 	pros::delay(30000);
 
+	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
+	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
+
 	// Intake pre-loads
 	move_intake(HIGH_VOLTAGE);
 	travelDistanceWithHeading(8, 40, 0, -1);
@@ -65,7 +68,6 @@ void autonomous() {
 	travelDistanceWithHeading(40, 100, 115, 1900);
 	
 	move_intake(STOP, STOP);
-
 
 }
 

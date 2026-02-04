@@ -13,17 +13,17 @@ constexpr int PARALLEL_TRACKING_WHEEL_PORT = 10;
 constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 6;
 
 #define LEFT_DRIVE_WHEEL_PORTS {-13, -11, -1, 2}
-#define RIGHT_DRIVE_WHEEL_PORTS {17, 18, 19, -20}
+#define RIGHT_DRIVE_WHEEL_PORTS {16, 18, 19, -20}
 
 constexpr int FRONT_INTAKE_PORT = -5;
 constexpr int MID_INTAKE_PORT = 4;
 constexpr int BACK_INTAKE_PORT = -8;
 
-constexpr char IMU_PORT = 7;
+constexpr char IMU_PORT = 9;
 
-constexpr char UNLOADER_PORT = 'A'; // A
-constexpr char CENTER_SCORE_PORT = 'B'; // B
-constexpr char DESCORE_PORT = 'C'; // C
+constexpr char UNLOADER_PORT = 'C'; // C
+constexpr char CENTER_SCORE_PORT = 'A'; // A
+constexpr char DESCORE_PORT = 'B'; // B
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
