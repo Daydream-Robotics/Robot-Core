@@ -4,7 +4,7 @@
 
 typedef struct WheelLengths {
     double parallel;
-    double perpendiciular;
+    double perpendicular;
 } WheelLengths;
 
 typedef struct Position {
@@ -16,6 +16,7 @@ typedef struct Position {
 class Autonomous {
 
     public:
+        Autonomous();
         // Turn to a target_heading [-180, 180]
         void turn(double target_heading);
 
@@ -39,7 +40,7 @@ class Autonomous {
         // Update position and orientation
         void updatePose(void);
 
-        // Returns the current yaw from imu
+        // Returns the current yaw (deg) from IMU; Returns -1 if IMU failure
         double getYaw(void);
 
         // Returns struct of distances travelled by Odometry Wheels
