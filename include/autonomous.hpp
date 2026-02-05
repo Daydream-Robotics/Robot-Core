@@ -16,15 +16,14 @@ typedef struct Position {
 class Autonomous {
 
     public:
+        // Constructor
         Autonomous();
+
         // Turn to a target_heading [-180, 180]
         void turn(double target_heading);
 
-        // Travel a specified distance with speed and heading
-        void travel(double distance, double speed, double target_heading);
-
         // Travel a specified distance with speed and heading with a timer (s) exit
-        void travel(double distance, double speed, double target_heading, double timer_s);
+        void travel(double distance, double speed, double target_heading, double timer_s = 0.0);
 
 
     private:

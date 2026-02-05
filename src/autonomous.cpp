@@ -3,8 +3,6 @@
 
 Autonomous::Autonomous() {}
 
-void Autonomous::travel(double distance, double speed, double target_heading) {}
-
 void Autonomous::travel(double distance, double speed, double target_heading, double timer_s) {}
 
 void Autonomous::updatePose(void) {
