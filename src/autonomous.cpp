@@ -31,13 +31,66 @@ class HeadingFilter {
 // TODO: Tune PID parameters
 Autonomous::Autonomous() 
 	: distancePID(0.0, 0.0, 0.0, 0.0), 
-	headingPID(0.0, 0.0, 0.0, 0.0) {
+	headingPID(0.0, 0.0, 0.0, 0.0),
+	turnPID(0.0, 0.0, 0.0, 0.0) {
 		leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
 		rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
 	}
 
-void Autonomous::turn(double targetHeading) {
-	
+void Autonomous::turnTo(double targetHeading) {
+	turnPID.reset();
+    turnPID.setTarget(targetHeading);
+
+	// TODO: Tune exit conditions
+    turnPID.exit_condition_set(
+        0.2, 150,     // small error (deg), time (ms)
+        2.0, 300,     // big error (deg), time
+        200,          // velocity settle time
+        4000          // timeout
+    );
+
+	// TODO: Tune alpha
+    HeadingFilter headingFilter(0.3);
+
+	// Initialize clocking
+	using clock = std::chrono::steady_clock;
+    auto lastTime = clock::now();
+
+	while (true) {
+		// Heading calculation
+		double rawHeading = getYaw();
+
+		if (rawHeading < 0) {
+			// TODO: Add more verbose error handling
+			return;
+		}
+
+		// Determine PID correction using smoothed heading
+		double filteredHeading = headingFilter.update(rawHeading - 180);
+		double correction = headingPID.compute(filteredHeading);
+
+		// Compute turnSpeed based on correction
+		double turnSpeed = std::clamp(
+            std::fabs(correction),
+            2.0,
+            65.0
+        );
+
+        turnSpeed = std::copysign(turnSpeed, correction);
+
+		leftMotors.move_velocity(turnSpeed);
+        rightMotors.move_velocity(-turnSpeed);
+
+		if (turnPID.exit_condition(100) != PID::RUNNING) // TODO: get Angular Velocity
+            break;
+
+		pros::delay(10);
+	}
+
+	leftMotors.move_velocity(0);
+    rightMotors.move_velocity(0);
+    pros::delay(250);
+
 }
 
 void Autonomous::travel(double distance, double speed, double targetHeading, double timer_s) {
@@ -150,36 +203,6 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
 
 }
 
-// Determine deceleration speed scaling
-static double computeDecelScale(double remaining, double totalDistance) {
-    double decelDistance = std::max(0.2, std::fabs(totalDistance) * 0.15);
-
-    if (remaining >= decelDistance)
-        return 1.0;
-
-    double x = std::clamp(remaining / decelDistance, 0.0, 1.0);
-
-    // Step smoothing
-    double smooth = x * x * (3.0 - 2.0 * x);
-
-	// Return speed scaling
-    return std::clamp(smooth, 0.2, 1.0);
-}
-
-// Limit acceleration takeoff
-static double accelLimit(double prev, double target, double dt, double accelLimit) {
-    double maxDelta = accelLimit * dt;
-    double delta = target - prev;
-
-    if (delta > maxDelta) delta = maxDelta;
-    if (delta < -maxDelta) delta = -maxDelta;
-
-    return prev + delta;
-}
-
-
-
-
 void Autonomous::updatePose(void) {
 	// Calculate distance travelled by each tracking wheel
 	WheelLengths arcs = getOdomWheelTravel();
@@ -285,4 +308,31 @@ static double angleDiffDeg(double a, double b) {
 	while (c > 180.0) c -= 360.0;
 	while (c <= -180.0) c += 360.0;
 	return c;
+}
+
+// Determine deceleration speed scaling
+static double computeDecelScale(double remaining, double totalDistance) {
+    double decelDistance = std::max(0.2, std::fabs(totalDistance) * 0.15);
+
+    if (remaining >= decelDistance)
+        return 1.0;
+
+    double x = std::clamp(remaining / decelDistance, 0.0, 1.0);
+
+    // Step smoothing
+    double smooth = x * x * (3.0 - 2.0 * x);
+
+	// Return speed scaling
+    return std::clamp(smooth, 0.2, 1.0);
+}
+
+// Limit acceleration takeoff
+static double accelLimit(double prev, double target, double dt, double accelLimit) {
+    double maxDelta = accelLimit * dt;
+    double delta = target - prev;
+
+    if (delta > maxDelta) delta = maxDelta;
+    if (delta < -maxDelta) delta = -maxDelta;
+
+    return prev + delta;
 }

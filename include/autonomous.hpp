@@ -22,7 +22,7 @@ class Autonomous {
         Autonomous();
 
         // Turn to a target_heading [-180, 180]
-        void turn(double targetHeading);
+        void turnTo(double targetHeading);
 
         // Travel a specified distance with speed and heading with a timer (s) exit
         void travel(double distance, double speed, double targetHeading, double timer_s = 0.0);
@@ -35,6 +35,9 @@ class Autonomous {
 
         // Heading PID controller
         PID headingPID;
+
+        // Turning PID controller
+        PID turnPID;
 
         // x-position of bot (inches)
         double pos_x = 0.0;
