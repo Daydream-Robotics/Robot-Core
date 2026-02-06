@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "pid.hpp"
+
 typedef struct WheelLengths {
     double parallel;
     double perpendicular;
@@ -20,13 +22,20 @@ class Autonomous {
         Autonomous();
 
         // Turn to a target_heading [-180, 180]
-        void turn(double target_heading);
+        void turn(double targetHeading);
 
         // Travel a specified distance with speed and heading with a timer (s) exit
-        void travel(double distance, double speed, double target_heading, double timer_s = 0.0);
+        void travel(double distance, double speed, double targetHeading, double timer_s = 0.0);
 
 
     private:
+
+        // Distance PID controller
+        PID distancePID;
+
+        // Heading PID controller
+        PID headingPID;
+
         // x-position of bot (inches)
         double pos_x = 0.0;
 
@@ -35,6 +44,12 @@ class Autonomous {
 
         // Heading of bot (rads)
         double heading = 0.0;
+
+        // Acceleration limit for takeoff (in/s^2)
+        double accelLimitRate = 200.0; // TODO: tune
+
+        // Time for takeoff (s)
+        double takeoffRampTime = 0.35;
 
         // Update position and orientation
         void updatePose(void);

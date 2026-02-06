@@ -1,9 +1,184 @@
 #include "autonomous.hpp"
 #include "subsystems.h"
 
-Autonomous::Autonomous() {}
+// Utility class for smoothing heading changes
+class HeadingFilter {
+	private:
+		double alpha;
+		double heading;
+		bool initialized = false;
 
-void Autonomous::travel(double distance, double speed, double target_heading, double timer_s) {}
+	public:
+		HeadingFilter(double alpha) : alpha(alpha) {}
+
+		double update(double raw) {
+			if (!initialized) {
+				heading = raw;
+				initialized = true;
+				return heading;
+			}
+
+			heading += alpha * angleDiffDeg(raw, heading);
+			return heading;
+		}
+
+		void reset() {
+			initialized = false;
+		}
+};
+
+
+// TODO: Tune PID parameters
+Autonomous::Autonomous() 
+	: distancePID(0.0, 0.0, 0.0, 0.0), 
+	headingPID(0.0, 0.0, 0.0, 0.0) {
+		leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
+		rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
+	}
+
+void Autonomous::turn(double targetHeading) {
+	
+}
+
+void Autonomous::travel(double distance, double speed, double targetHeading, double timer_s) {
+	// Set PID targets
+	distancePID.setTarget(distance);
+	headingPID.setTarget(targetHeading);
+
+	// TODO: Tune Exit Conditions
+	distancePID.exit_condition_set(
+		0.5, 200,	// small error (in), (ms)
+		2.0, 400,	// big error (in),(ms)
+		200,		// velocity settling time (ms)
+		timer_s * 1000 // timeout (ms)
+	);
+
+	// TODO: Tune Exit Conditions
+	headingPID.exit_condition_set(
+        1.0, 150,   // small error (deg), (ms)
+        3.0, 300,	// big error (deg), (ms)
+        200,		// velocity error (deg), (ms)
+        timer_s * 1000
+    );
+
+	// TODO: Tune alpha [0, 1] [more smooth, less smooth]
+	HeadingFilter headingFilter(0.35);
+
+	Position start(pos_x, pos_y);
+
+	double prevForward = 0.0;
+	// MORE?
+
+	using clock = std::chrono::steady_clock;
+	auto startTime = clock::now();
+	auto lastTime = startTime;
+
+	// Find heading and direction
+	double headingRad = convertDegToRad(targetHeading);
+    double direction = (distance >= 0.0) ? 1.0 : -1.0;
+
+    Position headingUnit {
+        direction * -std::cos(headingRad),
+        direction * -std::sin(headingRad)
+    };
+
+	while (true) {
+		// Find time step value
+		auto now = clock::now();
+		double dt = std::chrono::duration<double>(now - lastTime).count();
+		if (dt <= 0.0) dt = 1e-3;
+		lastTime = now;
+
+		// Update current position and orientation
+		updatePose();
+
+		// Find distance traveled
+		Position delta { pos_x - start.x, pos_y - start.y };
+		double traveled = delta.x * headingUnit.x + delta.y * headingUnit.y;
+		double remaining = std::fabs(distance) - std::fabs(traveled);
+
+		// Hard STOP
+
+		// Compute max target speed
+		double speedScale = computeDecelScale(remaining, distance);
+		double targetForward = speed * direction * speedScale;
+
+		// Smooth forward momentum
+		double forward = accelLimit(prevForward, targetForward, dt, accelLimitRate);
+		prevForward = forward;
+
+		// Heading calculation
+		double rawHeading = getYaw();
+
+		if (rawHeading < 0) {
+			// TODO: Add more verbose error handling
+			return;
+		}
+
+		// Determine PID correction using smoothed heading
+		double filteredHeading = headingFilter.update(rawHeading - 180);
+		double correction = headingPID.compute(filteredHeading);
+
+		// Takeoff ramping
+		double motionTime = std::chrono::duration<double>(now - startTime).count();
+        double ramp = std::min(1.0, motionTime / takeoffRampTime);
+        correction *= ramp;
+
+		// Compute motor velocities
+		double leftVel  = forward + correction;
+        double rightVel = forward - correction;
+
+        leftMotors.move_velocity(leftVel);
+        rightMotors.move_velocity(rightVel);
+
+
+		// Break if PID exit condition is met
+		if (distancePID.exit_condition(100) != PID::RUNNING) // TODO: get linear velocity
+            break;
+
+        if (headingPID.exit_condition(100) != PID::RUNNING) // TODO: get angular velocity
+            break;
+
+		pros::delay(10);
+
+	}
+
+	leftMotors.move_velocity(0);
+    rightMotors.move_velocity(0);
+    pros::delay(250);
+
+
+}
+
+// Determine deceleration speed scaling
+static double computeDecelScale(double remaining, double totalDistance) {
+    double decelDistance = std::max(0.2, std::fabs(totalDistance) * 0.15);
+
+    if (remaining >= decelDistance)
+        return 1.0;
+
+    double x = std::clamp(remaining / decelDistance, 0.0, 1.0);
+
+    // Step smoothing
+    double smooth = x * x * (3.0 - 2.0 * x);
+
+	// Return speed scaling
+    return std::clamp(smooth, 0.2, 1.0);
+}
+
+// Limit acceleration takeoff
+static double accelLimit(double prev, double target, double dt, double accelLimit) {
+    double maxDelta = accelLimit * dt;
+    double delta = target - prev;
+
+    if (delta > maxDelta) delta = maxDelta;
+    if (delta < -maxDelta) delta = -maxDelta;
+
+    return prev + delta;
+}
+
+
+
 
 void Autonomous::updatePose(void) {
 	// Calculate distance travelled by each tracking wheel
