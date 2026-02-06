@@ -120,7 +120,6 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
 	Position start(pos_x, pos_y);
 
 	double prevForward = 0.0;
-	// MORE?
 
 	using clock = std::chrono::steady_clock;
 	auto startTime = clock::now();
@@ -151,6 +150,9 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
 		double remaining = std::fabs(distance) - std::fabs(traveled);
 
 		// Hard STOP
+		if (remaining < STOPTHRESHOLD) {
+			break;
+		}
 
 		// Compute max target speed
 		double speedScale = computeDecelScale(remaining, distance);

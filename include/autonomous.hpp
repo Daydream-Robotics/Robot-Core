@@ -52,7 +52,10 @@ class Autonomous {
         double accelLimitRate = 200.0; // TODO: tune
 
         // Time for takeoff (s)
-        double takeoffRampTime = 0.35;
+        double takeoffRampTime = 0.35; // TODO: tune
+
+        // Immediate stop threshold for movement (in)
+        double STOPTHRESHOLD = 0.1; // TODO: tune
 
         // Update position and orientation
         void updatePose(void);
