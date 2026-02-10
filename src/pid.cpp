@@ -29,7 +29,7 @@ double PID::compute(double current) {
     }
 
     // Derivative
-    derivative = (error - prevError) / dt;
+    derivative =  prevError ? (error - prevError) / dt : 0;
     prevError = error;
 
     // Output
