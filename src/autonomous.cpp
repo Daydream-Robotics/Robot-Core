@@ -1,38 +1,96 @@
 #include "autonomous.hpp"
 #include "subsystems.h"
 
-// Utility class for smoothing heading changes
-class HeadingFilter {
-	private:
-		double alpha;
-		double heading;
-		bool initialized = false;
-
-	public:
-		HeadingFilter(double alpha) : alpha(alpha) {}
-
-		double update(double raw) {
-			if (!initialized) {
-				heading = raw;
-				initialized = true;
+// ====== Helper functions ======
+namespace {
+	// Normalize angle between [-180, 180]
+	double normalizeAngle(double a) {
+		return std::atan2(std::sin(a), std::cos(a));
+	}
+	
+	// Return Euclidean distance btwn points p1 and p2
+	double getDistance(Position p1, Position p2) {
+		return std::sqrt(std::pow((p2.x - p1.x), 2) + std::pow((p2.y - p1.y), 2));
+	}
+	
+	// Convert Degrees to Radians
+	double convertDegToRad(double degree) {
+		return degree * (std::numbers::pi / 180.0);
+	}
+	
+	// Covert Radians to Degrees
+	double convertRadToDeg(double rad) {
+		return rad * (180.0 / M_PI);
+	}
+	
+	// Subtract angles with [-180, 180] wrapping
+	double angleDiffDeg(double a, double b) {
+		double c = a - b;
+		while (c > 180.0) c -= 360.0;
+		while (c <= -180.0) c += 360.0;
+		return c;
+	}
+	
+	// Determine deceleration speed scaling
+	double computeDecelScale(double remaining, double totalDistance) {
+		double decelDistance = std::max(0.2, std::fabs(totalDistance) * 0.15);
+	
+		if (remaining >= decelDistance)
+			return 1.0;
+	
+		double x = std::clamp(remaining / decelDistance, 0.0, 1.0);
+	
+		// Step smoothing
+		double smooth = x * x * (3.0 - 2.0 * x);
+	
+		// Return speed scaling
+		return std::clamp(smooth, 0.2, 1.0);
+	}
+	
+	// Limit acceleration takeoff
+	double accelLimit(double prev, double target, double dt, double accelLimit) {
+		double maxDelta = accelLimit * dt;
+		double delta = target - prev;
+	
+		if (delta > maxDelta) delta = maxDelta;
+		if (delta < -maxDelta) delta = -maxDelta;
+	
+		return prev + delta;
+	}
+	
+	// Utility class for smoothing heading changes
+	class HeadingFilter {
+		private:
+			double alpha;
+			double heading;
+			bool initialized = false;
+	
+		public:
+			HeadingFilter(double alpha) : alpha(alpha) {}
+	
+			double update(double raw) {
+				if (!initialized) {
+					heading = raw;
+					initialized = true;
+					return heading;
+				}
+	
+				heading += alpha * angleDiffDeg(raw, heading);
 				return heading;
 			}
-
-			heading += alpha * angleDiffDeg(raw, heading);
-			return heading;
-		}
-
-		void reset() {
-			initialized = false;
-		}
-};
+	
+			void reset() {
+				initialized = false;
+			}
+	};
+}
 
 
 // TODO: Tune PID parameters
 Autonomous::Autonomous() 
-	: distancePID(0.0, 0.0, 0.0, 0.0), 
-	headingPID(0.0, 0.0, 0.0, 0.0),
-	turnPID(0.0, 0.0, 0.0, 0.0) {
+	: distancePID(0.1, 0.0, 0.0, 0.0), 
+	headingPID(1.5, 0.0, 0.0, 0.0),
+	turnPID(0.75, 0.04, 0.1, 10.0) {
 		leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
 		rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
 	}
@@ -41,12 +99,14 @@ void Autonomous::turnTo(double targetHeading) {
 	turnPID.reset();
     turnPID.setTarget(targetHeading);
 
+	pros::lcd::print(0, "Turning to %lf degrees", targetHeading);
+
 	// TODO: Tune exit conditions
     turnPID.exit_condition_set(
-        0.2, 150,     // small error (deg), time (ms)
-        2.0, 300,     // big error (deg), time
+        0.2, 300,     // small error (deg), time (ms)
+        2.0, 1000,     // big error (deg), time
         200,          // velocity settle time
-        4000          // timeout
+        0          // timeout
     );
 
 	// TODO: Tune alpha
@@ -59,15 +119,18 @@ void Autonomous::turnTo(double targetHeading) {
 	while (true) {
 		// Heading calculation
 		double rawHeading = getYaw();
+		updatePose();
 
 		if (rawHeading < 0) {
+			pros::lcd::print(0, "IMU Failure!");
 			// TODO: Add more verbose error handling
 			return;
 		}
 
 		// Determine PID correction using smoothed heading
 		double filteredHeading = headingFilter.update(rawHeading - 180);
-		double correction = headingPID.compute(filteredHeading);
+		double correction = turnPID.compute(filteredHeading);
+		//pros::lcd::print(1, "Correction: %lf", correction);
 
 		// Compute turnSpeed based on correction
 		double turnSpeed = std::clamp(
@@ -87,10 +150,13 @@ void Autonomous::turnTo(double targetHeading) {
 		pros::delay(10);
 	}
 
+	pros::lcd::print(2, "Exited Turn Loop");
+
 	leftMotors.move_velocity(0);
     rightMotors.move_velocity(0);
     pros::delay(250);
 
+	updatePose();
 }
 
 void Autonomous::travel(double distance, double speed, double targetHeading, double timer_s) {
@@ -166,6 +232,7 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
 		double rawHeading = getYaw();
 
 		if (rawHeading < 0) {
+			pros::lcd::print(0, "IMU Failure!");
 			// TODO: Add more verbose error handling
 			return;
 		}
@@ -209,10 +276,17 @@ void Autonomous::updatePose(void) {
 	// Calculate distance travelled by each tracking wheel
 	WheelLengths arcs = getOdomWheelTravel();
 
-	static double prevTheta = convertDegToRad(getYaw() - 180);
+	const double yaw = getYaw();
+
+	if (yaw < 0) {
+		pros::lcd::print(0, "IMU Failure!");
+		return;
+	}
+
+	static double prevTheta = convertDegToRad(yaw - 180);
 
 	// Get orientation from IMU
-	double theta = convertDegToRad(getYaw() - 180);
+	double theta = convertDegToRad(yaw - 180);
 	theta = normalizeAngle(theta);
 
 	// Determine change in heading 
@@ -234,6 +308,8 @@ void Autonomous::updatePose(void) {
 	pos_y += del_y;
 
 	prevTheta = theta;
+
+	controller.print(0, 0, "O: %.2lf\n", convertRadToDeg(theta));
 }
 
 double Autonomous::getYaw(void) {
@@ -282,59 +358,3 @@ WheelLengths Autonomous::getOdomWheelTravel(void) {
 	return del;
 }
 
-// ====== Helper functions ======
-
-// Normalize angle between [-180, 180]
-static double normalizeAngle(double a) {
-    return std::atan2(std::sin(a), std::cos(a));
-}
-
-// Return Euclidean distance btwn points p1 and p2
-static double getDistance(Position p1, Position p2) {
-    return std::sqrt(std::pow((p2.x - p1.x), 2) + std::pow((p2.y - p1.y), 2));
-}
-
-// Convert Degrees to Radians
-static double convertDegToRad(double degree) {
-    return degree * (std::numbers::pi / 180.0);
-}
-
-// Covert Radians to Degrees
-static double convertRadToDeg(double rad) {
-    return rad * (180.0 / M_PI);
-}
-
-// Subtract angles with [-180, 180] wrapping
-static double angleDiffDeg(double a, double b) {
-    double c = a - b;
-	while (c > 180.0) c -= 360.0;
-	while (c <= -180.0) c += 360.0;
-	return c;
-}
-
-// Determine deceleration speed scaling
-static double computeDecelScale(double remaining, double totalDistance) {
-    double decelDistance = std::max(0.2, std::fabs(totalDistance) * 0.15);
-
-    if (remaining >= decelDistance)
-        return 1.0;
-
-    double x = std::clamp(remaining / decelDistance, 0.0, 1.0);
-
-    // Step smoothing
-    double smooth = x * x * (3.0 - 2.0 * x);
-
-	// Return speed scaling
-    return std::clamp(smooth, 0.2, 1.0);
-}
-
-// Limit acceleration takeoff
-static double accelLimit(double prev, double target, double dt, double accelLimit) {
-    double maxDelta = accelLimit * dt;
-    double delta = target - prev;
-
-    if (delta > maxDelta) delta = maxDelta;
-    if (delta < -maxDelta) delta = -maxDelta;
-
-    return prev + delta;
-}
