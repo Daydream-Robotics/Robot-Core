@@ -19,7 +19,7 @@ constexpr int FRONT_INTAKE_PORT = 14;
 constexpr int MID_INTAKE_PORT = 4;
 constexpr int BACK_INTAKE_PORT = -5;
 
-constexpr char IMU_PORT = 12;
+constexpr char IMU_PORT = 8;
 
 constexpr char UNLOADER_PORT = 'C'; // C
 constexpr char CENTER_SCORE_PORT = 'A'; // A
@@ -39,10 +39,10 @@ constexpr int STOP = 0;
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 
-constexpr double PERPINDICULAR_TRACKING_WHEEL_DISTANCE = 2.588;
+constexpr double PERPINDICULAR_TRACKING_WHEEL_DISTANCE = 2.25;
 
 constexpr double PARALLEL_TRACKING_WHEEL_DIAMETER = 2.00;
-constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.75;
+constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.0;
 
 /* - - - - - - - - - - - - - - [PIDS] - - - - - - - - - - - - - - */
 
