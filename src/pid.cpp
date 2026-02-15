@@ -20,9 +20,6 @@ double PID::compute(double current) {
     last_time = now;
 
     error = target - current;
-    while (error > 180) error -= 360;
-    while (error < -180) error += 360;
-
 
     // Integral
     if (std::fabs(error) < start_i) {
