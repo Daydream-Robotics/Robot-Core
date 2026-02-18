@@ -10,6 +10,8 @@ class PID {
         // Constants
         double kP, kI, kD;
         double start_i;
+
+        bool isAngle;
         
         // State
         double target;
@@ -28,7 +30,7 @@ class PID {
         
     public:
         // Initialize PID with constants
-        PID(double p, double i, double d, double start_i);
+        PID(double p, double i, double d, double start_i, bool isAngle=false);
         
         // Set target and reset error
         void setTarget(double target);

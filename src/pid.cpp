@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-PID::PID(double p, double i, double d, double start_i) : kP(p), kI(i), kD(d), start_i(start_i) {
+PID::PID(double p, double i, double d, double start_i, bool isAngle) : kP(p), kI(i), kD(d), start_i(start_i), isAngle(isAngle) {
     reset();
 }
 
@@ -20,6 +20,11 @@ double PID::compute(double current) {
     last_time = now;
 
     error = target - current;
+
+    if (isAngle) {
+        while (error > 180) error -= 360;
+        while (error < -180) error += 360;
+    }
 
     // Integral
     if (std::fabs(error) < start_i) {

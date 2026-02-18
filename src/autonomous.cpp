@@ -88,11 +88,12 @@ namespace {
 
 // TODO: Tune PID parameters
 Autonomous::Autonomous() 
-	: distancePID(0.1, 0.0, 0.0, 0.0), 
-	headingPID(1.5, 0.0, 0.0, 0.0),
-	turnPID(1.2, 0.1, 0.001, 15.0) {
+	: distancePID(4.25, 0.0, 0.0, 0.0), 
+	headingPID(0.004, 0.01, 0.0, 0.0, true),
+	turnPID(1.2, 0.1, 0.001, 15.0, true) {
 		leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
 		rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
+		
 	}
 
 void Autonomous::turnTo(double targetHeading) {
@@ -173,8 +174,8 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
 
     distancePID.setTarget(distance);
     distancePID.exit_condition_set(
-        0.5, 200,
-        2.0, 400,
+        0.5, 400,
+        2.0, 1200,
         200,
         timer_s * 1000
     );
@@ -186,8 +187,8 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
 
 	double headingRad = convertDegToRad(targetHeading);
 	Position headingUnit {
-		-std::cos(headingRad),
-		-std::sin(headingRad)
+		std::sin(headingRad),
+		-std::cos(headingRad)
 	};
 
     while (true) {
@@ -196,7 +197,6 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
         // Compute traveled distance along heading vector
         Position delta { pos_x - start.x, pos_y - start.y };
         double traveled = delta.x * headingUnit.x + delta.y * headingUnit.y;
-
 
         double v = distancePID.compute(traveled);
         v = clamp(v, -speed, speed);
@@ -278,7 +278,8 @@ void Autonomous::updatePose(void) {
 
 	prevTheta = theta;
 
-	controller.print(0, 0, "O: %.2lf\n", convertRadToDeg(theta));
+	 controller.print(0, 0, "O: %.2lf\n", convertRadToDeg(theta));
+	//controller.print(0, 0, "X: %.2f Y: %.2f\n", pos_x, pos_y);
 }
 
 double Autonomous::getYaw(void) {
