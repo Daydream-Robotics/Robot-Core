@@ -121,7 +121,7 @@ void opcontrol(void);
  * Controls the intake for a certain amount of time. If no time is given, runs
  * indefinitely until told otherwise.
  */
-void move_intake(int front, int back = STOP, double seconds = 0.0);
+void move_intake(int front, int mid = STOP, int back = STOP, double seconds = 0.0);
 
 /**
  * Gets chassis motor values based on type of drive selected (Tank/Split Arcade).

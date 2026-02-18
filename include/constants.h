@@ -15,7 +15,7 @@ constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 6;
 #define LEFT_DRIVE_WHEEL_PORTS {-13, -11, -1, 2}
 #define RIGHT_DRIVE_WHEEL_PORTS {-3, 18, 19, 20}
 
-constexpr int FRONT_INTAKE_PORT = 14;
+constexpr int FRONT_INTAKE_PORT = -14;
 constexpr int MID_INTAKE_PORT = 4;
 constexpr int BACK_INTAKE_PORT = -5;
 

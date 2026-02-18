@@ -183,7 +183,6 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
     headingPID.setTarget(0.0);
 
     Position start(pos_x, pos_y);
-    double direction = (distance >= 0.0) ? 1.0 : -1.0;
 
 	double headingRad = convertDegToRad(targetHeading);
 	Position headingUnit {
