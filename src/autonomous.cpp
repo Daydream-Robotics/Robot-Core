@@ -89,7 +89,7 @@ namespace {
 // TODO: Tune PID parameters
 Autonomous::Autonomous() 
 	: distancePID(4.25, 0.0, 0.0, 0.0), 
-	headingPID(0.004, 0.01, 0.0, 0.0, true),
+	headingPID(0.01, 0.004, 0.0, 0.0, true),
 	turnPID(1.2, 0.1, 0.001, 15.0, true) {
 		leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
 		rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
@@ -197,8 +197,20 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
         Position delta { pos_x - start.x, pos_y - start.y };
         double traveled = delta.x * headingUnit.x + delta.y * headingUnit.y;
 
-        double v = distancePID.compute(traveled);
-        v = clamp(v, -speed, speed);
+        double error = distance - traveled;
+		double v = distancePID.compute(traveled);
+
+		if (fabs(error) > 6) {
+			v = std::copysign(speed, v);
+			// v = clamp(v, -speed, speed);
+		}
+		else { 
+			// Linear Stop
+			double scale = fabs(error) / 6.0;
+			scale = clamp(scale, 0.0, 1.0);
+			v *= scale;
+		}
+
 
         // Heading error
         double rawHeading = getYaw();
