@@ -43,8 +43,6 @@ void autonomous() {
 	pros::delay(250);
 	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
 	auton.travel(16, 50, 90, 1.150);
-	// travelDistanceWithHeading(14, 70, 90, 1350);
-	// travelDistanceWithHeading(100, 35, 90, 1000);
 	auton.travel(-12, 50, 90, 0.10);
 	auton.travel(12, 50, 90, 0.1);
 	pros::delay(3000);
@@ -63,14 +61,50 @@ void autonomous() {
 
 	auton.travel(20, 80, 90);
 
-	auton.turnTo(25);
+	auton.turnTo(0);
+
+	auton.travel(24, 70, 0);
+
+	auton.turnTo(-90);
 
 	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	auton.travel(70, 100, 25, 1.5);
 
-	pros::delay(1000);
+	auton.travel(99, 85, -90);
+
+	auton.turnTo(180);
+
+	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
+
+	auton.travel(40, 70, 180, 2.8);
+
+	auton.travel(-12, 90, 180, 0.1);
+	auton.travel(12, 90, 180, 0.1);
+	auton.travel(-12, 90, 180, 0.1);
+	auton.travel(12, 90, 180, 0.1);
+	
+
+	pros::delay(500);
+
 	move_intake(STOP);
 
+	auton.travel(-14.5, 70, 180);
+
+	unloader.set_value(true);
+
+	auton.turnTo(-90);
+
+	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
+	auton.travel(16, 50, -90, 1.150);
+
+	auton.travel(-12, 50, -90, 0.10);
+	auton.travel(12, 50, -90, 0.1);
+	pros::delay(3000);
+	move_intake(STOP);
+	
+	auton.travel(-50, 80, 75, 2);
+	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.3);
+	unloader.set_value(false);
+	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 3);
 
 	// move_intake(-MID_VOLTAGE, -MID_VOLTAGE, 0.2);
 	// // Score on Long Goal
