@@ -94,6 +94,22 @@ void autonomous() {
 	unloader.set_value(false);
 	move_intake(MAX_VOLTAGE, MAX_VOLTAGE, MAX_VOLTAGE, 3);
 
+	// Move away from goal
+	auton.travel(6, 90, -90);
+	auton.turnTo(0);
+	auton.travel(24, 90, 0);
+	auton.turnTo(90);
+
+	// Travel down field
+	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
+	auton.travel(93, 120, 90, 5);
+
+	// Face goal and park
+	auton.turnTo(20);
+	auton.travel(72, 80, 20, 2.5);
+	auton.travel(-18, 60, 0);
+	move_intake(STOP);
+
 }
 
 void opcontrol() {
