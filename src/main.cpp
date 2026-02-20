@@ -23,104 +23,76 @@ void autonomous() {
 
 	Autonomous auton = Autonomous();
 
-	// // Intake pre-loads
-	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	auton.travel(8, 40, 0);
-	// travelDistanceWithHeading(8, 40, 0, -1);
-	// pros::delay(250);
+	// Go to matchloader
+	auton.travel(-36, 70, 0);
 
-	// // Backup to match loader
-	auton.travel(-41.5, 70, 0);
-	// travelDistanceWithHeading(-35.25, 70, 0, -1);
-
-	// // Face match loader
-	move_intake(STOP, STOP, STOP);
-	auton.turnTo(90);
-	// turn_pid(90, 0);
-
-	// // Match load
+	// Turn to matchloader
 	unloader.set_value(true);
-	pros::delay(250);
+	auton.turnTo(90);
+
+	// Approach matchloader
 	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
 	auton.travel(16, 50, 90, 1.150);
-	auton.travel(-12, 50, 90, 0.10);
-	auton.travel(12, 50, 90, 0.1);
-	pros::delay(3000);
+
+	// Matchload
+	for (int i = 0; i < 2; i++){
+		auton.travel(-12, 50, 90, 0.15);
+		auton.travel(12, 60, 90, 0.35);
+	 	pros::delay(500);
+	}
 	move_intake(STOP);
-	// travelDistanceWithHeading(100, 25, 90, 1000);
 
-	// travelDistanceWithHeading(100, 35, 90, 1000);
-
-
-	// // Reverse to Long Goal
-	// travelDistanceWithHeading(-50, 60, 90, 2000);
+	// Reverse and score on long goal
 	auton.travel(-50, 80, 75, 2);
-	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.3);
+	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
+	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 0.1);
+	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
 	unloader.set_value(false);
-	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 3);
+	move_intake(MAX_VOLTAGE, MAX_VOLTAGE, MAX_VOLTAGE, 3);
 
+	// Back away from goal
 	auton.travel(20, 80, 90);
 
+	// Go past goal
 	auton.turnTo(0);
-
 	auton.travel(24, 70, 0);
-
 	auton.turnTo(-90);
 
+	// Travel down field and face balls
 	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-
 	auton.travel(99, 85, -90);
-
 	auton.turnTo(180);
 
+	// Get side balls
 	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-
 	auton.travel(40, 70, 180, 2.8);
-
-	auton.travel(-12, 90, 180, 0.1);
-	auton.travel(12, 90, 180, 0.1);
-	auton.travel(-12, 90, 180, 0.1);
-	auton.travel(12, 90, 180, 0.1);
-	
-
+	auton.travel(-6, 50, 180, 0.8);
+	auton.travel(8, 60, 180, 0.8);
 	pros::delay(500);
-
 	move_intake(STOP);
 
-	auton.travel(-14.5, 70, 180);
-
+	// Back up to matchloader
+	auton.travel(-15.5, 70, 180);
 	unloader.set_value(true);
-
 	auton.turnTo(-90);
 
+	// Matchload
 	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
 	auton.travel(16, 50, -90, 1.150);
-
-	auton.travel(-12, 50, -90, 0.10);
-	auton.travel(12, 50, -90, 0.1);
-	pros::delay(3000);
+	for (int i = 0; i < 2; i++){
+		auton.travel(-12, 50, -90, 0.15);
+		auton.travel(12, 60, -90, 0.35);
+	 	pros::delay(500);
+	}
 	move_intake(STOP);
 	
-	auton.travel(-50, 80, 75, 2);
-	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.3);
+	// Approach long goal and score
+	auton.travel(-50, 80, -115, 2);
+	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
+	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 0.1);
+	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
 	unloader.set_value(false);
-	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 3);
-
-	// move_intake(-MID_VOLTAGE, -MID_VOLTAGE, 0.2);
-	// // Score on Long Goal
-	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, 3);
-	// unloader.set_value(false);
-
-
-	// // Backup and face side balls
-	// travelDistanceWithHeading(16, 70, 90, -1);
-	// turn_pid(0, 0);
-	
-	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE);
-	// // Park
-	// travelDistanceWithHeading(40, 100, 115, 1900);
-	
-	// move_intake(STOP, STOP);
+	move_intake(MAX_VOLTAGE, MAX_VOLTAGE, MAX_VOLTAGE, 3);
 
 }
 

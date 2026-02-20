@@ -104,8 +104,8 @@ void Autonomous::turnTo(double targetHeading) {
 
 	// TODO: Tune exit conditions
     turnPID.exit_condition_set(
-        0.2, 250,     // small error (deg), time (ms)
-        1.0, 3000,     // big error (deg), time
+        0.8, 250,     // small error (deg), time (ms)
+        2.0, 3000,     // big error (deg), time
         200,          // velocity settle time
         0          // timeout
     );
@@ -175,7 +175,7 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
     distancePID.setTarget(distance);
     distancePID.exit_condition_set(
         0.5, 400,
-        2.0, 1200,
+        2.0, 600,
         200,
         timer_s * 1000
     );
@@ -189,6 +189,9 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
 		std::sin(headingRad),
 		-std::cos(headingRad)
 	};
+
+	// Initialize previous distance traveled in last dt
+	double prevTraveled = 0.0;
 
     while (true) {
         updatePose();
@@ -239,10 +242,12 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
         leftMotors.move_velocity(left);
         rightMotors.move_velocity(right);
 
-		// Exit if any exit condition is met. 100 set to prevent velocity timeout for now
-        if (distancePID.exit_condition(100) != PID::RUNNING)
+		// Compute current velocity and determine exit condition
+		double currVel = 100; //(traveled - prevTraveled) / 10e-3;
+        if (distancePID.exit_condition(currVel) != PID::RUNNING)
             break;
 
+		prevTraveled = traveled;
         pros::delay(10);
     }
 
