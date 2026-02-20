@@ -72,7 +72,7 @@ void autonomous() {
 	move_intake(STOP);
 
 	// Back up to matchloader
-	auton.travel(-15.5, 70, 180);
+	auton.travel(-16.25, 70, 180);
 	unloader.set_value(true);
 	auton.turnTo(-90);
 
@@ -102,7 +102,7 @@ void autonomous() {
 
 	// Travel down field
 	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	auton.travel(93, 120, 90, 5);
+	auton.travel(95, 120, 90, 5.25);
 
 	// Face goal and park
 	auton.turnTo(20);
