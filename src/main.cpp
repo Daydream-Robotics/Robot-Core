@@ -87,7 +87,7 @@ void autonomous() {
 	move_intake(STOP);
 	
 	// Approach long goal and score
-	auton.travel(-50, 80, -115, 2);
+	auton.travel(-50, 80, -105, 2);
 	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
 	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 0.1);
 	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
@@ -102,7 +102,7 @@ void autonomous() {
 
 	// Travel down field
 	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	auton.travel(95, 150, 90, 5.25);
+	auton.travel(94, 150, 90, 5.25);
 
 	// Face goal and park
 	auton.turnTo(15);
