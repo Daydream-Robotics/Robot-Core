@@ -294,7 +294,7 @@ void Autonomous::updatePose(void) {
 
 	prevTheta = theta;
 
-	 controller.print(0, 0, "O: %.2lf\n", convertRadToDeg(theta));
+	 // controller.print(0, 0, "O: %.2lf\n", convertRadToDeg(theta));
 	//controller.print(0, 0, "X: %.2f Y: %.2f\n", pos_x, pos_y);
 }
 
@@ -343,4 +343,3 @@ WheelLengths Autonomous::getOdomWheelTravel(void) {
 
 	return del;
 }
-
