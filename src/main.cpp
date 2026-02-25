@@ -30,84 +30,84 @@ void autonomous() {
 	unloader.set_value(true);
 	auton.turnTo(90);
 
-	// Approach matchloader
-	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	auton.travel(16, 50, 90, 1.150);
+	// // Approach matchloader
+	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
+	// auton.travel(16, 50, 90, 1.150);
 
-	// Matchload
-	for (int i = 0; i < 2; i++){
-		auton.travel(-12, 50, 90, 0.15);
-		auton.travel(12, 60, 90, 0.35);
-	 	pros::delay(500);
-	}
-	move_intake(STOP);
+	// // Matchload
+	// for (int i = 0; i < 2; i++){
+	// 	auton.travel(-12, 50, 90, 0.15);
+	// 	auton.travel(12, 60, 90, 0.35);
+	//  	pros::delay(500);
+	// }
+	// move_intake(STOP);
 
-	// Reverse and score on long goal
-	auton.travel(-50, 80, 75, 2);
-	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 0.1);
-	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	unloader.set_value(false);
-	move_intake(MAX_VOLTAGE, MAX_VOLTAGE, MAX_VOLTAGE, 3);
+	// // Reverse and score on long goal
+	// auton.travel(-50, 80, 75, 2);
+	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
+	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 0.1);
+	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
+	// unloader.set_value(false);
+	// move_intake(MAX_VOLTAGE, MAX_VOLTAGE, MAX_VOLTAGE, 3);
 
-	// Back away from goal
-	auton.travel(20, 80, 90);
+	// // Back away from goal
+	// auton.travel(20, 80, 90);
 
-	// Go past goal
-	auton.turnTo(0);
-	auton.travel(24, 70, 0);
-	auton.turnTo(-90);
+	// // Go past goal
+	// auton.turnTo(0);
+	// auton.travel(24, 70, 0);
+	// auton.turnTo(-90);
 
-	// Travel down field and face balls
-	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	auton.travel(99, 85, -90);
-	auton.turnTo(180);
+	// // Travel down field and face balls
+	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
+	// auton.travel(99, 85, -90);
+	// auton.turnTo(180);
 
-	// Get side balls
-	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	auton.travel(40, 70, 180, 2.8);
-	auton.travel(-6, 50, 180, 0.8);
-	auton.travel(8, 60, 180, 0.8);
-	pros::delay(500);
-	move_intake(STOP);
+	// // Get side balls
+	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
+	// auton.travel(40, 70, 180, 2.8);
+	// auton.travel(-6, 50, 180, 0.8);
+	// auton.travel(8, 60, 180, 0.8);
+	// pros::delay(500);
+	// move_intake(STOP);
 
-	// Back up to matchloader
-	auton.travel(-16.25, 70, 180);
-	unloader.set_value(true);
-	auton.turnTo(-90);
+	// // Back up to matchloader
+	// auton.travel(-16.25, 70, 180);
+	// unloader.set_value(true);
+	// auton.turnTo(-90);
 
-	// Matchload
-	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	auton.travel(16, 50, -90, 1.150);
-	for (int i = 0; i < 2; i++){
-		auton.travel(-12, 50, -90, 0.15);
-		auton.travel(12, 60, -90, 0.35);
-	 	pros::delay(500);
-	}
-	move_intake(STOP);
+	// // Matchload
+	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
+	// auton.travel(16, 50, -90, 1.150);
+	// for (int i = 0; i < 2; i++){
+	// 	auton.travel(-12, 50, -90, 0.15);
+	// 	auton.travel(12, 60, -90, 0.35);
+	//  	pros::delay(500);
+	// }
+	// move_intake(STOP);
 	
-	// Approach long goal and score
-	auton.travel(-50, 80, -105, 2);
-	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 0.1);
-	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	unloader.set_value(false);
-	move_intake(MAX_VOLTAGE, MAX_VOLTAGE, MAX_VOLTAGE, 1.75);
+	// // Approach long goal and score
+	// auton.travel(-50, 80, -105, 2);
+	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
+	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 0.1);
+	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
+	// unloader.set_value(false);
+	// move_intake(MAX_VOLTAGE, MAX_VOLTAGE, MAX_VOLTAGE, 1.75);
 
-	// Move away from goal
-	auton.travel(6, 90, -90);
-	auton.turnTo(0);
-	auton.travel(24, 90, 0);
-	auton.turnTo(90);
+	// // Move away from goal
+	// auton.travel(6, 90, -90);
+	// auton.turnTo(0);
+	// auton.travel(24, 90, 0);
+	// auton.turnTo(90);
 
-	// Travel down field
-	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	auton.travel(94, 150, 90, 5.25);
+	// // Travel down field
+	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
+	// auton.travel(94, 150, 90, 5.25);
 
-	// Face goal and park
-	auton.turnTo(15);
-	auton.travel(72, 110, 15, 1.1);
-	// auton.travel(-6, 60, 0, 0.5);
+	// // Face goal and park
+	// auton.turnTo(15);
+	// auton.travel(72, 110, 15, 1.1);
+	// // auton.travel(-6, 60, 0, 0.5);
 
 }
 
