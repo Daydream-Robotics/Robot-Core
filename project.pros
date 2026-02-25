@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "Immaculate-Auto-Skills",
+    "project_name": "AI Skill",
     "target": "v5",
     "templates": {
       "kernel": {

@@ -2,7 +2,8 @@
 #include "subsystems.h"
 #include "constants.h"
 #include "autonomous.hpp"
-
+#include "slam.h"
+#include "objectHandler.h"
 #include <numbers>
 
 
@@ -30,17 +31,19 @@ void autonomous() {
 	unloader.set_value(true);
 	auton.turnTo(90);
 
+	collect(GamePiece::RED_BALL);
+
 	// // Approach matchloader
 	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
 	// auton.travel(16, 50, 90, 1.150);
 
-	// // Matchload
-	// for (int i = 0; i < 2; i++){
-	// 	auton.travel(-12, 50, 90, 0.15);
-	// 	auton.travel(12, 60, 90, 0.35);
-	//  	pros::delay(500);
-	// }
-	// move_intake(STOP);
+	// Matchload
+	for (int i = 0; i < 2; i++){
+		auton.travel(-12, 50, 90, 0.15);
+		auton.travel(12, 60, 90, 0.35);
+	 	pros::delay(500);
+	}
+	move_intake(STOP);
 
 	// // Reverse and score on long goal
 	// auton.travel(-50, 80, 75, 2);
