@@ -28,21 +28,21 @@ void autonomous() {
 	auton.travel(-36, 70, 0);
 
 	// Turn to matchloader
-	unloader.set_value(true);
+	// unloader.set_value(true);
 	auton.turnTo(90);
 
-	collect(GamePiece::RED_BALL);
+	matchload();
 
 	// // Approach matchloader
-	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
+	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
 	// auton.travel(16, 50, 90, 1.150);
 
 	// Matchload
-	for (int i = 0; i < 2; i++){
-		auton.travel(-12, 50, 90, 0.15);
-		auton.travel(12, 60, 90, 0.35);
-	 	pros::delay(500);
-	}
+	// for (int i = 0; i < 2; i++){
+	// 	auton.travel(-12, 50, 90, 0.15);
+	// 	auton.travel(12, 60, 90, 0.35);
+	//  	pros::delay(500);
+	// }
 	move_intake(STOP);
 
 	// // Reverse and score on long goal
@@ -116,6 +116,22 @@ void autonomous() {
 
 void opcontrol() {
 	// Set chassis brake mode to coast
+
+	
+	Autonomous auton = Autonomous();
+
+	// Go to matchloader
+	// auton.travel(-36, 70, 0);
+
+	// Turn to matchloader
+	// unloader.set_value(true);
+	// auton.turnTo(90);
+
+	// matchload();
+
+	trackingMode(GamePiece::BLUE_BALL);
+
+
 	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 
@@ -165,6 +181,8 @@ void opcontrol() {
 		// Delay added to prevent crashing
 		pros::delay(20);
 	}
+
+	
 }
 
 void move_intake(int front, int mid, int back, double seconds) {

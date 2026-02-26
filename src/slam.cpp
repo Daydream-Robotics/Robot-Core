@@ -4,6 +4,8 @@
 #include "constants.h"
 #include "subsystems.h"
 #include "autonomous.hpp"
+
+
 // #include <cmath>
 // #include <string>
 
@@ -154,12 +156,12 @@ void collect(GamePiece gamePiece)
     printf("[TurnTo] Exiting loop. Final Error: %.2f\n", error); // DEBUG
     // END DEBUG
 
-    frontIntake.move_velocity(0);
-    midIntake.move_velocity(0);
+    // frontIntake.move_velocity(0);
+    // midIntake.move_velocity(0);
 
     leftMotors.move_velocity(0);
     rightMotors.move_velocity(0);
-    pros::lcd::print(1, "robot stopped turning");
+    // pros::lcd::print(1, "robot stopped turning");
     return;
 }
 
@@ -264,8 +266,28 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece)
 }
 
 //
-void matchload()
+void matchload(bool isFar)
 {
+    Autonomous auton = Autonomous();
+    GamePiece gamePiece;
+
+
+    if(!isFar)gamePiece = GamePiece::RED_BALL;
+    else gamePiece = GamePiece::BLUE_BALL;
+
+    unloader.set_value(true);
+
+    move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
+
+    collect(gamePiece);
+
+    // auton.travel(-5, 100, 90, 0.5);
+
+    // for (int i = 0; i < 2; i++){
+	// 	auton.travel(-12, 100, 90, 0.15);
+	// 	auton.travel(12, 100, 90, 0.35);
+	//  	pros::delay(500);
+	// }
 }
 
 //
@@ -286,8 +308,16 @@ void trackingMode(GamePiece GamePiece) {
     int turnSpeed = 0;
     std::optional<GamePieceData> ball;
 
+
+        pros::lcd::print(1,"program running");
+    int n = 1;
+
     while (not frame_ready) {
+        
         pros::delay(10);
+        pros::lcd::clear_line(1);
+        pros::lcd::print(1,"%d program running", n);
+        n++;
         continue;
     }
 

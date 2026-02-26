@@ -42,7 +42,7 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece);
 void turnToGamePiece(GamePiece gamePiece);
 
 //
-void matchload(void);
+void matchload(bool isFar = true);
 
 //
 void scoreMid(void);
