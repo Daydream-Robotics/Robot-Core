@@ -9,9 +9,9 @@ constexpr char TEAM = '\0';
 constexpr double FRAME_CENTER = 0.5;
 
 constexpr double COLLECT_TURN_ADJUSTMENT = 1;
-constexpr double collect_turn_kP = 10; // 12
-constexpr double collect_turn_kI = 0.5;
-constexpr double collect_turn_kD = 0;
+constexpr double collect_turn_kP = 40; // 12 // 10
+constexpr double collect_turn_kI = 0;
+constexpr double collect_turn_kD = 10;
 
 constexpr double collect_move_kP = 0.05;
 constexpr double collect_move_kI = 0;
@@ -37,7 +37,7 @@ constexpr int TRACK_MIN_VELOCITY = 2;
 void move(int x);
 
 // collect ball
-void collect(GamePiece gamePiece);
+void collect(GamePiece gamePiece, int isLoading = 0);
 std::optional<GamePieceData> findBall(GamePiece gamePiece);
 void turnToGamePiece(GamePiece gamePiece);
 

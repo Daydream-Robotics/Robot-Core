@@ -30,7 +30,15 @@ class Autonomous {
         // Update position and orientation
         void updatePose(void);
 
-        double getYaw(void);
+        double getYaw(void);        
+        
+        
+        // x-position of bot (inches)
+        double pos_x = 0.0;
+
+        // y-position of bot (inches)
+        double pos_y = 0.0;
+
 
     private:
 
@@ -43,11 +51,6 @@ class Autonomous {
         // Turning PID controller
         PID turnPID;
 
-        // x-position of bot (inches)
-        double pos_x = 0.0;
-
-        // y-position of bot (inches)
-        double pos_y = 0.0;
 
         // Heading of bot (rads)
         double heading = 0.0;

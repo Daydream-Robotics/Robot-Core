@@ -4,6 +4,7 @@
 #include "constants.h"
 #include "subsystems.h"
 #include "autonomous.hpp"
+#include <chrono>
 
 
 // #include <cmath>
@@ -51,11 +52,17 @@ void move(int x)
 
 // collects a ball which color is designated by the parameter gamePiece
 // the parameter can be assigned to RED_BALL or BLUE_BALL (if for whatever reason you can do other game objects)
-void collect(GamePiece gamePiece)
+void collect(GamePiece gamePiece, int isLoading)
 {
+    using namespace std::chrono;   
+    Autonomous auton = Autonomous();
+
+    seconds interval = 2s;
+    auto start = steady_clock::now();
+
     //  setting the weight for how fast the move veloicty will be
     float vel_weight = 255;
-    
+    int humpCount = 0;
     pros::lcd::print(1, "test");
     // declares a GamePieceData variable which is assigned to getObject()
     printf("[Collect] Calling findBall...\n");
@@ -67,26 +74,35 @@ void collect(GamePiece gamePiece)
     int turnSpeed;
     int empty_frames = 0;
 
+    int x = 0;
     // needs alternate exit
     while (not frame_ready and IsConnected()) {
+        pros::lcd::print(2,"%d", x);
         pros::delay(10);
+        x++;
         continue;
     }
+    pros::lcd::print(1,"connected");
+     move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
 
-     move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
 
-
-    // TODO: add alternate exits to loop
+     // TODO: add alternate exits to loop
     std::optional<int> old_x, old_y;
     int times_far_from_old = 0;
     int num_centered = 0;
     do {
-        if (not IsConnected()) {
-            break;
-        }
-
+        /////-------------------------////
+        // commented this out and it worked 
+        // Do not remove
+        //
+        // if (not IsConnected()) {
+        //     pros::lcd::print(1,"not connected");
+        //     break;
+        // }
+        /////-------------------------////
         if(not frame_ready) {
             pros::delay(10);
+            pros::lcd::print(1,"frame not ready");
             continue;
         }
 
@@ -135,8 +151,47 @@ void collect(GamePiece gamePiece)
 
         pros::lcd::print(1, "turning with %d velocity", turnSpeed);
 
-        leftMotors.move_velocity(turnSpeed + 30);
-        rightMotors.move_velocity(-turnSpeed + 30);
+        // //runns if we are matchloading
+        // if(isLoading == 1){
+        //     pros::lcd::print(5, "is loading = %d", isLoading);
+        //     auton.updatePose();
+        //     if(abs( prevX - auton.pos_x) < 1){
+        //         isLoading++;
+        //         pros::lcd::print(3, "Entered Collect pt2");
+        //         collect(gamePiece, isLoading);
+        //         return;
+        //     }
+        //     prevX = auton.pos_x;
+        // }
+
+        
+
+        
+        if(isLoading == 3){
+            if(empty_frames > 2 || humpCount > 2)return;
+
+            pros::lcd::print(5, "is loading = %d", isLoading);
+            // auton.travel(-12, 50, -90, 0.15);
+            // auton.travel(12, 60, -90, 0.35);
+            leftMotors.move_velocity(-20);
+            rightMotors.move_velocity(-20);
+            pros::delay(400);
+            leftMotors.move_velocity(20);
+            rightMotors.move_velocity(20);            
+            pros::delay(500);
+            humpCount++;
+            
+        }
+        else if(isLoading == 2){
+            if(gamePiece == GamePiece::BLUE_BALL)gamePiece = GamePiece::RED_BALL;
+            else gamePiece == GamePiece::BLUE_BALL;
+            isLoading = 3;   
+        }
+        else{
+        leftMotors.move_velocity(turnSpeed + 50);
+        rightMotors.move_velocity(-turnSpeed + 50);
+        }
+
 
 
         previousError = error; // resetting the previous Angle to use in the next iteration
@@ -149,9 +204,15 @@ void collect(GamePiece gamePiece)
             num_centered = 0;
         }
 
-        pros::delay(10);
-    } while (empty_frames < 10);
+        duration<double> time_sice = steady_clock::now() - start;
+        if(isLoading == 1 && time_sice >= interval)break;
 
+        //previus empty frames: 10
+    } while (empty_frames < 5 );
+    
+    if(isLoading == 1){
+        collect(gamePiece, 2);
+    }
     // DEBUG
     printf("[TurnTo] Exiting loop. Final Error: %.2f\n", error); // DEBUG
     // END DEBUG
@@ -161,7 +222,7 @@ void collect(GamePiece gamePiece)
 
     leftMotors.move_velocity(0);
     rightMotors.move_velocity(0);
-    // pros::lcd::print(1, "robot stopped turning");
+    pros::lcd::print(5, "robot stopped turning");
     return;
 }
 
@@ -277,9 +338,10 @@ void matchload(bool isFar)
 
     unloader.set_value(true);
 
-    move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-
-    collect(gamePiece);
+    move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
+    pros::lcd::print(1,"moving intake");
+    pros::delay(300);
+    collect(gamePiece, 1);
 
     // auton.travel(-5, 100, 90, 0.5);
 

@@ -14,6 +14,7 @@ void initialize() {
 	while (imu.is_calibrating()) {
 		pros::delay(20);
 	}
+	pros::Task frame_task(UpdateFrame_task_fn, (void*)"PROS_Task_Param", TASK_PRIORITY_DEFAULT, TASK_STACK_DEPTH_DEFAULT, "Vision Frame Update");
 }
 
 void disabled() {}
@@ -25,16 +26,16 @@ void autonomous() {
 	Autonomous auton = Autonomous();
 
 	// Go to matchloader
-	auton.travel(-36, 70, 0);
+	// auton.travel(-36, 70, 0);
 
 	// Turn to matchloader
 	// unloader.set_value(true);
-	auton.turnTo(90);
+	// auton.turnTo(90);
 
-	matchload();
+	// trackingMode(GamePiece::BLUE_BALL);
 
 	// // Approach matchloader
-	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
+	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
 	// auton.travel(16, 50, 90, 1.150);
 
 	// Matchload
@@ -43,7 +44,7 @@ void autonomous() {
 	// 	auton.travel(12, 60, 90, 0.35);
 	//  	pros::delay(500);
 	// }
-	move_intake(STOP);
+	// move_intake(STOP);
 
 	// // Reverse and score on long goal
 	// auton.travel(-50, 80, 75, 2);
@@ -118,18 +119,18 @@ void opcontrol() {
 	// Set chassis brake mode to coast
 
 	
-	Autonomous auton = Autonomous();
+	// Autonomous auton = Autonomous();
 
-	// Go to matchloader
-	// auton.travel(-36, 70, 0);
+	// // Go to matchloader
+	// // auton.travel(-36, 70, 0);
 
-	// Turn to matchloader
-	// unloader.set_value(true);
-	// auton.turnTo(90);
+	// // Turn to matchloader
+	// // unloader.set_value(true);
+	// // auton.turnTo(90);
 
-	// matchload();
+	 matchload();
 
-	trackingMode(GamePiece::BLUE_BALL);
+	 
 
 
 	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
