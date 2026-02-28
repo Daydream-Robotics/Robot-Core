@@ -4,7 +4,7 @@
 #include "constants.h"
 #include "subsystems.h"
 #include "autonomous.hpp"
-#include <chrono>
+
 
 
 // #include <cmath>
@@ -56,9 +56,8 @@ void collect(GamePiece gamePiece, int isLoading)
 {
     using namespace std::chrono;   
     Autonomous auton = Autonomous();
+    int count = 0;
 
-    seconds interval = 2s;
-    auto start = steady_clock::now();
 
     //  setting the weight for how fast the move veloicty will be
     float vel_weight = 255;
@@ -89,7 +88,7 @@ void collect(GamePiece gamePiece, int isLoading)
      // TODO: add alternate exits to loop
     std::optional<int> old_x, old_y;
     int times_far_from_old = 0;
-    int num_centered = 0;
+
     do {
         /////-------------------------////
         // commented this out and it worked 
@@ -102,9 +101,10 @@ void collect(GamePiece gamePiece, int isLoading)
         /////-------------------------////
         if(not frame_ready) {
             pros::delay(10);
-            pros::lcd::print(1,"frame not ready");
+            // pros::lcd::print(1,"frame not ready");
             continue;
         }
+        // pros::lcd::print(1,"frame ready");
 
         ball = GetObject(gamePiece);
 
@@ -149,7 +149,7 @@ void collect(GamePiece gamePiece, int isLoading)
                ball->x, error, turnSpeed, condition);
         // END DEBUG
 
-        pros::lcd::print(1, "turning with %d velocity", turnSpeed);
+        // pros::lcd::print(1, "turning with %d velocity", turnSpeed);
 
         // //runns if we are matchloading
         // if(isLoading == 1){
@@ -168,7 +168,7 @@ void collect(GamePiece gamePiece, int isLoading)
 
         
         if(isLoading == 3){
-            if(empty_frames > 2 || humpCount > 2)return;
+            if(empty_frames > 2 || humpCount > 4 && humpCount >1)return;
 
             pros::lcd::print(5, "is loading = %d", isLoading);
             // auton.travel(-12, 50, -90, 0.15);
@@ -176,8 +176,8 @@ void collect(GamePiece gamePiece, int isLoading)
             leftMotors.move_velocity(-20);
             rightMotors.move_velocity(-20);
             pros::delay(400);
-            leftMotors.move_velocity(20);
-            rightMotors.move_velocity(20);            
+            leftMotors.move_velocity(50);
+            rightMotors.move_velocity(50);            
             pros::delay(500);
             humpCount++;
             
@@ -185,7 +185,12 @@ void collect(GamePiece gamePiece, int isLoading)
         else if(isLoading == 2){
             if(gamePiece == GamePiece::BLUE_BALL)gamePiece = GamePiece::RED_BALL;
             else gamePiece == GamePiece::BLUE_BALL;
+            pros::lcd::print(0,"loading = 2");
             isLoading = 3;   
+        }
+        else if(isLoading == 1 && std::abs(error) < .01){
+        leftMotors.move_velocity(50);
+        rightMotors.move_velocity(50);
         }
         else{
         leftMotors.move_velocity(turnSpeed + 50);
@@ -196,19 +201,15 @@ void collect(GamePiece gamePiece, int isLoading)
 
         previousError = error; // resetting the previous Angle to use in the next iteration
 
-        pros::lcd::print(2, "Error: %lf", error);
+        // pros::lcd::print(2, "Error: %lf", error);
+        pros::lcd::print(1, "run count %d", count);
 
-        if (std::abs(error) < MAX_PIXEL_OFFSET) {
-            num_centered++;
-        } else {
-            num_centered = 0;
-        }
 
-        duration<double> time_sice = steady_clock::now() - start;
-        if(isLoading == 1 && time_sice >= interval)break;
 
+        if(isLoading == 1 && count >= 15)break;
+        count++;
         //previus empty frames: 10
-    } while (empty_frames < 5 );
+    } while (empty_frames < 5);
     
     if(isLoading == 1){
         collect(gamePiece, 2);
