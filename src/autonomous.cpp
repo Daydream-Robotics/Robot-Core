@@ -1,5 +1,6 @@
 #include "autonomous.hpp"
 #include "subsystems.h"
+#include "constants.h"
 
 // ====== Helper functions ======
 namespace {
@@ -44,7 +45,7 @@ namespace {
 		double smooth = x * x * (3.0 - 2.0 * x);
 	
 		// Return speed scaling
-		return std::clamp(smooth, 0.2, 1.0);
+		return std::clamp(smooth, 0.0, 1.0);
 	}
 	
 	// Limit acceleration takeoff
@@ -88,34 +89,34 @@ namespace {
 
 // TODO: Tune PID parameters
 Autonomous::Autonomous() 
-	: distancePID(4.25, 0.0, 0.0, 0.0), 
-	headingPID(0.01, 0.004, 0.0, 0.0, true),
-	turnPID(1.2, 0.1, 0.001, 15.0, true) {
+	: distancePID(DISTANCE_KP, DISTANCE_KI, DISTANCE_KD, DISTANCE_KI_THRESHOLD),  // 5.0, 2.0, 0.0, 1.0
+	headingPID(HEADING_KP, HEADING_KI, HEADING_KD, HEADING_KI_THRESHOLD), // 0.002, 0.0, 0.0, 0.0
+	turnPID(TURN_KP, TURN_KI, TURN_KD, TURN_KI_THRESHOLD) { // 1.22, 0.000, 0.063875, 180
 		leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
 		rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
-		
 	}
 
 void Autonomous::turnTo(double targetHeading) {
 	turnPID.reset();
     turnPID.setTarget(targetHeading);
 
-	pros::lcd::print(0, "Turning to %lf degrees", targetHeading);
+	// pros::lcd::print(0, "Turning to %lf degrees", targetHeading);
 
 	// TODO: Tune exit conditions
     turnPID.exit_condition_set(
-        0.8, 250,     // small error (deg), time (ms)
-        2.0, 3000,     // big error (deg), time
-        200,          // velocity settle time
+        0.3, 75,     // small error (deg), time (ms)
+        0.5, 100,     // big error (deg), time
+       0.5 ,1000000,          // velocity settle time
         0          // timeout
     );
 
 	// TODO: Tune alpha
-    HeadingFilter headingFilter(1);
+    HeadingFilter headingFilter(0.3);
 
-	// Initialize clocking
+		// Initialize clocking
 	using clock = std::chrono::steady_clock;
     auto lastTime = clock::now();
+	double prevHeading = getYaw();
 
 	while (true) {
 		// Heading calculation
@@ -123,44 +124,59 @@ void Autonomous::turnTo(double targetHeading) {
 		updatePose();
 
 		if (rawHeading < 0) {
-			pros::lcd::print(0, "IMU Failure!");
+			pros::lcd::print(0, "[TurnTo] IMU Failure! YAW: %lf", rawHeading);
 			// TODO: Add more verbose error handling
 			return;
 		}
 
+		// Calculate angular velocity
+		auto now = clock::now();
+		std::chrono::duration<double> dt_dur = now - lastTime;
+		double dt = dt_dur.count();
+        if (dt < 0.001) dt = 0.001; // Prevent division by zero
+		lastTime = now;
+		
 		// Determine PID correction using smoothed heading
 		double filteredHeading = headingFilter.update(rawHeading - 180);
-		double correction = turnPID.compute(filteredHeading);
+		double correction = turnPID.compute(filteredHeading,true);
 		//pros::lcd::print(1, "Correction: %lf", correction);
-
+		
 		// Compute turnSpeed based on correction
 		double turnSpeed = std::clamp(
-            std::fabs(correction),
-            2.0,
-            65.0
+			std::fabs(correction),
+            1.0, // 2
+            100.0 // 70
         );
-
+		
         turnSpeed = std::copysign(turnSpeed, correction);
-
+		
 		leftMotors.move_velocity(turnSpeed);
         rightMotors.move_velocity(-turnSpeed);
-
-		if (turnPID.exit_condition(100) != PID::RUNNING) // TODO: get Angular Velocity
-            break;
-
+		
+		double currentVelocity = (std::fabs(angleDiffDeg(targetHeading, filteredHeading)) < 1.0) ? angleDiffDeg(rawHeading, prevHeading) / dt : 999.0;
+		if (turnPID.exit_condition(currentVelocity) != PID::RUNNING)
+			break;
+		prevHeading = rawHeading;
+		
 		pros::delay(10);
 	}
 
-	pros::lcd::print(2, "Exited Turn Loop");
+	// pros::lcd::print(2, "Exited Turn Loop");
 
 	leftMotors.move_velocity(0);
     rightMotors.move_velocity(0);
-    pros::delay(250);
+    pros::delay(10);
 
 	updatePose();
 }
 
-void Autonomous::travel(double distance, double speed, double targetHeading, double timer_s) {
+void Autonomous::setPose(double x, double y) {
+    this->pos_x = x;
+    this->pos_y = y;
+}
+
+double Autonomous::travel(double distance, double speed, double targetHeading, double timer_s) {
+	double traveled = 0;
 
     auto clamp = [](double v, double lo, double hi) {
         return (v < lo) ? lo : (v > hi) ? hi : v;
@@ -171,63 +187,81 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
         while (a < -180.0) a += 360.0;
         return a;
     };
-
+	// int count = 0;
     distancePID.setTarget(distance);
     distancePID.exit_condition_set(
-        0.5, 400,
-        2.0, 600,
-        200,
+        0.1, 10,
+        0.4, 30,
+        0.5, 200,
         timer_s * 1000
     );
 
     headingPID.setTarget(0.0);
 
     Position start(pos_x, pos_y);
+    double direction = (distance >= 0.0) ? 1.0 : -1.0;
 
 	double headingRad = convertDegToRad(targetHeading);
 	Position headingUnit {
-		std::sin(headingRad),
-		-std::cos(headingRad)
+		std::cos(headingRad),
+		std::sin(headingRad)
 	};
 
-	// Initialize previous distance traveled in last dt
-	double prevTraveled = 0.0;
+    double prevVelocity = 0.0;
+    double prevDistance = 0.0;
+
+	using clock = std::chrono::steady_clock;
+    auto startTime = clock::now();
+	auto lastTime = clock::now();
 
     while (true) {
-        updatePose();
+		// get elapesed time since last loop
+		auto now = clock::now();
+		std::chrono::duration<double> dt_dur = now - lastTime;
+		double dt = dt_dur.count();
+        if (dt < 0.001) dt = 0.001; // Prevent division by zero
+		lastTime = now;
 
+        updatePose();
+		
+		// if (pos_x < -1) {
+		// 	pros::lcd::print(7, "OUT OF BOUNDS!");
+		// 	break;
+		// }
+
+		// controller.print(0,0, "%.2f, %.2f", pos_x, pos_y);
         // Compute traveled distance along heading vector
         Position delta { pos_x - start.x, pos_y - start.y };
-        double traveled = delta.x * headingUnit.x + delta.y * headingUnit.y;
+		printf("X: %.2f, Y: %.2f\n", pos_x, pos_y);
 
-        double error = distance - traveled;
-		double v = distancePID.compute(traveled);
+		traveled = delta.x * headingUnit.x + delta.y * headingUnit.y;
 
-		if (fabs(error) > 6) {
-			v = std::copysign(speed, v);
-			// v = clamp(v, -speed, speed);
-		}
-		else { 
-			// Linear Stop
-			double scale = fabs(error) / 6.0;
-			scale = clamp(scale, 0.0, 1.0);
-			v *= scale;
-		}
+        double v = distancePID.compute(traveled);
+        v = clamp(v, -speed, speed);
 
+		// limiter during accel
+		double currentAccelLimit = accelLimitRate;
+        if (std::fabs(v) < std::fabs(prevVelocity)) {
+			currentAccelLimit = 500.0; // Allow faster deceleration
+        }
+		v = accelLimit(prevVelocity, v, dt, currentAccelLimit);
+        prevVelocity = v;
 
         // Heading error
         double rawHeading = getYaw();
         if (rawHeading < 0) {
-            pros::lcd::print(0, "IMU Failure!");
-            return;
+            pros::lcd::print(0, "[Travel] IMU Failure!");
+            break;
         }
 
         double headingError = normalizeDeg(targetHeading - rawHeading);
 
         // Heading correction
+		// double omega = headingPID.compute(headingError) * (std::fabs(v) / speed);
         double omega = headingPID.compute(headingError);
 
         // Differential drive
+		
         double left  = v + omega;
         double right = v - omega;
 
@@ -242,20 +276,28 @@ void Autonomous::travel(double distance, double speed, double targetHeading, dou
         leftMotors.move_velocity(left);
         rightMotors.move_velocity(right);
 
-		// Compute current velocity and determine exit condition
-		double currVel = 100; //(traveled - prevTraveled) / 10e-3;
-        if (distancePID.exit_condition(currVel) != PID::RUNNING)
+		// Exit if any exit condition is met.
+		// Ignore velocity exit for the first second to allow robot to accelerate
+		auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime).count();
+		double currVel = (elapsed_ms > 1000) ? (traveled - prevDistance) / dt : 999.0;
+		PID::ExitState exitState = distancePID.exit_condition(currVel);
+        if (exitState != PID::RUNNING){
+			// print exit condition
+			pros::lcd::print(0,"Exit Condition Meet");
+			printf("Exit Condition: %d\n", exitState);
             break;
-
-		prevTraveled = traveled;
+		}
+        prevDistance = traveled;
+		//   controller.print(0,0, "%.2f", rawHeading);
+		// count++;
         pros::delay(10);
     }
 
     leftMotors.move_velocity(0);
     rightMotors.move_velocity(0);
-    pros::delay(250);
+    pros::delay(10);
+	return traveled;
 }
-
 
 void Autonomous::updatePose(void) {
 	// Calculate distance travelled by each tracking wheel
@@ -264,7 +306,7 @@ void Autonomous::updatePose(void) {
 	const double yaw = getYaw();
 
 	if (yaw < 0) {
-		pros::lcd::print(0, "IMU Failure!");
+		pros::lcd::print(0, "[Update Pose] IMU Failure!");
 		return;
 	}
 
@@ -292,10 +334,14 @@ void Autonomous::updatePose(void) {
 	pos_x += del_x;
 	pos_y += del_y;
 
-	prevTheta = theta;
+	// print to the controller every 100 ms
+	static uint32_t lastPrintTime = 0;
+	if (pros::millis() - lastPrintTime > 100) {
+		controller.print(0, 0, "X:%.1f Y:%.1f", pos_x, pos_y);
+		lastPrintTime = pros::millis();
+	}
 
-	 // controller.print(0, 0, "O: %.2lf\n", convertRadToDeg(theta));
-	//controller.print(0, 0, "X: %.2f Y: %.2f\n", pos_x, pos_y);
+	prevTheta = theta;
 }
 
 double Autonomous::getYaw(void) {
@@ -321,10 +367,14 @@ WheelLengths Autonomous::getOdomWheelTravel(void) {
     static double lastParallel = parallelTrackingWheel.get_position();
 	static double lastPerpendicular = perpendicularTrackingWheel.get_position();
 
-    // Get current centidegree position of tracking wheels
-	int currParallel = parallelTrackingWheel.get_position();
-	int currPerpendicular = perpendicularTrackingWheel.get_position();
 
+	// pros::delay(100);
+
+    // Get current centidegree position of tracking wheels
+	double currParallel = parallelTrackingWheel.get_position();
+	double currPerpendicular = perpendicularTrackingWheel.get_position();
+
+	// controller.print(0,0, "%d", currParallel);
     // Get delta between current and last frame
 	double dTicksL = currParallel - lastParallel; 
 	double dTicksS = currPerpendicular - lastPerpendicular;
@@ -337,9 +387,34 @@ WheelLengths Autonomous::getOdomWheelTravel(void) {
     // Save current position as previous
 	lastParallel = currParallel;
 	lastPerpendicular = currPerpendicular;
-
+	// controller.print(0, 0, "O: %.2f\n", delParallel);
 	// Create a structure of lengths
 	WheelLengths del(delParallel, delPerpendicular);
+	
 
 	return del;
+}
+
+bool Autonomous::travelToPoint(double targetX, double targetY, double maxSpeed, bool reverse, int timer) {
+	updatePose();
+	Position start(pos_x, pos_y);
+	double dx = targetX - start.x;
+	double dy = targetY - start.y;
+	
+	double distance = std::hypot(dx, dy); //euclidean distance from start to end point	
+	double targetHeading = std::atan2(dy, dx) * 180.0  / M_PI;
+	
+	if (reverse) {
+		targetHeading += 180;
+		if (targetHeading > 180) targetHeading -= 360;
+		
+		distance = -distance;
+	}
+
+	turnTo(targetHeading);
+	travel(distance, maxSpeed, targetHeading, timer);
+
+	pros::delay(10);
+
+	return true;
 }

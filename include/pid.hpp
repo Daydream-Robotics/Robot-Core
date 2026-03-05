@@ -10,8 +10,6 @@ class PID {
         // Constants
         double kP, kI, kD;
         double start_i;
-
-        bool isAngle;
         
         // State
         double target;
@@ -23,24 +21,28 @@ class PID {
         // Exit conditions
         double smallError, bigError;
         int smallTime, bigTime;
+        double velocityThreshold;
         int velocityTime, timeout;
         
         int smallCounter, bigCounter, velocityCounter;
-        std::chrono::steady_clock::time_point startTime;
+        std::chrono::steady_clock::time_point startTime, lastTime;
         
     public:
         // Initialize PID with constants
-        PID(double p, double i, double d, double start_i, bool isAngle=false);
+        PID(double p, double i, double d, double start_i);
         
         // Set target and reset error
-        void setTarget(double target);
+        void setTarget(double target, bool resetPID = true);
+
+        // Set PID constants
+        void setConstants(double p, double i, double d);
 
         // Returns next output value based on current value
-        double compute(double current);
+        double compute(double current, bool usesAngle = false);
 
         // Set parameters for exiting PID computation
         void exit_condition_set(double smallError, int smallTime,
-            double bigError, int bigTime,
+            double bigError, int bigTime, double velocityThreshold,
             int velocityTime, int timeout);
         
         // Enum for different states for exiting PID computation
