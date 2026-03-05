@@ -2,7 +2,8 @@
 #include "subsystems.h"
 #include "constants.h"
 #include "autonomous.hpp"
-
+#include "slam.h"
+#include "objectHandler.h"
 #include <numbers>
 
 
@@ -13,6 +14,7 @@ void initialize() {
 	while (imu.is_calibrating()) {
 		pros::delay(20);
 	}
+	pros::Task frame_task(UpdateFrame_task_fn, (void*)"PROS_Task_Param", TASK_PRIORITY_DEFAULT, TASK_STACK_DEPTH_DEFAULT, "Vision Frame Update");
 }
 
 void disabled() {}
@@ -23,30 +25,20 @@ void autonomous() {
 
 	Autonomous auton = Autonomous();
 
-	// while (true) {
-	// 	auton.updatePose();
-	// 	pros::lcd::print(1, "X: %.2f, Y: %.2f", auton.pos_x, auton.pos_y);
-	// 	pros::lcd::print(2, "Heading: %.2f", auton.getYaw());
-	// 	pros::delay(20);
-	// }
-	
+	// Go to matchloader
+	 auton.travel(-36, 70, 0);
 
-	auton.travelToPoint(48, 0);
-	auton.travelToPoint(48, -48);
-	auton.travelToPoint(0, -48);
-	auton.travelToPoint(0, 0);
-	// // Go to matchloader
-	// auton.travel(-36, 70, 0);
-
-	// // Turn to matchloader
+	// Turn to matchloader
 	// unloader.set_value(true);
-	// auton.turnTo(90);
+	 auton.turnTo(90);
+	 matchload();
+	// trackingMode(GamePiece::BLUE_BALL);
 
 	// // Approach matchloader
 	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
 	// auton.travel(16, 50, 90, 1.150);
 
-	// // Matchload
+	// Matchload
 	// for (int i = 0; i < 2; i++){
 	// 	auton.travel(-12, 50, 90, 0.15);
 	// 	auton.travel(12, 60, 90, 0.35);
@@ -125,6 +117,24 @@ void autonomous() {
 
 void opcontrol() {
 	// Set chassis brake mode to coast
+
+	
+	// Autonomous auton = Autonomous();
+
+	// // Go to matchloader
+	// // auton.travel(-36, 70, 0);
+
+	// // Turn to matchloader
+	// // unloader.set_value(true);
+	// // auton.turnTo(90);
+
+	//  matchload(false);
+
+	collect(GamePiece::RED_BALL, 4);
+
+	 
+
+
 	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 
@@ -132,7 +142,7 @@ void opcontrol() {
 	backIntake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 
 	while(true){
-	
+
 		/* - - - - - - - - - - - - - - [CHASSIS CONTROLS] - - - - - - - - - - - - - - */
 
 		drive(DriveType::TANK);
@@ -156,8 +166,20 @@ void opcontrol() {
 			descorer.toggle();
 		}
 
-		/* - - - - - - - - - - - - - - [INTAKE] - - - - - - - - - - - - - - */
+		/* - - - - - - - - - - - - - - - - [AI] - - - - - - - - - - - - - - - - - - */		
+		if(controller.get_digital_new_press(DIGITAL_LEFT)){
+			matchload(false);
+		}
 
+		if(controller.get_digital_new_press(DIGITAL_RIGHT)){
+			collect(GamePiece::RED_BALL, 4);
+		}
+
+		if(controller.get_digital_new_press(DIGITAL_DOWN)){
+			collect(GamePiece::RED_BALL);
+		}
+		
+		/* - - - - - - - - - - - - - - [INTAKE] - - - - - - - - - - - - - - */
 		// Main intake
 		if (controller.get_digital(DIGITAL_R1)) { // intake
 			move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
@@ -174,6 +196,8 @@ void opcontrol() {
 		// Delay added to prevent crashing
 		pros::delay(20);
 	}
+
+	
 }
 
 void move_intake(int front, int mid, int back, double seconds) {

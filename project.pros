@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "TravelT0",
+    "project_name": "AI Skill",
     "target": "v5",
     "templates": {
       "kernel": {
