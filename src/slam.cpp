@@ -192,6 +192,7 @@ void collect(GamePiece gamePiece, int isLoading)
         leftMotors.move_velocity(50);
         rightMotors.move_velocity(50);
         }
+
         else{
         leftMotors.move_velocity(turnSpeed + 50);
         rightMotors.move_velocity(-turnSpeed + 50);
@@ -213,6 +214,19 @@ void collect(GamePiece gamePiece, int isLoading)
     
     if(isLoading == 1){
         collect(gamePiece, 2);
+    }
+    else if(isLoading == 4){
+        leftMotors.move_velocity(-50);
+        rightMotors.move_velocity(-50);
+        pros::delay(800);
+        leftMotors.move_velocity(0);
+        rightMotors.move_velocity(0);
+        collect(gamePiece);
+        leftMotors.move_velocity(-100);
+        rightMotors.move_velocity(-100);
+        pros::delay(2000);
+        leftMotors.move_velocity(0);
+        rightMotors.move_velocity(0);
     }
     // DEBUG
     printf("[TurnTo] Exiting loop. Final Error: %.2f\n", error); // DEBUG
@@ -343,15 +357,8 @@ void matchload(bool isFar)
     pros::lcd::print(1,"moving intake");
     pros::delay(300);
     collect(gamePiece, 1);
-
-    // auton.travel(-5, 100, 90, 0.5);
-
-    // for (int i = 0; i < 2; i++){
-	// 	auton.travel(-12, 100, 90, 0.15);
-	// 	auton.travel(12, 100, 90, 0.35);
-	//  	pros::delay(500);
-	// }
 }
+
 
 //
 void scoreMid()

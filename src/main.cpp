@@ -128,7 +128,9 @@ void opcontrol() {
 	// // unloader.set_value(true);
 	// // auton.turnTo(90);
 
-	 matchload(false);
+	//  matchload(false);
+
+	collect(GamePiece::RED_BALL, 4);
 
 	 
 
@@ -140,7 +142,7 @@ void opcontrol() {
 	backIntake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 
 	while(true){
-	
+
 		/* - - - - - - - - - - - - - - [CHASSIS CONTROLS] - - - - - - - - - - - - - - */
 
 		drive(DriveType::TANK);
@@ -164,8 +166,20 @@ void opcontrol() {
 			descorer.toggle();
 		}
 
-		/* - - - - - - - - - - - - - - [INTAKE] - - - - - - - - - - - - - - */
+		/* - - - - - - - - - - - - - - - - [AI] - - - - - - - - - - - - - - - - - - */		
+		if(controller.get_digital_new_press(DIGITAL_LEFT)){
+			matchload(false);
+		}
 
+		if(controller.get_digital_new_press(DIGITAL_RIGHT)){
+			collect(GamePiece::RED_BALL, 4);
+		}
+
+		if(controller.get_digital_new_press(DIGITAL_DOWN)){
+			collect(GamePiece::RED_BALL);
+		}
+		
+		/* - - - - - - - - - - - - - - [INTAKE] - - - - - - - - - - - - - - */
 		// Main intake
 		if (controller.get_digital(DIGITAL_R1)) { // intake
 			move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
