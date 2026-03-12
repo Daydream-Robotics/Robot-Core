@@ -51,7 +51,7 @@ constexpr double DISTANCE_KI = 0.0;
 constexpr double DISTANCE_KD = 0.0; 
 constexpr double DISTANCE_KI_THRESHOLD = 1.0;
 
-constexpr double HEADING_KP = 0.0001; 
+constexpr double HEADING_KP = 0.01; 
 constexpr double HEADING_KI = 0.0;
 constexpr double HEADING_KD = 0.0;  
 constexpr double HEADING_KI_THRESHOLD = 0.0;

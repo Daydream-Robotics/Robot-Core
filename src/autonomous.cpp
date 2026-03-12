@@ -192,7 +192,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
     distancePID.exit_condition_set(
         0.1, 10,
         0.4, 30,
-        0.5, 200,
+        0.5, 200000000,
         timer_s * 1000
     );
 

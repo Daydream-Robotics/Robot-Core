@@ -26,12 +26,17 @@ void autonomous() {
 	Autonomous auton = Autonomous();
 
 	// Go to matchloader
-	 auton.travel(-36, 70, 0);
+	 auton.travelToPoint(-36, 0, 70, true);
+	
 
 	// Turn to matchloader
-	// unloader.set_value(true);
-	 auton.turnTo(90);
-	 matchload();
+	unloader.set_value(true);
+	auton.turnTo(90);
+	matchload(false);
+
+	auton.travelToPoint(-35,-22, 80, true, 5);
+
+	
 	// trackingMode(GamePiece::BLUE_BALL);
 
 	// // Approach matchloader
@@ -130,7 +135,7 @@ void opcontrol() {
 
 	//  matchload(false);
 
-	collect(GamePiece::RED_BALL, 4);
+	// collect(GamePiece::RED_BALL, 4);
 
 	 
 

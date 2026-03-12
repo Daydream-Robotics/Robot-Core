@@ -81,8 +81,8 @@ void collect(GamePiece gamePiece, int isLoading)
         x++;
         continue;
     }
-    pros::lcd::print(1,"connected");
-     move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
+    // pros::lcd::print(1,"connected");
+     move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
 
 
      // TODO: add alternate exits to loop
@@ -170,9 +170,7 @@ void collect(GamePiece gamePiece, int isLoading)
         if(isLoading == 3){
             if(empty_frames > 2 || humpCount > 4 && humpCount >1)return;
 
-            pros::lcd::print(5, "is loading = %d", isLoading);
-            // auton.travel(-12, 50, -90, 0.15);
-            // auton.travel(12, 60, -90, 0.35);
+            // pros::lcd::print(5, "is loading = %d", isLoading);
             leftMotors.move_velocity(-20);
             rightMotors.move_velocity(-20);
             pros::delay(400);
@@ -185,7 +183,7 @@ void collect(GamePiece gamePiece, int isLoading)
         else if(isLoading == 2){
             if(gamePiece == GamePiece::BLUE_BALL)gamePiece = GamePiece::RED_BALL;
             else gamePiece == GamePiece::BLUE_BALL;
-            pros::lcd::print(0,"loading = 2");
+            // pros::lcd::print(0,"loading = 2");
             isLoading = 3;   
         }
         else if(isLoading == 1 && std::abs(error) < .01){
@@ -203,7 +201,7 @@ void collect(GamePiece gamePiece, int isLoading)
         previousError = error; // resetting the previous Angle to use in the next iteration
 
         // pros::lcd::print(2, "Error: %lf", error);
-        pros::lcd::print(1, "run count %d", count);
+        // pros::lcd::print(1, "run count %d", count);
 
 
 
@@ -216,15 +214,15 @@ void collect(GamePiece gamePiece, int isLoading)
         collect(gamePiece, 2);
     }
     else if(isLoading == 4){
-        leftMotors.move_velocity(-50);
-        rightMotors.move_velocity(-50);
-        pros::delay(800);
+        leftMotors.move_velocity(-30);
+        rightMotors.move_velocity(-30);
+        pros::delay(400);
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
         collect(gamePiece);
         leftMotors.move_velocity(-100);
         rightMotors.move_velocity(-100);
-        pros::delay(2000);
+        pros::delay(300);
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
     }
@@ -237,7 +235,7 @@ void collect(GamePiece gamePiece, int isLoading)
 
     leftMotors.move_velocity(0);
     rightMotors.move_velocity(0);
-    pros::lcd::print(5, "robot stopped turning");
+    // pros::lcd::print(5, "robot stopped turning");
     return;
 }
 
@@ -353,10 +351,15 @@ void matchload(bool isFar)
 
     unloader.set_value(true);
 
-    move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-    pros::lcd::print(1,"moving intake");
+    move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
+    // pros::lcd::print(1,"moving intake");
     pros::delay(300);
     collect(gamePiece, 1);
+    leftMotors.move_velocity(-100);
+    rightMotors.move_velocity(-100);
+    pros::delay(200);
+    leftMotors.move_velocity(0);
+    rightMotors.move_velocity(0);
 }
 
 
