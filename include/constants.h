@@ -9,20 +9,21 @@
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
-constexpr int LEFT_TRACKING_WHEEL_PORT = -18;
-constexpr int RIGHT_TRACKING_WHEEL_PORT = 13;
-constexpr int BACK_TRACKING_WHEEL_PORT = 20;
+constexpr int PARALLEL_TRACKING_WHEEL_PORT = -6;
+constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 10;
 
-#define LEFT_DRIVE_WHEEL_PORTS {-1, 2, -3, -4}
-#define RIGHT_DRIVE_WHEEL_PORTS {5, -17, 14, 12}
+#define LEFT_DRIVE_WHEEL_PORTS {-13, -11, -1, 2}
+#define RIGHT_DRIVE_WHEEL_PORTS {-3, 18, 19, 20}
 
-constexpr int FRONT_INTAKE_PORT = -6;
-constexpr int MAIN_INTAKE_PORT = 9;
-constexpr int BACK_INTAKE_PORT = -8;
+constexpr int FRONT_INTAKE_PORT = -14;
+constexpr int MID_INTAKE_PORT = 4;
+constexpr int BACK_INTAKE_PORT = -5;
 
-constexpr char IMU_PORT = 11;
+constexpr char IMU_PORT = 12;
 
-constexpr char PNEUMATIC_PORT = 'A';
+constexpr char UNLOADER_PORT = 'C'; 
+constexpr char CENTER_SCORE_PORT = 'A'; 
+constexpr char DESCORE_PORT = 'B'; 
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
@@ -38,26 +39,32 @@ constexpr int STOP = 0;
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 
-constexpr double LEFT_TRACKING_WHEEL_DISTANCE = 1.58;
-constexpr double RIGHT_TRACKING_WHEEL_DISTANCE = 1.58;
-constexpr double BACK_TRACKING_WHEEL_DISTANCE = 1.188;
+constexpr double PERPINDICULAR_TRACKING_WHEEL_DISTANCE = 2.25;
 
-constexpr double TRACKING_WHEEL_DIAMETER = 2.00;
-constexpr double BACK_TRACKING_WHEEL_DIAMETER = 2.75;
+constexpr double PARALLEL_TRACKING_WHEEL_DIAMETER = 2.00;
+constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.0;
 
 /* - - - - - - - - - - - - - - [PIDS] - - - - - - - - - - - - - - */
 
-constexpr double TURN_KP = 3.5;
-constexpr double TURN_KI = 0.0000000;//0.00001;
-constexpr double TURN_KD = 0.04; //0.16; // 0.04
+constexpr double DISTANCE_KP = 4.25;
+constexpr double DISTANCE_KI = 0.0; 
+constexpr double DISTANCE_KD = 0.0; 
+constexpr double DISTANCE_KI_THRESHOLD = 1.0;
 
-constexpr double MOVE_KP = 1.5;
-constexpr double MOVE_KI = 0.0;
-constexpr double MOVE_KD = 0.0;
+constexpr double HEADING_KP = 0.01; 
+constexpr double HEADING_KI = 0.0;
+constexpr double HEADING_KD = 0.0;  
+constexpr double HEADING_KI_THRESHOLD = 0.0;
 
-constexpr double MOVE_HEADING_KP = 0.1;
-constexpr double MOVE_HEADING_KI = 0.001;
-constexpr double MOVE_HEADING_KD = 0.001;
-constexpr double MOVE_HEADING_INTEGRATOR_LIMIT = 0.5;
+constexpr double TURN_KP = 1.2; 
+constexpr double TURN_KI = 0.01; 
+constexpr double TURN_KD = 0.001; 
+constexpr double TURN_KI_THRESHOLD = 15.0;
+
+
+enum class DriveType {
+    SPLIT_ARCADE,
+    TANK
+};
 
 #endif

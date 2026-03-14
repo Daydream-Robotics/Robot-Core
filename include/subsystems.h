@@ -2,11 +2,18 @@
 
 extern pros::Controller controller;
 
+extern pros::Rotation parallelTrackingWheel;
+extern pros::Rotation perpendicularTrackingWheel;
+
 extern pros::MotorGroup leftMotors;
 extern pros::MotorGroup rightMotors;
 
-extern pros::Motor mainIntake;
 extern pros::Motor frontIntake;
+extern pros::Motor midIntake;
 extern pros::Motor backIntake;
 
-extern pros::adi::Pneumatics piston;
+extern pros::IMU imu;
+
+extern pros::adi::Pneumatics unloader;
+extern pros::adi::Pneumatics centerScore;
+extern pros::adi::Pneumatics descorer;

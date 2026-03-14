@@ -1,85 +1,63 @@
-/*
- * \file odometry.h
- *
- *  Contains function declarations and constants for odometry
- */
+// /*
+//  * \file odometry.h
+//  *
+//  *  Contains function declarations and constants for odometry
+//  */
 
-#ifndef ODOMETRY_H
-#define ODOMETRY_H
+// #ifndef ODOMETRY_H
+// #define ODOMETRY_H
 
-#include <cmath>
-#include <chrono>
+// #include <cmath>
+// #include <chrono>
 
-// Longitudinal position (inches)
-extern double pos_x;
+// // Struct for holding lengths travelled by wheels
+// typedef struct ArcLengths {
+//     double parallel;
+//     double perpendicular;
+// } ArcLengths;
 
-// Lateral position (inches)
-extern double pos_y;
+// typedef struct Position {
+//     double x;
+//     double y;
+// } Position;
 
-// Orientation (radians) (0 - 2pi)
-extern double theta;
+// // Calculate and update global position and orientation variables
+// void update_position_and_angle(void);
 
-// Previous Orientation (radians) (0 - 2pi)
-extern double prevTheta;
+// // Normalize the angle btwn pi and -pi
+// double normalizeAngle(double a);
 
-// Tracking Wheels
-extern pros::Rotation LTWheel;
-extern pros::Rotation RTWheel;
-extern pros::Rotation BTWheel;
+// // Get arc lengths travelled and update encoder values
+// ArcLengths get_wheel_travel(void);
 
-// IMU Sensor
-extern pros::IMU imu;
+// // Return change in heading based on arc lengths travelled
+// double compute_heading_change(ArcLengths arcs);
 
+// // Convert degrees to radians
+// double convertDegToRad(double degrees);
 
-// Struct for holding lengths travelled by wheels
-typedef struct ArcLengths {
-    double left;
-    double right;
-    double back;
-} ArcLengths;
+// // Convert radians to degrees
+// double convertRadToDeg (double rad);
 
-typedef struct Position {
-    double x;
-    double y;
-} Position;
+// // Find distance between two positions
+// double getDistance (Position p1, Position p2);
 
-// Calculate and update global position and orientation variables
-void update_position_and_angle(void);
+// // Turn to specified target angle
+// void turn_pid(double target, double weightAdjustment);
 
-// Normalize the angle btwn pi and -pi
-double normalizeAngle(double a);
+// // Move to specified position (if backward == 1, then reverse instead) (if timer == -1, then there is no timer)
+// void move_pid(Position target, int speed, double weightAdjustment, int backwards, int timer);
 
-// Get arc lengths travelled and update encoder values
-ArcLengths get_wheel_travel(void);
+// // Move a specified distance
+// void move_dist_pid(double targetDistance, int speed, int timer, bool backwards);
 
-// Return change in heading based on arc lengths travelled
-double compute_heading_change(ArcLengths arcs);
+// // Get yaw from imu
+// double get_yaw_quaternion();
 
-// Convert degrees to radians
-double convertDegToRad(double degrees);
+// // Move a specified distance and direction
+// void travelDistanceWithHeading(double distance, double speed, double target_heading, int timer);
 
-// Convert radians to degrees
-double convertRadToDeg (double rad);
+// // Helper: shortest difference a - b normalized
+// double angleDiffDeg(double a, double b);
 
-// Find distance between two positions
-double getDistance (Position p1, Position p2);
-
-// Turn to specified target angle
-void turn_pid(double target, double weightAdjustment);
-
-// Move to specified position (if backward == 1, then reverse instead) (if timer == -1, then there is no timer)
-void move_pid(Position target, int speed, double weightAdjustment, int backwards, int timer);
-
-// Move a specified distance
-void move_dist_pid(double targetDistance, int speed, int timer, bool backwards);
-
-// Get yaw from imu
-double get_yaw_quaternion();
-
-// Move a specified distance and direction
-void travelDistanceWithHeading(double distance, double speed, double target_heading, int timer);
-
-// Helper: shortest difference a - b normalized
-double angleDiffDeg(double a, double b);
-
-#endif
+// #endif
