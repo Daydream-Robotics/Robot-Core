@@ -4,8 +4,10 @@
 #include "odometry.hpp"
 
 
-PurePursuit::PurePursuit(double wheelBase) 
-: velocityPID(PP_KP, PP_KI, PP_KD, 0.0), wheelBase(wheelBase) {
+PurePursuit::PurePursuit(std::vector<Position> path) 
+    : velocityPID(PP_KP, PP_KI, PP_KD, 0.0) {
+    this->path = path;
+}
 
 
 std::pair<double, double> PurePursuit::step() {
@@ -27,8 +29,9 @@ std::pair<double, double> PurePursuit::step() {
 
     double curvature = (2.0 * localY) / pow(look_ahead_dist, 2.0);
 
-    // set up pid here
+    // set up pid here later
 
+    int base_vel = 50 // this will be changed 
     
 }
 

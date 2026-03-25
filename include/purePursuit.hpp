@@ -14,18 +14,18 @@ struct TargetPoint : Position {
 
 class PurePursuit {
     private:
-        std::vector<TargetPoint> path;
-        
-        int findClosestPoint(Position position);
+        Position findClosestPoint(Position position);
         Position findLookaheadPoint(Position position);
         
-        double wheelbase;
+        double wheelbase; // may be useful but idk
         PID velocityPID;
+        
+        std::vector<Position> path;
+        int lastPassedPointIndex = 0;
         double look_ahead_dist;
 
-
     public:
-        PurePursuit(double wheelBase);
+        PurePursuit(std::vector<Position> path);
 
         void setPath(std::vector<TargetPoint> new_path);
 
