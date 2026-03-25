@@ -1,4 +1,7 @@
+#pragma once
+
 #include "main.h"
+#include "odometry.hpp"
 
 extern pros::Controller controller;
 
