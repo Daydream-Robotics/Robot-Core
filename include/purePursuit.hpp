@@ -14,8 +14,9 @@ struct TargetPoint : Position {
 
 class PurePursuit {
     private:
-        Position findClosestPoint(Position position);
-        Position findLookaheadPoint(Position position);
+        int findClosestPointIndex(Position cur_position);
+        Position findLookaheadPoint(Position cur_position);
+        Position convertToRobotCoords(Position robot_pos, double robot_heading_deg, Position target_point);
         
         double wheelbase; // may be useful but idk
         PID velocityPID;
