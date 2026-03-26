@@ -6,6 +6,8 @@
 #include "objectHandler.h"
 #include <numbers>
 
+#include "purePursuit.hpp"
+
 
 void initialize() {
 	pros::lcd::initialize();
@@ -22,19 +24,52 @@ void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
+	std::vector<Position> path = {
+		{0, 0},
+		{1, 0},
+		{2, 0},
+		{3, 0},
+		{4, 0},
+		{5, 0},
+		{6, 0},
+		{7, 0},
+		{9, 0},
+		{10, 0},
+		{11, 0},
+		{12, 0},
+		{13, 0},
+		{14, 0},
+		{15, 0},
+		{16, 0},
+		{17, 0},
+		{19, 0},
+		{20, 0}
+	};
 
-	Autonomous auton = Autonomous();
+	PurePursuit purePursuit(path);
 
-	// Go to matchloader
-	 auton.travelToPoint(-36, 0, 70, true);
+	bool finished = false;
+	while (true) {
+		finished = purePursuit.step();
+		if (finished) {
+			break;
+		}
+		pros::delay(10);
+	}
 	
 
-	// Turn to matchloader
-	unloader.set_value(true);
-	auton.turnTo(90);
-	matchload(false);
+	// Autonomous auton = Autonomous();
 
-	auton.travelToPoint(-35,-22, 80, true, 5);
+	// // Go to matchloader
+	//  auton.travelToPoint(-36, 0, 70, true);
+	
+
+	// // Turn to matchloader
+	// unloader.set_value(true);
+	// auton.turnTo(90);
+	// matchload(false);
+
+	// auton.travelToPoint(-35,-22, 80, true, 5);
 
 	
 	// trackingMode(GamePiece::BLUE_BALL);

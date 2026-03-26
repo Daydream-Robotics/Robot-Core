@@ -35,3 +35,6 @@ class HeadingFilter {
 		double update(double raw);
 		void reset();
 };
+
+
+double calcDistBetweenPoints(Position pt1, Position pt2);

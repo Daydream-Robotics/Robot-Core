@@ -89,9 +89,6 @@ void Autonomous::turnTo(double targetHeading) {
     pros::delay(10);
 }
 
-void Autonomous::setPose(double x, double y) {
-    odom.setPose(x, y);
-}
 
 double Autonomous::travel(double distance, double speed, double targetHeading, double timer_s) {
 	double traveled = 0;

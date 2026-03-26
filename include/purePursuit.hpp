@@ -9,6 +9,10 @@ constexpr double PP_KP = 1.0;
 constexpr double PP_KI = 0.0;
 constexpr double PP_KD = 0.0;
 
+constexpr double TURN_RATE = 1;
+
+constexpr double END_TOLERANCE = 1;
+
 struct TargetPoint : Position {
 };
 
@@ -23,12 +27,12 @@ class PurePursuit {
         
         std::vector<Position> path;
         int lastPassedPointIndex = 0;
-        double look_ahead_dist;
+        double look_ahead_dist = 2;
 
     public:
         PurePursuit(std::vector<Position> path);
 
         void setPath(std::vector<TargetPoint> new_path);
 
-        std::pair<double, double> step();
+        bool step();
 };

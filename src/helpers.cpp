@@ -78,3 +78,8 @@ double HeadingFilter::update(double raw) {
 void HeadingFilter::reset() {
     initialized = false;
 }
+
+
+double calcDistBetweenPoints(Position pt1, Position pt2) {
+    return std::hypot(pt1.x - pt2.x, pt1.y - pt2.y);
+}
