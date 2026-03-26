@@ -36,13 +36,15 @@ bool PurePursuit::step() {
 
     Position target_point = findLookaheadPoint({cur_x, cur_y});
     Position local_target_coord = convertToRobotCoords({cur_x, cur_y}, cur_heading_deg, target_point);
+    pros::lcd::print(6, "LX %.2lf, LY %.2lf", local_target_coord.x, local_target_coord.y);
 
     // Using actual distance to target ensures accurate curvature regardless of point sparsity
     double actual_dist = calcDistBetweenPoints({cur_x, cur_y}, target_point);
     double curvature = 0.0;
     if (actual_dist > 0.01) {
-        curvature = (2.0 * local_target_coord.y) / (actual_dist * actual_dist);
+        curvature = (2.0 * local_target_coord.x) / (actual_dist * actual_dist);
     }
+    pros::lcd::print(1, "Cur: %lf", curvature);
 
     double radius = 0; // not used (may be used later)
     if (std::abs(curvature) > 0.001) {
@@ -107,7 +109,8 @@ Position PurePursuit::findLookaheadPoint(Position robot_position) {
     }
 
     // Update the last passed point to prevent tracking backwards
-    lastPassedPointIndex = std::max(lastPassedPointIndex, start_point_index);
+    lastPassedPointIndex = start_point_index;
+    // lastPassedPointIndex = std::max(lastPassedPointIndex, start_point_index);
 
     for (int i = lastPassedPointIndex; i < path.size(); i++) {
         Position iter_point = path[i];

@@ -9,9 +9,9 @@ constexpr double PP_KP = 1.0;
 constexpr double PP_KI = 0.0;
 constexpr double PP_KD = 0.0;
 
-constexpr double TURN_RATE = 1;
+constexpr double TURN_RATE = 50;
 
-constexpr double END_TOLERANCE = 1;
+constexpr double END_TOLERANCE = 2;
 
 struct TargetPoint : Position {
 };
