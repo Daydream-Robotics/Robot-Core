@@ -183,6 +183,10 @@ void opcontrol() {
 		if(controller.get_digital_new_press(DIGITAL_DOWN)){
 			collect(GamePiece::RED_BALL);
 		}
+
+		if(controller.get_digital_new_press(DIGITAL_UP)){
+			trackingMode(GamePiece::RED_BALL);
+		}
 		
 		/* - - - - - - - - - - - - - - [INTAKE] - - - - - - - - - - - - - - */
 		// Main intake
