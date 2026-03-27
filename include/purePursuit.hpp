@@ -11,7 +11,7 @@ constexpr double PurPur_KD = 0.0;
 
 constexpr double TURN_RATE = 50;
 
-constexpr double END_TOLERANCE = 2;
+constexpr double END_TOLERANCE = 1.5;
 
 class PurePursuit {
     private:
