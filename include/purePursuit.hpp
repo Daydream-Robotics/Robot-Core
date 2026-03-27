@@ -5,16 +5,13 @@
 #include "helpers.hpp"
 #include "pid.hpp"
 
-constexpr double PP_KP = 1.0;
-constexpr double PP_KI = 0.0;
-constexpr double PP_KD = 0.0;
+constexpr double PurPur_KP = 1.0;
+constexpr double PurPur_KI = 0.0;
+constexpr double PurPur_KD = 0.0;
 
 constexpr double TURN_RATE = 50;
 
 constexpr double END_TOLERANCE = 2;
-
-struct TargetPoint : Position {
-};
 
 class PurePursuit {
     private:
@@ -32,7 +29,7 @@ class PurePursuit {
     public:
         PurePursuit(std::vector<Position> path);
 
-        void setPath(std::vector<TargetPoint> new_path);
+        void setPath(std::vector<Position> new_path);
 
         bool step();
 };

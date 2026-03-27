@@ -8,11 +8,11 @@
 
 
 PurePursuit::PurePursuit(std::vector<Position> path) 
-    : velocityPID(PP_KP, PP_KI, PP_KD, 0.0) {
+    : velocityPID(PurPur_KP, PurPur_KI, PurPur_KD, 0.0) {
     this->path = path;
 }
 
-void PurePursuit::setPath(std::vector<TargetPoint> new_path) {
+void PurePursuit::setPath(std::vector<Position> new_path) {
     path.clear();
     for (const auto& point : new_path) {
         path.push_back({point.x, point.y});
