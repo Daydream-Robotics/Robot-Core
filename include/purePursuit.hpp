@@ -9,9 +9,9 @@ constexpr double PurPur_KP = 1.0;
 constexpr double PurPur_KI = 0.0;
 constexpr double PurPur_KD = 0.0;
 
-constexpr double TURN_RATE = 50;
+constexpr double TURN_RATE = 1000; // lo 1000
 
-constexpr double END_TOLERANCE = 1.5;
+constexpr double END_TOLERANCE = 3;
 
 class PurePursuit {
     private:
@@ -24,8 +24,8 @@ class PurePursuit {
         
         std::vector<Position> path;
         int lastPassedPointIndex = 0;
-        double look_ahead_dist = 2;
-
+        double look_ahead_dist = 10.0; 
+        
     public:
         PurePursuit(std::vector<Position> path);
 

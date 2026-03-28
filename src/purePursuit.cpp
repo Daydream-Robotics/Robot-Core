@@ -26,7 +26,7 @@ bool PurePursuit::step() {
 
     double cur_x = odom.pos_x;
     double cur_y = odom.pos_y;
-    double cur_heading_deg = odom.getYaw();
+    double cur_heading_deg = odom.getYaw() - 180.0; // Remove the 180 degree offset from getYaw()
     
     if (calcDistBetweenPoints({cur_x, cur_y}, path.back()) < END_TOLERANCE) {
         leftMotors.move_velocity(0);
@@ -42,7 +42,7 @@ bool PurePursuit::step() {
     double actual_dist = calcDistBetweenPoints({cur_x, cur_y}, target_point);
     double curvature = 0.0;
     if (actual_dist > 0.01) {
-        curvature = (2.0 * local_target_coord.x) / (actual_dist * actual_dist);
+        curvature = (2.0 * local_target_coord.y) / (actual_dist * actual_dist); // Use lateral distance (Y) instead of forward distance (X)
     }
     pros::lcd::print(1, "Cur: %lf", curvature);
 
@@ -54,8 +54,8 @@ bool PurePursuit::step() {
     // set up pid here later
     int base_vel = 50; // this will be changed 
 
+    int left_vel = base_vel + (curvature * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
     int right_vel = base_vel - (curvature * TURN_RATE);
-    int left_vel = base_vel + (curvature * TURN_RATE);
 
     rightMotors.move_velocity(right_vel);
     leftMotors.move_velocity(left_vel);
@@ -109,8 +109,8 @@ Position PurePursuit::findLookaheadPoint(Position robot_position) {
     }
 
     // Update the last passed point to prevent tracking backwards
-    lastPassedPointIndex = start_point_index;
-    // lastPassedPointIndex = std::max(lastPassedPointIndex, start_point_index);
+    // lastPassedPointIndex = start_point_index;
+    lastPassedPointIndex = std::max(lastPassedPointIndex, start_point_index);
 
     for (int i = lastPassedPointIndex; i < path.size(); i++) {
         Position iter_point = path[i];
