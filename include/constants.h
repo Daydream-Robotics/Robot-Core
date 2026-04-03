@@ -41,8 +41,8 @@ constexpr int STOP = 0;
 
 constexpr double PERPINDICULAR_TRACKING_WHEEL_DISTANCE = 2.25;
 
-constexpr double PARALLEL_TRACKING_WHEEL_DIAMETER = 2.00;
-constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.0;
+constexpr double PARALLEL_TRACKING_WHEEL_DIAMETER = 2.03895;
+constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.0425;
 
 /* - - - - - - - - - - - - - - [PIDS] - - - - - - - - - - - - - - */
 
