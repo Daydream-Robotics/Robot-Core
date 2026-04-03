@@ -18,6 +18,7 @@ class PurePursuit {
         int findClosestPointIndex(Position cur_position);
         Position findLookaheadPoint(Position cur_position);
         Position convertToRobotCoords(Position robot_pos, double robot_heading_deg, Position target_point);
+        double getCurvature(Position pt1, Position pt2);
         
         double wheelbase; // may be useful but idk
         PID velocityPID;

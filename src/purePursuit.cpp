@@ -125,3 +125,10 @@ Position PurePursuit::findLookaheadPoint(Position robot_position) {
     // If no point is far enough ahead, default to the very last point
     return path.back();
 }
+
+
+double PurePursuit::getCurvature(Position pt1, Position pt2){
+    double dist = calcDistBetweenPoints(pt1, pt2);
+    double curvature = (2.0 * pt1.y) / (dist * dist); // Use lateral distance (Y) instead of forward distance (X)
+    return curvature;   
+}
