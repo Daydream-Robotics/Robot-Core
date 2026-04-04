@@ -248,11 +248,11 @@ std::vector<Position> path = {
 	PurePursuit purePursuit(path);
 
 	bool finished = false;
-	while (true) {
+	while (not finished) {
+		// odom.updatePose();
+
+
 		finished = purePursuit.step();
-		if (finished) {
-			break;
-		}
 		pros::delay(10);
 	}
 	

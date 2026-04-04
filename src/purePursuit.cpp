@@ -17,13 +17,13 @@ void PurePursuit::setPath(std::vector<Position> new_path) {
     for (const auto& point : new_path) {
         path.push_back({point.x, point.y});
     }
-    lastPassedPointIndex = 0;
+    last_passed_point_index = 0;
 }
 
 
 bool PurePursuit::step() {
     odom.updatePose();
-
+    
     double cur_x = odom.pos_x;
     double cur_y = odom.pos_y;
     double cur_heading_deg = odom.getYaw() - 180.0; // Remove the 180 degree offset from getYaw()
@@ -34,7 +34,11 @@ bool PurePursuit::step() {
         return true;
     }
 
-    Position target_point = findLookaheadPoint({cur_x, cur_y});
+    // update closest point on path
+    updateClosestPointIndex({cur_x, cur_y});
+
+    // get target point coords local to the robot
+    Position target_point = getLookaheadPoint({cur_x, cur_y});
     Position local_target_coord = convertToRobotCoords({cur_x, cur_y}, cur_heading_deg, target_point);
     pros::lcd::print(6, "LX %.2lf, LY %.2lf", local_target_coord.x, local_target_coord.y);
 
@@ -46,16 +50,25 @@ bool PurePursuit::step() {
     }
     pros::lcd::print(1, "Cur: %lf", curvature);
 
+    // Throttle base velocity based on the actual lookahead curvature
+    int base_vel;
+    if (std::abs(curvature) < 0.0001) {
+        base_vel = MAX_BASE_VEL;
+    } else {
+        base_vel = (1.0 / std::abs(curvature)) * CURV_SPEED_ADJUSTMENT;
+    }
+    base_vel = std::clamp(base_vel, MIN_BASE_VEL, MAX_BASE_VEL);
+    pros::lcd::print(2, "VEL: %d", base_vel);
+
     double radius = 0; // not used (may be used later)
     if (std::abs(curvature) > 0.001) {
         radius = 1 / curvature;
     }
 
     // set up pid here later
-    int base_vel = 50; // this will be changed 
 
-    int left_vel = base_vel + (curvature * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
-    int right_vel = base_vel - (curvature * TURN_RATE);
+    int left_vel = base_vel + (curvature * base_vel * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
+    int right_vel = base_vel - (curvature * base_vel * TURN_RATE);
 
     rightMotors.move_velocity(right_vel);
     leftMotors.move_velocity(left_vel);
@@ -78,7 +91,7 @@ Position PurePursuit::convertToRobotCoords(Position robot_pos, double robot_head
 
 
 // TODO: set up early exit when it's clear no point is going to be closer
-int PurePursuit::findClosestPointIndex(Position robot_position) {
+void PurePursuit::updateClosestPointIndex(Position robot_position) {
     int closest_index = 0;
     std::optional<double> min_dist = std::nullopt;
 
@@ -96,12 +109,12 @@ int PurePursuit::findClosestPointIndex(Position robot_position) {
 
     }
 
-    return closest_index;
+    closest_pt_idx = closest_index;
 }
 
 
-Position PurePursuit::findLookaheadPoint(Position robot_position) {
-    int start_point_index = findClosestPointIndex(robot_position);
+Position PurePursuit::getLookaheadPoint(Position robot_position) {
+    int start_point_index = closest_pt_idx;
 
     if (path.empty()) {
         pros::lcd::print(7 ,"NO PATH ADDED");
@@ -109,10 +122,10 @@ Position PurePursuit::findLookaheadPoint(Position robot_position) {
     }
 
     // Update the last passed point to prevent tracking backwards
-    // lastPassedPointIndex = start_point_index;
-    lastPassedPointIndex = std::max(lastPassedPointIndex, start_point_index);
+    // last_passed_point_index = start_point_index;
+    last_passed_point_index = std::max(last_passed_point_index, start_point_index);
 
-    for (int i = lastPassedPointIndex; i < path.size(); i++) {
+    for (int i = last_passed_point_index; i < path.size(); i++) {
         Position iter_point = path[i];
         double dist_to_point = calcDistBetweenPoints(iter_point, robot_position);
 
@@ -124,11 +137,4 @@ Position PurePursuit::findLookaheadPoint(Position robot_position) {
 
     // If no point is far enough ahead, default to the very last point
     return path.back();
-}
-
-
-double PurePursuit::getCurvature(Position pt1, Position pt2){
-    double dist = calcDistBetweenPoints(pt1, pt2);
-    double curvature = (2.0 * pt1.y) / (dist * dist); // Use lateral distance (Y) instead of forward distance (X)
-    return curvature;   
 }
