@@ -1,9 +1,11 @@
 #pragma once
 
 #include <vector>
-#include "odometry.hpp"
-#include "helpers.hpp"
-#include "pid.hpp"
+
+struct Position {
+    double x;
+    double y;
+};
 
 struct Sample {
     double t = 0.0; // where in spline param
@@ -57,28 +59,26 @@ class ALS_Path {
     public:
         ALS_Path() = default;
 
+        // ===============================================
+        //    MAIN PATH BUILDING & QUERY INTERFACE
+        //  Primary External Query Interface for lookahead point
+        // ===============================================
+        Position returnLookaheadPoint(const Position& currentPos);
+
         // Main build function, computes paramterization, fit, and sample table
         bool buildFromPoints(const std::vector<Position>& points, double sampleSpacing = 0.25);
 
-        // Query points and geometry
-        Position getPointAtParameter(double tQuery) const;
-        Position getPointAtArcLength(double sQuery) const;
-
-        double getHeadingAtParameter(double tQuery) const;
-        double getCurvatureAtParameter(double tQuery) const;
-
-        // Closest Point helper
-        std::size_t findClosestSampleIndex(const Position& robotPos, std::size_t startIdx = 0, std::size_t endIdx = static_cast<std::size_t>(-1)) const;
-
         // Utilities
         double getMaxAbsCurvatureInRange(double sStart, double sEnd) const;
-        bool isValid() const;
-        double getTotalLength() const;
+
         const std::vector<double>& getParameters() const;
         const std::vector<Sample>& getSamples() const;
         const CubicSpline& getXSpline() const;
         const CubicSpline& getYSpline() const;
-
+        
+        bool isValid() const;
+        double getTotalLength() const;
+        
     private:
         // Build Helpers
         static std::vector<double> computeChordLengthParameters(const std::vector<Position>& points);
@@ -95,7 +95,20 @@ class ALS_Path {
         // Dense lookup able for arc-length queries
         std::vector<Sample> m_samples;
 
+        // Query points and geometry
+        Position getPointAtParameter(double tQuery) const;
+        Position getPointAtArcLength(double sQuery) const;
+
+        double getHeadingAtParameter(double tQuery) const;
+        double getCurvatureAtParameter(double tQuery) const;
+
+        // Closest Point helper
+        std::size_t findClosestSampleIndex(const Position& robotPos, std::size_t startIdx = 0, std::size_t endIdx = static_cast<std::size_t>(-1)) const;
+
+
+        // globals
         double m_totalLength = 0.0;
+        std::size_t m_lastIndex = 0; // for efficient closest point queries
         bool m_valid = false;
 };
 

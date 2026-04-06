@@ -1,21 +1,47 @@
 #include "arclengthSplining.hpp"
-#include "purePursuit.hpp"
-#include "helpers.hpp"
 #include <cmath>
-#include "odometry.hpp"
-#include "subsystems.h"
+#include <cstdio>
+#include <algorithm>
 
-#include "main.h"
-// Generates a paramterized (x = x(s), y = y(s)) version of a descrete set of points
+// ----------------------------------------
+//             MAIN INTERFACE
+// ----------------------------------------
+Position ALS_Path::returnLookaheadPoint(const Position& curPosition) {
+    if (m_samples.empty()) {
+        printf("No samples in returnLookaheadPoint\n");
+        return Position{};
+    }
 
-struct Example {
-    double t;
-    double s;
-    double x;
-    double y;
-    double heading;
-    double curvature;
-};
+    // Get current closest point on line
+    std::size_t closestIdx = findClosestSampleIndex(curPosition, m_lastIndex, getSamples().size());
+    const Sample& currentSample = getSamples()[closestIdx];
+
+    m_lastIndex = closestIdx; // update last index for faster search
+
+    // ================================
+    // LOOKAHEAD CALCULATIONS
+    // equation = some constant + curvature gain * abs(curvature at closest point), clamped between min & max
+    // base = some constant
+    // min = minimum clamp
+    // max = maximum clamp
+    // curvature = curvature at CURRENT CLOSEST POINT
+    // ================================
+    double baseLookahead = 5.0;
+    double minLookahead  = 2.0;
+    double maxLookahead  = 12.0;
+    double curvatureGain = 20.0;
+
+    double lookaheadDistance = baseLookahead / (1.0 + curvatureGain * std::abs(currentSample.curvature));
+    lookaheadDistance = std::clamp(lookaheadDistance, minLookahead, maxLookahead);
+
+
+    double targetS = currentSample.s + lookaheadDistance; 
+    if (targetS > m_totalLength) {
+        targetS = m_totalLength;
+    }
+
+    return getPointAtArcLength(targetS);
+}
 
 
 // ----------------------------------------
@@ -221,7 +247,7 @@ const std::vector<SplineSegment>& CubicSpline::getSegments() const {
 // ----------------------------------------
 //    ARC-LENGTH PARAM. & PATHBUILDING
 // ----------------------------------------
-std::vector<double> computeChordLengthParameters(const std::vector<Position>& points) {
+std::vector<double> ALS_Path::computeChordLengthParameters(const std::vector<Position>& points) {
     std::vector<double> t;
 
     if (points.empty()) {
@@ -242,11 +268,12 @@ std::vector<double> computeChordLengthParameters(const std::vector<Position>& po
     return t;
 }
 
-bool ALS_Path::buildFromPoints(const std::vector<Position>& points, double sampleSpacing = 0.25) {
+bool ALS_Path::buildFromPoints(const std::vector<Position>& points, double sampleSpacing) {
     m_valid = false;
     m_parameters.clear();
     m_samples.clear();
     m_totalLength = 0.0;
+    m_lastIndex = 0;
     
     if (points.size() < 2) {
         printf("Need at least 2 points to build path\n");
@@ -308,6 +335,16 @@ Position ALS_Path::getPointAtParameter(double tQuery) const {
     return p;
 }
 
+Position ALS_Path::getPointAtArcLength(double sQuery) const {
+    double tQuery = arcLengthToParameter(sQuery);
+    Position p;
+
+
+    p.x = m_splineX.evaluate(tQuery);
+    p.y = m_splineY.evaluate(tQuery);
+    return p;
+}
+
 double ALS_Path::getHeadingAtParameter(double tQuery) const {
     double dx = m_splineX.evalFirstDeriv(tQuery);
     double dy = m_splineY.evalFirstDeriv(tQuery);
@@ -327,6 +364,172 @@ double ALS_Path::getCurvatureAtParameter(double tQuery) const {
     }
 
     return (dx * ddy - dy * ddx) / denom;
+}
+
+
+// BUILD SAMPLE TABLE FOR ARC-LENGTH QUERIES
+
+void ALS_Path::buildSamples(double sampleSpacing) {
+    m_samples.clear();
+    m_totalLength = 0.0;
+
+    if (!m_splineX.isValid() || !m_splineY.isValid()) {
+        printf("Splines invalid in buildSamples\n");
+        return;
+    }
+
+    if (m_parameters.size() < 2) {
+        printf("Not enough parameters to build samples\n");
+        return;
+    }
+
+    if (sampleSpacing <= 0.0) {
+        printf("Sample spacing must be positive\n");
+        return;
+    }
+
+    const double tStart = m_parameters.front();
+    const double tEnd   = m_parameters.back();
+
+    Position prev = getPointAtParameter(tStart);
+
+    Sample first;
+    first.t = tStart;
+    first.s = 0.0;
+    first.x = prev.x;
+    first.y = prev.y;
+    first.heading = getHeadingAtParameter(tStart);
+    first.curvature = getCurvatureAtParameter(tStart);
+    m_samples.push_back(first);
+
+    double accumulatedS = 0.0;
+    double currentT = tStart;
+
+    while (currentT < tEnd) {
+        double dxdt = m_splineX.evalFirstDeriv(currentT);
+        double dydt = m_splineY.evalFirstDeriv(currentT);
+
+        double speed = std::hypot(dxdt, dydt);
+
+        double dt;
+        if (speed < 1e-9) {
+            dt = 1e-3;
+        } else {
+            dt = sampleSpacing / speed;
+        }
+
+        double nextT = currentT + dt;
+        if (nextT > tEnd) {
+            nextT = tEnd;
+        }
+
+        Position curr = getPointAtParameter(nextT);
+
+        double ds = std::hypot(curr.x - prev.x, curr.y - prev.y);
+        accumulatedS += ds;
+
+        Sample sample;
+        sample.t = nextT;
+        sample.s = accumulatedS;
+        sample.x = curr.x;
+        sample.y = curr.y;
+        sample.heading = getHeadingAtParameter(nextT);
+        sample.curvature = getCurvatureAtParameter(nextT);
+
+        m_samples.push_back(sample);
+
+        prev = curr;
+        currentT = nextT;
+    }
+
+    m_totalLength = accumulatedS;
+}
+
+std::size_t ALS_Path::findClosestSampleIndex(const Position& robotPos, std::size_t startIdx, std::size_t endIdx) const {
+    if (m_samples.empty()) {
+        return 0;
+    }
+
+    if (startIdx >= m_samples.size()) {
+        startIdx = m_samples.size() - 1;
+    }
+
+    if (endIdx == static_cast<std::size_t>(-1) || endIdx > m_samples.size()) {
+        endIdx = m_samples.size();
+    }
+
+    std::size_t closestIdx = startIdx;
+    double minDist = std::hypot(robotPos.x - m_samples[startIdx].x, robotPos.y - m_samples[startIdx].y);
+
+    std::size_t count = 0;
+    const std::size_t maxCount = 100;
+
+    for (std::size_t i = startIdx + 1; i < endIdx; i++) {
+        double dist = std::hypot(robotPos.x - m_samples[i].x, robotPos.y - m_samples[i].y);
+
+        if (dist < minDist) {
+            minDist = dist;
+            closestIdx = i;
+            count = 0;
+        } else {
+            count++;
+        }
+
+        if (count >= maxCount) {
+            break;
+        }
+    }
+
+    return closestIdx;
+}
+
+double ALS_Path::arcLengthToParameter(double sQuery) const {
+    if (m_samples.empty()) {
+        printf("No samples in arcLengthToParameter\n");
+        return 0.0;
+    }
+
+    if (sQuery <= 0.0) {
+        return m_samples.front().t;
+    }
+
+    if (sQuery >= m_samples.back().s) {
+        return m_samples.back().t;
+    }
+
+    // Binary search to find the right interval
+    std::size_t left = 0;
+    std::size_t right = m_samples.size() - 1;
+    while (left <= right) {
+        std::size_t mid = left + (right - left) / 2;
+        const Sample& seg = m_samples[mid];
+
+        if (sQuery < seg.s) {
+            if (mid == 0) {
+                return m_samples.front().t;
+            }
+            right = mid - 1;
+        } else if (sQuery > seg.s) {
+            left = mid + 1;
+        } else {
+            return m_samples[mid].t;
+        }
+    }
+
+    // Interpolate between samples[right] and samples[left]
+    std::size_t upper = left;
+    std::size_t lower = upper - 1;
+
+    const Sample& a = m_samples[lower];
+    const Sample& b = m_samples[upper];
+
+    double ds = b.s - a.s;
+    if (std::abs(ds) < 1e-12) {
+        return a.t;
+    }
+
+    double alpha = (sQuery - a.s) / ds;
+    return a.t + alpha * (b.t - a.t); //returns a t that is linearly interpolated between a.t and b.t based on where sQuery falls between a.s and b.s
 }
 
 
