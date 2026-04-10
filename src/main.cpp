@@ -23,6 +23,7 @@ void initialize() {
 
 	// Precompute Sample Tables (need to do this for each path)
 	ALS_Path als_path1;
+	pros::lcd::print(1, "Program Start");
 	als_path1.buildFromPoints(path, 0.25); //(path id, sample spacing)
 	als_path1.isValid() ? pros::lcd::print(2, "Path build success") : pros::lcd::print(2, "Path build failure");
 }

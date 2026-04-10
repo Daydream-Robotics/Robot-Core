@@ -1,11 +1,7 @@
 #pragma once
 
 #include <vector>
-
-struct Position {
-    double x;
-    double y;
-};
+#include "odometry.hpp"
 
 struct Sample {
     double t = 0.0; // where in spline param
