@@ -371,6 +371,16 @@ double ALS_Path::getCurvatureAtParameter(double tQuery) const {
 }
 
 
+double ALS_Path::calcLookaheadDist() {
+    double vel = std::abs(odom.getParallelVel());
+
+    double dyn_lookahead = LOOKAHEAD_SECONDS * vel;
+    double dyn_lookahead = std::clamp(dyn_lookahead, MIN_LOOKAHEAD_DIST, MAX_LOOKAHEAD_DIST);
+
+    return dyn_lookahead;
+}
+
+
 // BUILD SAMPLE TABLE FOR ARC-LENGTH QUERIES
 
 void ALS_Path::buildSamples(double sampleSpacing) {
