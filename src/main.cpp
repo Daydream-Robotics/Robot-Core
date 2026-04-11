@@ -11,6 +11,7 @@
 #include "purePursuit.hpp"
 
 
+
 void initialize() {
 	// Initialize subsystems
 	pros::lcd::initialize();
@@ -23,9 +24,17 @@ void initialize() {
 
 	// Precompute Sample Tables (need to do this for each path)
 	ALS_Path als_path1;
-	pros::lcd::print(1, "Program Start");
+	FILE* ifiles = fopen("/usd/test.txt", "w");
+
+	
+	// fputs("Test 1", ifiles);
+	fputs("Program Start", ifiles);
+	
 	als_path1.buildFromPoints(path, 0.25); //(path id, sample spacing)
 	als_path1.isValid() ? pros::lcd::print(2, "Path build success") : pros::lcd::print(2, "Path build failure");
+
+	fclose(ifiles);
+	
 }
 
 void disabled() {}
@@ -34,7 +43,7 @@ void competition_initialize() {}
 
 void autonomous() {
 
-
+	
 
 	PurePursuit purePursuit(path);
 

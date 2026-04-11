@@ -6,9 +6,12 @@
 // ----------------------------------------
 //             MAIN INTERFACE
 // ----------------------------------------
+
+FILE* ifiles = fopen("/usd/test.txt", "w");
+
 Position ALS_Path::returnLookaheadPoint(const Position& curPosition) {
     if (m_samples.empty()) {
-        printf("No samples in returnLookaheadPoint\n");
+        fputs("No samples in returnLookaheadPoint\n",ifiles);
         return Position{};
     }
 
@@ -53,10 +56,10 @@ bool CubicSpline::buildSpline(const std::vector<double>& t, const std::vector<do
 
     const std::size_t n = t.size();
     if (n < 2) {
-        printf("Invalid T length\n");
+        fputs("Invalid T length\n",ifiles);
         return false;
     } else if (values.size() != n) {
-        printf("T length does not match Path length\n");
+        fputs("T length does not match Path length\n", ifiles);
         return false;
     }
 
@@ -193,11 +196,12 @@ std::size_t CubicSpline::findSegmentIndex(double tQuery) const {
 // FUNCTION EVALUATION
 
 double CubicSpline::evaluate(double tQuery) const {
+    
     if (!m_valid || m_segments.empty()) {
-        printf("Spline invalid in evaluate\n");
+        fputs("Spline invalid in evaluate\n",ifiles);
         return 0.0;
     }
-
+    
     const SplineSegment& seg = m_segments[findSegmentIndex(tQuery)];
     double u = tQuery - seg.t0;
 
@@ -206,7 +210,7 @@ double CubicSpline::evaluate(double tQuery) const {
 
 double CubicSpline::evalFirstDeriv(double tQuery) const {
     if (!m_valid || m_segments.empty()) {
-        printf("Spline invalid in evalFirstDeriv\n");
+        fputs("Spline invalid in evalFirstDeriv\n",ifiles);
         return 0.0;
     }
 
@@ -218,7 +222,7 @@ double CubicSpline::evalFirstDeriv(double tQuery) const {
 
 double CubicSpline::evalSecondDeriv(double tQuery) const {
     if (!m_valid || m_segments.empty()) {
-        printf("Spline invalid in evalSecondDeriv\n");
+        fputs("Spline invalid in evalSecondDeriv\n",ifiles);
         return 0.0;
     }
 
@@ -251,7 +255,7 @@ std::vector<double> ALS_Path::computeChordLengthParameters(const std::vector<Pos
     std::vector<double> t;
 
     if (points.empty()) {
-        printf("Points empty\n");
+        fputs("Points empty\n",ifiles);
         return t;
     }
 
@@ -276,12 +280,12 @@ bool ALS_Path::buildFromPoints(const std::vector<Position>& points, double sampl
     m_lastIndex = 0;
     
     if (points.size() < 2) {
-        printf("Need at least 2 points to build path\n");
+        fputs("Need at least 2 points to build path\n", ifiles);
         return false;
     }
 
     if (sampleSpacing <= 0.0) {
-        printf("Sample spacing must be positive\n");
+        fputs("Sample spacing must be positive\n",ifiles);
         return false;
     }
 
@@ -291,7 +295,7 @@ bool ALS_Path::buildFromPoints(const std::vector<Position>& points, double sampl
     // Reject duplicates that cause repeated t values (cleanup just in case)
     for (std::size_t i = 1; i < m_parameters.size(); i++) {
         if (m_parameters[i] <= m_parameters[i - 1]) {
-            printf("Points contain duplicate or non-increasing positions\n");
+            fputs("Points contain duplicate or non-increasing positions\n", ifiles);
             return false;
         }
     }
@@ -307,12 +311,12 @@ bool ALS_Path::buildFromPoints(const std::vector<Position>& points, double sampl
 
     // Build parametric splines
     if (!m_splineX.buildSpline(m_parameters, xVals)) {
-        printf("Failed to build X spline\n");
+        fputs("Failed to build X spline\n", ifiles);
         return false;
     }
 
     if (!m_splineY.buildSpline(m_parameters, yVals)) {
-        printf("Failed to build Y spline\n");
+        fputs("Failed to build Y spline\n", ifiles);
         return false;
     }
 
@@ -320,7 +324,7 @@ bool ALS_Path::buildFromPoints(const std::vector<Position>& points, double sampl
     buildSamples(sampleSpacing);
 
     if (m_samples.empty()) {
-        printf("Failed to build sample table\n");
+        fputs("Failed to build sample table\n", ifiles);
         return false;
     }
 
@@ -374,17 +378,17 @@ void ALS_Path::buildSamples(double sampleSpacing) {
     m_totalLength = 0.0;
 
     if (!m_splineX.isValid() || !m_splineY.isValid()) {
-        printf("Splines invalid in buildSamples\n");
+        fputs("Splines invalid in buildSamples\n", ifiles);
         return;
     }
 
     if (m_parameters.size() < 2) {
-        printf("Not enough parameters to build samples\n");
+        fputs("Not enough parameters to build samples\n", ifiles);
         return;
     }
 
     if (sampleSpacing <= 0.0) {
-        printf("Sample spacing must be positive\n");
+        fputs("Sample spacing must be positive\n", ifiles);
         return;
     }
 
@@ -485,7 +489,7 @@ std::size_t ALS_Path::findClosestSampleIndex(const Position& robotPos, std::size
 
 double ALS_Path::arcLengthToParameter(double sQuery) const {
     if (m_samples.empty()) {
-        printf("No samples in arcLengthToParameter\n");
+        fputs("No samples in arcLengthToParameter\n", ifiles);
         return 0.0;
     }
 
