@@ -64,7 +64,7 @@ class ALS_Path {
         //    MAIN PATH BUILDING & QUERY INTERFACE
         //  Primary External Query Interface for lookahead point
         // ===============================================
-        Position returnLookaheadPoint(const Position& currentPos);
+        Position returnLookaheadPoint(const Position& currentPos, double lookaheadDistance = MAX_LOOKAHEAD_DIST);
         
         // Main build function, computes paramterization, fit, and sample table
         bool buildFromPoints(const std::vector<Position>& points, double sampleSpacing = 0.25);
@@ -79,7 +79,6 @@ class ALS_Path {
         
         bool isValid() const;
         double getTotalLength() const;
-        double getLookaheadDist() const;
         
     private:
         // Build Helpers
@@ -104,8 +103,6 @@ class ALS_Path {
         double getHeadingAtParameter(double tQuery) const;
         double getCurvatureAtParameter(double tQuery) const;
         
-        double calcLookaheadDist();
-
         // Closest Point helper
         std::size_t findClosestSampleIndex(const Position& robotPos, std::size_t startIdx = 0, std::size_t endIdx = static_cast<std::size_t>(-1)) const;
 

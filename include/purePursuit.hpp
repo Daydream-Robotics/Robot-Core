@@ -23,6 +23,7 @@ class PurePursuit {
         void updateClosestPointIndex(Position cur_position);
         Position getLookaheadPoint(Position cur_position);
         Position convertToRobotCoords(Position robot_pos, double robot_heading_deg, Position target_point);
+        double getLookaheadDist();
         double getCurvature(Position pt1, Position pt2);
         
         double wheelbase; // may be useful but idk

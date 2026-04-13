@@ -9,7 +9,7 @@
 
 FILE* ifiles = fopen("/usd/test.txt", "w");
 
-Position ALS_Path::returnLookaheadPoint(const Position& curPosition) {
+Position ALS_Path::returnLookaheadPoint(const Position& curPosition, double lookaheadDistance) {
     if (m_samples.empty()) {
         fputs("No samples in returnLookaheadPoint\n",ifiles);
         return Position{};
@@ -29,13 +29,13 @@ Position ALS_Path::returnLookaheadPoint(const Position& curPosition) {
     // max = maximum clamp
     // curvature = curvature at CURRENT CLOSEST POINT
     // ================================
-    double baseLookahead = 5.0;
-    double minLookahead  = 2.0;
-    double maxLookahead  = 12.0;
-    double curvatureGain = 20.0;
+    // double baseLookahead = 5.0;
+    // double minLookahead  = 2.0;
+    // double maxLookahead  = 12.0;
+    // double curvatureGain = 20.0;
 
-    double lookaheadDistance = baseLookahead / (1.0 + curvatureGain * std::abs(currentSample.curvature));
-    lookaheadDistance = std::clamp(lookaheadDistance, minLookahead, maxLookahead);
+    // double lookaheadDistance = baseLookahead / (1.0 + curvatureGain * std::abs(currentSample.curvature));
+    // lookaheadDistance = std::clamp(lookaheadDistance, minLookahead, maxLookahead);
 
 
     double targetS = currentSample.s + lookaheadDistance; 
@@ -368,16 +368,6 @@ double ALS_Path::getCurvatureAtParameter(double tQuery) const {
     }
 
     return (dx * ddy - dy * ddx) / denom;
-}
-
-
-double ALS_Path::calcLookaheadDist() {
-    double vel = std::abs(odom.getParallelVel());
-
-    double dyn_lookahead = LOOKAHEAD_SECONDS * vel;
-    double dyn_lookahead = std::clamp(dyn_lookahead, MIN_LOOKAHEAD_DIST, MAX_LOOKAHEAD_DIST);
-
-    return dyn_lookahead;
 }
 
 

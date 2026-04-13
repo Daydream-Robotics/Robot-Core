@@ -90,6 +90,16 @@ Position PurePursuit::convertToRobotCoords(Position robot_pos, double robot_head
 }
 
 
+double PurePursuit::getLookaheadDist() {
+    double vel = std::abs(odom.getParallelVel());
+
+    double dyn_lookahead = LOOKAHEAD_SECONDS * vel;
+    double dyn_lookahead = std::clamp(dyn_lookahead, MIN_LOOKAHEAD_DIST, MAX_LOOKAHEAD_DIST);
+
+    return dyn_lookahead;
+}
+
+
 // TODO: set up early exit when it's clear no point is going to be closer
 void PurePursuit::updateClosestPointIndex(Position robot_position) {
     int closest_index = 0;
