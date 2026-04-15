@@ -7,7 +7,7 @@
 #include <numbers>
 #include "arclengthSplining.hpp"
 #include "paths.h"
-
+#include "sd_card_logging.hpp"
 #include "purePursuit.hpp"
 
 
@@ -24,16 +24,15 @@ void initialize() {
 
 	// Precompute Sample Tables (need to do this for each path)
 	ALS_Path als_path1;
-	FILE* ifiles = fopen("/usd/test.txt", "w");
-
 	
-	// fputs("Test 1", ifiles);
-	fputs("Program Start", ifiles);
+	Logger::getInstance().init("/usd/log.txt");
+    LOG("Program Start");
+
+
 	
 	als_path1.buildFromPoints(path, 0.25); //(path id, sample spacing)
 	als_path1.isValid() ? pros::lcd::print(2, "Path build success") : pros::lcd::print(2, "Path build failure");
 
-	fclose(ifiles);
 	
 }
 
