@@ -22,6 +22,13 @@ PurePursuit::PurePursuit(std::vector<Position> path, ALS_Path& als_path)
 
 
 bool PurePursuit::step() {
+    // Safety check to prevent a data abort if the path is empty/invalid
+    if (!als_path.isValid() || als_path.getSamples().empty()) {
+        leftMotors.move_velocity(0);
+        rightMotors.move_velocity(0);
+        return true;
+    }
+
     odom.updatePose();
     
     double cur_x = odom.pos_x;
