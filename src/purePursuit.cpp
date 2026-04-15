@@ -6,10 +6,11 @@
 #include "arclengthSplining.hpp"
 #include "main.h"
 
-PurePursuit::PurePursuit(std::vector<Position> path) 
-    : velocityPID(PurPur_KP, PurPur_KI, PurPur_KD, 0.0) {
+PurePursuit::PurePursuit(std::vector<Position> path, ALS_Path& als_path) 
+    : velocityPID(PurPur_KP, PurPur_KI, PurPur_KD, 0.0), als_path(als_path) {
     this->path = path;
 }
+
 
 void PurePursuit::setPath(std::vector<Position> new_path) {
     path.clear();
@@ -33,15 +34,13 @@ bool PurePursuit::step() {
         return true;
     }
 
-    // update closest point on path
-    int closestPtInx = getClosestPtIdx({cur_x, cur_y});
-
     // update dynamic lookahead
     lookAheadDist = getLookaheadDist();
 
     // get target point coords local to the robot
-    Position targetPoint = getLookaheadPoint({cur_x, cur_y}, closestPtInx);
-    // Position targetPoint = ALS_Path.returnLookaheadPoint({cur_x, cur_y}, getLookaheadDist()); // NOTE: ik this is wrong
+    // int closestPtInx = getClosestPtIdx({cur_x, cur_y});
+    // Position targetPoint = getLookaheadPoint({cur_x, cur_y}, closestPtInx);
+    Position targetPoint = als_path.returnLookaheadPoint({cur_x, cur_y}, lookAheadDist);
     Position robotFrameTargetPt = convertPtToRobotFrame(targetPoint);
 
     // Using actual distance to target ensures accurate curvature regardless of point sparsity
@@ -63,8 +62,8 @@ bool PurePursuit::step() {
         pros::lcd::print(1, "Cur: %lf", curvature);
         pros::lcd::print(2, "VEL: %d", base_vel);
 
-        printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | Idx:%d | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d\n",
-               cur_x, cur_y, cur_heading_deg, current_vel, lookAheadDist, closestPtInx, targetPoint.x, targetPoint.y,
+        printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d\n",
+               cur_x, cur_y, cur_heading_deg, current_vel, lookAheadDist, targetPoint.x, targetPoint.y,
                robotFrameTargetPt.x, robotFrameTargetPt.y, curvature, base_vel, left_vel, right_vel);
     }
     stepCounter++;

@@ -4,6 +4,7 @@
 #include "odometry.hpp"
 #include "helpers.hpp"
 #include "pid.hpp"
+#include "arclengthSplining.hpp"
 
 constexpr double PurPur_KP = 1.0; // unused
 constexpr double PurPur_KI = 0.0; // unused
@@ -13,13 +14,13 @@ constexpr double MAX_LOOKAHEAD_DIST = 20.0;
 constexpr double MIN_LOOKAHEAD_DIST = 7.0;
 constexpr double LOOKAHEAD_SECONDS = 1; // this it the amount of time the robot looks ahead of it for pure pursuit
 
-constexpr double TURN_RATE = 9.0; 
+constexpr double TURN_RATE = 2.5; // Too high can stall the inner wheel on sharp turns
 
 constexpr int MAX_VIEWABLE_INDEX_AHEAD = 10;
 
-constexpr double SPEED_ADJUSTMENT_CONST = 10;
-constexpr int MIN_BASE_VEL = 10;
-constexpr int MAX_BASE_VEL = 80;
+constexpr double SPEED_ADJUSTMENT_CONST = 7.0; // Too high can cause the robot to overbrake on curves
+constexpr int MIN_BASE_VEL = 40;
+constexpr int MAX_BASE_VEL = 100;
 
 constexpr double END_TOLERANCE = 3;
 
@@ -44,8 +45,10 @@ class PurePursuit {
         Position getLookaheadPoint(Position currentPosition, int closestPtIdx);
     
         PID velocityPID;
-        
+         
         std::vector<Position> path;
+        ALS_Path& als_path;
+
         double lookAheadDist = 10.0; 
         
         int lastPassedPtIdx = 0;
@@ -53,7 +56,7 @@ class PurePursuit {
         int stepCounter = 0;
         
     public:
-        PurePursuit(std::vector<Position> path);
+        PurePursuit(std::vector<Position> path, ALS_Path& als_path);
 
         void setPath(std::vector<Position> new_path);
 

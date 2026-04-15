@@ -10,7 +10,7 @@
 #include "sd_card_logging.hpp"
 #include "purePursuit.hpp"
 
-
+ALS_Path als_path1;
 
 void initialize() {
 	// Initialize subsystems
@@ -23,7 +23,7 @@ void initialize() {
 	pros::Task frame_task(UpdateFrame_task_fn, (void*)"PROS_Task_Param", TASK_PRIORITY_DEFAULT, TASK_STACK_DEPTH_DEFAULT, "Vision Frame Update");
 
 	// Precompute Sample Tables (need to do this for each path)
-	ALS_Path als_path1;
+	// ALS_Path als_path1;
 	
 	Logger::getInstance().init("/usd/log.txt");
     LOG("Program Start");
@@ -44,14 +44,8 @@ void autonomous() {
 
 	
 
-	PurePursuit purePursuit(path);
-
-	bool finished = false;
-	while (not finished) {
-		// odom.updatePose();
-
-
-		finished = purePursuit.step();
+	PurePursuit purePursuit(path, als_path1);
+	while (not purePursuit.step()) {
 		pros::delay(10);
 	}
 	
