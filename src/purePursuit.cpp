@@ -6,19 +6,9 @@
 #include "arclengthSplining.hpp"
 #include "main.h"
 
-PurePursuit::PurePursuit(std::vector<Position> path, ALS_Path& als_path) 
+PurePursuit::PurePursuit(ALS_Path& als_path) 
     : velocityPID(PurPur_KP, PurPur_KI, PurPur_KD, 0.0), als_path(als_path) {
-    this->path = path;
 }
-
-
-// void PurePursuit::setPath(std::vector<Position> new_path) {
-//     path.clear();
-//     for (const auto& point : new_path) {
-//         path.push_back({point.x, point.y});
-//     }
-//     lastPassedPtIdx = 0;
-// }
 
 
 bool PurePursuit::step() {
@@ -47,8 +37,6 @@ bool PurePursuit::step() {
     lookAheadDist = getLookaheadDist();
 
     // get target point coords local to the robot
-    // int closestPtInx = getClosestPtIdx({cur_x, cur_y});
-    // Position targetPoint = getLookaheadPoint({cur_x, cur_y}, closestPtInx);
     Position targetPoint = als_path.returnLookaheadPoint({cur_x, cur_y}, lookAheadDist);
     Position robotFrameTargetPt = convertPtToRobotFrame(targetPoint);
 
@@ -125,74 +113,7 @@ double PurePursuit::getLookaheadDist() {
 }
 
 
-// TODO: set up early exit when it's clear no point is going to be closer
-int PurePursuit::getClosestPtIdx(Position robotPosition) {
-
-    int closestPtIdx = this->lastPassedPtIdx;
-    std::optional<double> minDistance = std::nullopt;
-
-    // Limit the search window to prevent the robot from skipping ahead to crossing path segments
-    int searchLimit = std::min((int)path.size(), this->lastPassedPtIdx + 50);
-
-    // starts from the last point passed
-    for (int i = this->lastPassedPtIdx; i < searchLimit; i++) {
-        Position currentPoint = path[i];
-
-        double currentPointDistance = calcDistBetweenPoints(robotPosition, currentPoint);
-
-        if (!minDistance.has_value()) {
-            minDistance = currentPointDistance;
-            closestPtIdx = i;
-        } else if (currentPointDistance < minDistance.value()) {
-            minDistance = currentPointDistance;
-            closestPtIdx = i;
-        }
-    }
-    
-    // set last passed index
-    lastPassedPtIdx = std::max(lastPassedPtIdx, closestPtIdx);
-
-    // printf("Closest Pt: %d\n", closestPtIdx);
-    return closestPtIdx;
-}
-
-
 int PurePursuit::getBaseVelocity(double curvature) {
     int base_vel = MAX_BASE_VEL / (1 + (std::abs(curvature) * SPEED_ADJUSTMENT_CONST));
     return std::clamp(base_vel, MIN_BASE_VEL, MAX_BASE_VEL);
-}
-
-
-
-
-
-
-
-
-// DEPRICATED
-Position PurePursuit::getLookaheadPoint(Position robot_position, int closestPtIdx) {
-    if (path.empty()) {
-        pros::lcd::print(7 ,"NO PATH ADDED");
-        return {0, 0};
-    }
-
-    int targetIdx = closestPtIdx;
-    for (int i = closestPtIdx; i < path.size(); i++) {
-        targetIdx = i;
-        double distanceToPoint = calcDistBetweenPoints(path[i], robot_position);
-
-        // Find the first point that sits outside the lookahead distance radius
-        if (distanceToPoint >= lookAheadDist) {
-            break;
-        }
-    }
-
-    // Fallback: If we are far off the path (closest point is already > lookAheadDist),
-    // advance the target index a bit to ensure we merge smoothly back onto the path 
-    // instead of turning around to hit the exact closest point behind/beside us.
-    if (targetIdx == closestPtIdx && calcDistBetweenPoints(path[targetIdx], robot_position) >= lookAheadDist) {
-        targetIdx = std::min((int)path.size() - 1, closestPtIdx + 4);
-    }
-
-    return path[targetIdx];
 }
