@@ -12,13 +12,13 @@ PurePursuit::PurePursuit(std::vector<Position> path, ALS_Path& als_path)
 }
 
 
-void PurePursuit::setPath(std::vector<Position> new_path) {
-    path.clear();
-    for (const auto& point : new_path) {
-        path.push_back({point.x, point.y});
-    }
-    lastPassedPtIdx = 0;
-}
+// void PurePursuit::setPath(std::vector<Position> new_path) {
+//     path.clear();
+//     for (const auto& point : new_path) {
+//         path.push_back({point.x, point.y});
+//     }
+//     lastPassedPtIdx = 0;
+// }
 
 
 bool PurePursuit::step() {
@@ -28,7 +28,9 @@ bool PurePursuit::step() {
     double cur_y = odom.pos_y;
     double cur_heading_deg = odom.getYaw() - 180.0; // Remove the 180 degree offset from getYaw()
     
-    if (calcDistBetweenPoints({cur_x, cur_y}, path.back()) < END_TOLERANCE) {
+    double distFromEnd = als_path.getTotalLength() - als_path.getSamples()[als_path.findClosestSampleIndex({cur_x, cur_y}, 0, -1)].s;
+
+    if (distFromEnd < END_TOLERANCE) {
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
         return true;

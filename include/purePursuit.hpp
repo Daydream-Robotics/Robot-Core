@@ -16,9 +16,9 @@ constexpr double LOOKAHEAD_SECONDS = 1; // this it the amount of time the robot 
 
 constexpr double TURN_RATE = 2.5; // Too high can stall the inner wheel on sharp turns
 
-constexpr int MAX_VIEWABLE_INDEX_AHEAD = 10;
+// constexpr int MAX_VIEWABLE_INDEX_AHEAD = 10;
 
-constexpr double SPEED_ADJUSTMENT_CONST = 7.0; // Too high can cause the robot to overbrake on curves
+constexpr double SPEED_ADJUSTMENT_CONST = 10.0; // Too high can cause the robot to overbrake on curves
 constexpr int MIN_BASE_VEL = 40;
 constexpr int MAX_BASE_VEL = 100;
 
@@ -57,6 +57,7 @@ class PurePursuit {
         
     public:
         PurePursuit(std::vector<Position> path, ALS_Path& als_path);
+        // PurePursuit(ALS_Path& als_path);
 
         void setPath(std::vector<Position> new_path);
 

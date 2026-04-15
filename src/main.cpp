@@ -6,11 +6,12 @@
 #include "objectHandler.h"
 #include <numbers>
 #include "arclengthSplining.hpp"
-#include "paths.h"
+#include "paths.hpp"
 #include "sd_card_logging.hpp"
 #include "purePursuit.hpp"
 
 ALS_Path als_path1;
+ALS_Path als_path2;
 
 void initialize() {
 	// Initialize subsystems
@@ -32,8 +33,9 @@ void initialize() {
 	
 	als_path1.buildFromPoints(path, 0.25); //(path id, sample spacing)
 	als_path1.isValid() ? pros::lcd::print(2, "Path build success") : pros::lcd::print(2, "Path build failure");
-
 	
+	als_path2.buildFromPoints(path2, 0.25); //(path id, sample spacing)
+	als_path2.isValid() ? pros::lcd::print(3, "Path build success") : pros::lcd::print(3, "Path build failure");
 }
 
 void disabled() {}
@@ -44,7 +46,7 @@ void autonomous() {
 
 	
 
-	PurePursuit purePursuit(path, als_path1);
+	PurePursuit purePursuit(path2, als_path2);
 	while (not purePursuit.step()) {
 		pros::delay(10);
 	}

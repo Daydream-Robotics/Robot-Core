@@ -63,6 +63,9 @@ class ALS_Path {
         
         // Main build function, computes paramterization, fit, and sample table
         bool buildFromPoints(const std::vector<Position>& points, double sampleSpacing = 0.25);
+
+        // Closest Point helper
+        std::size_t findClosestSampleIndex(const Position& robotPos, std::size_t startIdx = 0, std::size_t endIdx = static_cast<std::size_t>(-1)) const;
         
         // Utilities
         double getMaxAbsCurvatureInRange(double sStart, double sEnd) const;
@@ -98,10 +101,8 @@ class ALS_Path {
         double getHeadingAtParameter(double tQuery) const;
         double getCurvatureAtParameter(double tQuery) const;
         
-        // Closest Point helper
-        std::size_t findClosestSampleIndex(const Position& robotPos, std::size_t startIdx = 0, std::size_t endIdx = static_cast<std::size_t>(-1)) const;
-
-
+        
+        
         // globals
         double m_totalLength = 0.0;
         std::size_t m_lastIndex = 0; // for efficient closest point queries
