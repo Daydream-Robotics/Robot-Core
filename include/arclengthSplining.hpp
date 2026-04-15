@@ -3,11 +3,6 @@
 #include <vector>
 #include "odometry.hpp"
 
-constexpr double MAX_LOOKAHEAD_DIST = 30.0;
-constexpr double MIN_LOOKAHEAD_DIST = 5.0;
-constexpr double LOOKAHEAD_SECONDS = 1.0;
-
-
 struct Sample {
     double t = 0.0; // where in spline param
     double s = 0.0; // distance from start
@@ -64,7 +59,7 @@ class ALS_Path {
         //    MAIN PATH BUILDING & QUERY INTERFACE
         //  Primary External Query Interface for lookahead point
         // ===============================================
-        Position returnLookaheadPoint(const Position& currentPos, double lookaheadDistance = MAX_LOOKAHEAD_DIST);
+        Position returnLookaheadPoint(const Position& currentPos, double lookaheadDistance);
         
         // Main build function, computes paramterization, fit, and sample table
         bool buildFromPoints(const std::vector<Position>& points, double sampleSpacing = 0.25);

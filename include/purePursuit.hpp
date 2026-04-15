@@ -5,35 +5,52 @@
 #include "helpers.hpp"
 #include "pid.hpp"
 
-constexpr double PurPur_KP = 1.0;
-constexpr double PurPur_KI = 0.0;
-constexpr double PurPur_KD = 0.0;
+constexpr double PurPur_KP = 1.0; // unused
+constexpr double PurPur_KI = 0.0; // unused
+constexpr double PurPur_KD = 0.0; // unused
 
-constexpr double TURN_RATE = 9; // hi 20
+constexpr double MAX_LOOKAHEAD_DIST = 20.0;
+constexpr double MIN_LOOKAHEAD_DIST = 7.0;
+constexpr double LOOKAHEAD_SECONDS = 1; // this it the amount of time the robot looks ahead of it for pure pursuit
+
+constexpr double TURN_RATE = 9.0; 
 
 constexpr int MAX_VIEWABLE_INDEX_AHEAD = 10;
-constexpr double CURV_SPEED_ADJUSTMENT = 1;
-constexpr int MIN_BASE_VEL = 15;
-constexpr int MAX_BASE_VEL = 75;
+
+constexpr double SPEED_ADJUSTMENT_CONST = 10;
+constexpr int MIN_BASE_VEL = 10;
+constexpr int MAX_BASE_VEL = 80;
 
 constexpr double END_TOLERANCE = 3;
 
 class PurePursuit {
     private:
-        void updateClosestPointIndex(Position cur_position);
-        Position getLookaheadPoint(Position cur_position);
-        Position convertToRobotCoords(Position robot_pos, double robot_heading_deg, Position target_point);
+        // calculates the curvature of a point within the robot frame
+        double calculateCurvature(Position robotFrameTargetPt);
+
+        // converts a target point to a point local to the robot's frame of reference
+        Position convertPtToRobotFrame(Position targetPoint);
+
+        // returns the dynamic lookahead distance adjusted for the robot speed
         double getLookaheadDist();
-        double getCurvature(Position pt1, Position pt2);
+
+        // returns the index of the point along the path that is currently closest to the robot.
+        int getClosestPtIdx(Position robotPosition);
+
+        // returns base velocity based off curvature to target point and distance to end of path
+        int getBaseVelocity(double curvature);
         
-        double wheelbase; // may be useful but idk
+        // DEPRICATED
+        Position getLookaheadPoint(Position currentPosition, int closestPtIdx);
+    
         PID velocityPID;
         
         std::vector<Position> path;
-        double look_ahead_dist = 10.0; 
+        double lookAheadDist = 10.0; 
         
-        int last_passed_point_index = 0;
-        int closest_pt_idx = 0;
+        int lastPassedPtIdx = 0;
+
+        int stepCounter = 0;
         
     public:
         PurePursuit(std::vector<Position> path);

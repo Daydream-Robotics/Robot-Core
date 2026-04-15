@@ -114,8 +114,8 @@ void Odometry::setPose(double x, double y) {
 }
 
 double Odometry::getParallelVel() {
-	double cent_deg_s = parallelTrackingWheel.get_velocity();
-	return (cent_deg_s / 36000.0) * PARALLEL_TRACKING_WHEEL_DIAMETER * std::numbers::pi;
+	double deg_s = parallelTrackingWheel.get_velocity();
+	return (deg_s / 360.0) * PARALLEL_TRACKING_WHEEL_DIAMETER * std::numbers::pi;
 }
 
 // could be used to do odom in background
