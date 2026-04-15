@@ -467,7 +467,7 @@ std::size_t ALS_Path::findClosestSampleIndex(const Position& robotPos, std::size
     double minDist = std::hypot(robotPos.x - m_samples[startIdx].x, robotPos.y - m_samples[startIdx].y);
 
     std::size_t count = 0;
-    const std::size_t maxCount = 100;
+    const std::size_t maxCount = m_samples.size() / 5; // worst case, search through 20% of samples before giving up (prevents long search if something goes wrong)
 
     for (std::size_t i = startIdx + 1; i < endIdx; i++) {
         double dist = std::hypot(robotPos.x - m_samples[i].x, robotPos.y - m_samples[i].y);
