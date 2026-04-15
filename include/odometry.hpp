@@ -20,6 +20,9 @@ public:
 
     // Returns the current yaw (deg) from IMU; Returns -1 if IMU failure
     double getYaw(void);
+    
+    double getPosX();
+    double getPosY();
 
     // Set the robot's current position
     void setPose(double x, double y);
@@ -30,7 +33,8 @@ public:
     // Returns struct of distances travelled by Odometry Wheels
     WheelLengths getOdomWheelTravel(void);
 
-    
+    double getParallelVel();
+
     // x-position of bot (inches)
     double pos_x = 0.0;
 

@@ -3,9 +3,8 @@
 #include <cmath>
 #include "odometry.hpp"
 #include "subsystems.h"
-
+#include "arclengthSplining.hpp"
 #include "main.h"
-
 
 PurePursuit::PurePursuit(std::vector<Position> path) 
     : velocityPID(PurPur_KP, PurPur_KI, PurPur_KD, 0.0) {
@@ -17,7 +16,7 @@ void PurePursuit::setPath(std::vector<Position> new_path) {
     for (const auto& point : new_path) {
         path.push_back({point.x, point.y});
     }
-    last_passed_point_index = 0;
+    lastPassedPtIdx = 0;
 }
 
 
@@ -35,40 +34,40 @@ bool PurePursuit::step() {
     }
 
     // update closest point on path
-    updateClosestPointIndex({cur_x, cur_y});
+    int closestPtInx = getClosestPtIdx({cur_x, cur_y});
+
+    // update dynamic lookahead
+    lookAheadDist = getLookaheadDist();
 
     // get target point coords local to the robot
-    Position target_point = getLookaheadPoint({cur_x, cur_y});
-    Position local_target_coord = convertToRobotCoords({cur_x, cur_y}, cur_heading_deg, target_point);
-    pros::lcd::print(6, "LX %.2lf, LY %.2lf", local_target_coord.x, local_target_coord.y);
+    Position targetPoint = getLookaheadPoint({cur_x, cur_y}, closestPtInx);
+    // Position targetPoint = ALS_Path.returnLookaheadPoint({cur_x, cur_y}, getLookaheadDist()); // NOTE: ik this is wrong
+    Position robotFrameTargetPt = convertPtToRobotFrame(targetPoint);
 
     // Using actual distance to target ensures accurate curvature regardless of point sparsity
-    double actual_dist = calcDistBetweenPoints({cur_x, cur_y}, target_point);
-    double curvature = 0.0;
-    if (actual_dist > 0.01) {
-        curvature = (2.0 * local_target_coord.y) / (actual_dist * actual_dist); // Use lateral distance (Y) instead of forward distance (X)
-    }
-    pros::lcd::print(1, "Cur: %lf", curvature);
+    double curvature = calculateCurvature(robotFrameTargetPt);
 
     // Throttle base velocity based on the actual lookahead curvature
-    int base_vel;
-    if (std::abs(curvature) < 0.0001) {
-        base_vel = MAX_BASE_VEL;
-    } else {
-        base_vel = (1.0 / std::abs(curvature)) * CURV_SPEED_ADJUSTMENT;
-    }
-    base_vel = std::clamp(base_vel, MIN_BASE_VEL, MAX_BASE_VEL);
-    pros::lcd::print(2, "VEL: %d", base_vel);
-
-    double radius = 0; // not used (may be used later)
-    if (std::abs(curvature) > 0.001) {
-        radius = 1 / curvature;
-    }
+    int base_vel = getBaseVelocity(curvature);
 
     // set up pid here later
 
     int left_vel = base_vel + (curvature * base_vel * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
     int right_vel = base_vel - (curvature * base_vel * TURN_RATE);
+
+    
+    if (stepCounter % 10 == 0) {
+        double current_vel = odom.getParallelVel();
+        pros::lcd::print(5, "Velocity: %.2lf in/s", current_vel);
+        pros::lcd::print(6, "LX %.2lf, LY %.2lf", robotFrameTargetPt.x, robotFrameTargetPt.y);
+        pros::lcd::print(1, "Cur: %lf", curvature);
+        pros::lcd::print(2, "VEL: %d", base_vel);
+
+        printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | Idx:%d | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d\n",
+               cur_x, cur_y, cur_heading_deg, current_vel, lookAheadDist, closestPtInx, targetPoint.x, targetPoint.y,
+               robotFrameTargetPt.x, robotFrameTargetPt.y, curvature, base_vel, left_vel, right_vel);
+    }
+    stepCounter++;
 
     rightMotors.move_velocity(right_vel);
     leftMotors.move_velocity(left_vel);
@@ -77,9 +76,27 @@ bool PurePursuit::step() {
 }
 
 
-Position PurePursuit::convertToRobotCoords(Position robot_pos, double robot_heading_deg, Position target_point) {
-    double dx = target_point.x - robot_pos.x;
-    double dy = target_point.y - robot_pos.y;
+// calculates the curvature of a point within the robot frame
+double PurePursuit::calculateCurvature(Position robotFrameTargetPt) {
+    double actual_dist = calcDistBetweenPoints({0, 0}, robotFrameTargetPt);
+    
+    double curvature = 0.0;
+    if (actual_dist > 0.01) {
+        curvature = (2.0 * robotFrameTargetPt.y) / (actual_dist * actual_dist); // Use lateral distance (Y) instead of forward distance (X)
+    }
+
+    return curvature;
+}
+
+
+// converts a target point to a point local to the robot's frame of reference
+Position PurePursuit::convertPtToRobotFrame(Position targetPoint) {
+    double robot_x = odom.pos_x;
+    double robot_y = odom.pos_y;
+    double robot_heading_deg = odom.getYaw() - 180.0; // Remove the 180 degree offset from getYaw()
+    
+    double dx = targetPoint.x - robot_x;
+    double dy = targetPoint.y - robot_y;
 
     // localize displacements relative to orientation of robot
     double robot_heading_rad = convertDegToRad(robot_heading_deg);
@@ -90,51 +107,84 @@ Position PurePursuit::convertToRobotCoords(Position robot_pos, double robot_head
 }
 
 
-// TODO: set up early exit when it's clear no point is going to be closer
-void PurePursuit::updateClosestPointIndex(Position robot_position) {
-    int closest_index = 0;
-    std::optional<double> min_dist = std::nullopt;
-
-    for (int i = 0; i < this->path.size(); i++) {
-        Position point = path[i];
-
-        double point_dist = calcDistBetweenPoints(robot_position, point);
-
-        if (!min_dist.has_value()) {
-            min_dist = point_dist;
-        } else if (point_dist < min_dist.value()) {
-            min_dist = point_dist;
-            closest_index = i;
-        }
-
-    }
-
-    closest_pt_idx = closest_index;
+// gets the dynamic lookahead distance based off of the forward velocity of the robot.
+double PurePursuit::getLookaheadDist() {
+    double vel = std::abs(odom.getParallelVel());
+    // pros::lcd::print(5, "Velocity: %lf in/s", vel); // Commented out to prevent LVGL crashes
+    double dynamicLookahead = std::clamp(LOOKAHEAD_SECONDS * vel, MIN_LOOKAHEAD_DIST, MAX_LOOKAHEAD_DIST);
+    // printf("Dynamic Lookahead: %lf\n", dynamicLookahead);
+    return dynamicLookahead;
 }
 
 
-Position PurePursuit::getLookaheadPoint(Position robot_position) {
-    int start_point_index = closest_pt_idx;
+// TODO: set up early exit when it's clear no point is going to be closer
+int PurePursuit::getClosestPtIdx(Position robotPosition) {
 
+    int closestPtIdx = this->lastPassedPtIdx;
+    std::optional<double> minDistance = std::nullopt;
+
+    // Limit the search window to prevent the robot from skipping ahead to crossing path segments
+    int searchLimit = std::min((int)path.size(), this->lastPassedPtIdx + 50);
+
+    // starts from the last point passed
+    for (int i = this->lastPassedPtIdx; i < searchLimit; i++) {
+        Position currentPoint = path[i];
+
+        double currentPointDistance = calcDistBetweenPoints(robotPosition, currentPoint);
+
+        if (!minDistance.has_value()) {
+            minDistance = currentPointDistance;
+            closestPtIdx = i;
+        } else if (currentPointDistance < minDistance.value()) {
+            minDistance = currentPointDistance;
+            closestPtIdx = i;
+        }
+    }
+    
+    // set last passed index
+    lastPassedPtIdx = std::max(lastPassedPtIdx, closestPtIdx);
+
+    // printf("Closest Pt: %d\n", closestPtIdx);
+    return closestPtIdx;
+}
+
+
+int PurePursuit::getBaseVelocity(double curvature) {
+    int base_vel = MAX_BASE_VEL / (1 + (std::abs(curvature) * SPEED_ADJUSTMENT_CONST));
+    return std::clamp(base_vel, MIN_BASE_VEL, MAX_BASE_VEL);
+}
+
+
+
+
+
+
+
+
+// DEPRICATED
+Position PurePursuit::getLookaheadPoint(Position robot_position, int closestPtIdx) {
     if (path.empty()) {
         pros::lcd::print(7 ,"NO PATH ADDED");
         return {0, 0};
     }
 
-    // Update the last passed point to prevent tracking backwards
-    // last_passed_point_index = start_point_index;
-    last_passed_point_index = std::max(last_passed_point_index, start_point_index);
-
-    for (int i = last_passed_point_index; i < path.size(); i++) {
-        Position iter_point = path[i];
-        double dist_to_point = calcDistBetweenPoints(iter_point, robot_position);
+    int targetIdx = closestPtIdx;
+    for (int i = closestPtIdx; i < path.size(); i++) {
+        targetIdx = i;
+        double distanceToPoint = calcDistBetweenPoints(path[i], robot_position);
 
         // Find the first point that sits outside the lookahead distance radius
-        if (dist_to_point >= look_ahead_dist) {
-            return iter_point;
+        if (distanceToPoint >= lookAheadDist) {
+            break;
         }
     }
 
-    // If no point is far enough ahead, default to the very last point
-    return path.back();
+    // Fallback: If we are far off the path (closest point is already > lookAheadDist),
+    // advance the target index a bit to ensure we merge smoothly back onto the path 
+    // instead of turning around to hit the exact closest point behind/beside us.
+    if (targetIdx == closestPtIdx && calcDistBetweenPoints(path[targetIdx], robot_position) >= lookAheadDist) {
+        targetIdx = std::min((int)path.size() - 1, closestPtIdx + 4);
+    }
+
+    return path[targetIdx];
 }

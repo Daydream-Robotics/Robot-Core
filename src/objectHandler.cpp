@@ -65,7 +65,7 @@ void UpdateFrame_task_fn(void* param){
         while(token) {
             int classId;
             GamePieceData data;
-            int internalIndex = classId;
+            int internalIndex = -1;
     
             if(!parseObject(token, classId, data)) 
                 break;

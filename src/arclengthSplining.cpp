@@ -10,7 +10,7 @@
 
 
 
-Position ALS_Path::returnLookaheadPoint(const Position& curPosition) {
+Position ALS_Path::returnLookaheadPoint(const Position& curPosition, double lookaheadDistance) {
     if (m_samples.empty()) {
         LOG("No samples in returnLookaheadPoint");
         return Position{};
@@ -30,13 +30,13 @@ Position ALS_Path::returnLookaheadPoint(const Position& curPosition) {
     // max = maximum clamp
     // curvature = curvature at CURRENT CLOSEST POINT
     // ================================
-    double baseLookahead = 5.0;
-    double minLookahead  = 2.0;
-    double maxLookahead  = 12.0;
-    double curvatureGain = 20.0;
+    // double baseLookahead = 5.0;
+    // double minLookahead  = 2.0;
+    // double maxLookahead  = 12.0;
+    // double curvatureGain = 20.0;
 
-    double lookaheadDistance = baseLookahead / (1.0 + curvatureGain * std::abs(currentSample.curvature));
-    lookaheadDistance = std::clamp(lookaheadDistance, minLookahead, maxLookahead);
+    // double lookaheadDistance = baseLookahead / (1.0 + curvatureGain * std::abs(currentSample.curvature));
+    // lookaheadDistance = std::clamp(lookaheadDistance, minLookahead, maxLookahead);
 
 
     double targetS = currentSample.s + lookaheadDistance; 

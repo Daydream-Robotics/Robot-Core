@@ -67,6 +67,14 @@ double Odometry::getYaw(void) {
 	return ((yaw * (180.0 / std::numbers::pi)) + 180.0);
 }
 
+double Odometry::getPosX() {
+    return pos_x;
+}
+
+double Odometry::getPosY() {
+    return pos_y;
+}
+
 WheelLengths Odometry::getOdomWheelTravel(void) {
     // Get Initial Wheel Position
     static double lastParallel = parallelTrackingWheel.get_position();
@@ -103,6 +111,11 @@ WheelLengths Odometry::getOdomWheelTravel(void) {
 void Odometry::setPose(double x, double y) {
 	pos_x = x;
 	pos_y = y;
+}
+
+double Odometry::getParallelVel() {
+	double deg_s = parallelTrackingWheel.get_velocity();
+	return (deg_s / 360.0) * PARALLEL_TRACKING_WHEEL_DIAMETER * std::numbers::pi;
 }
 
 // could be used to do odom in background

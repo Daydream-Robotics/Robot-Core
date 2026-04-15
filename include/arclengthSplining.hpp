@@ -59,14 +59,14 @@ class ALS_Path {
         //    MAIN PATH BUILDING & QUERY INTERFACE
         //  Primary External Query Interface for lookahead point
         // ===============================================
-        Position returnLookaheadPoint(const Position& currentPos);
-
+        Position returnLookaheadPoint(const Position& currentPos, double lookaheadDistance);
+        
         // Main build function, computes paramterization, fit, and sample table
         bool buildFromPoints(const std::vector<Position>& points, double sampleSpacing = 0.25);
-
+        
         // Utilities
         double getMaxAbsCurvatureInRange(double sStart, double sEnd) const;
-
+        
         const std::vector<double>& getParameters() const;
         const std::vector<Sample>& getSamples() const;
         const CubicSpline& getXSpline() const;
@@ -78,26 +78,26 @@ class ALS_Path {
     private:
         // Build Helpers
         static std::vector<double> computeChordLengthParameters(const std::vector<Position>& points);
-
+        
         void buildSamples(double sampleSpacing);
         double arcLengthToParameter(double sQuery) const;
-
+    
         CubicSpline m_splineX;
         CubicSpline m_splineY;
-
+        
         // Original params for points
         std::vector<double> m_parameters;
-
+        
         // Dense lookup able for arc-length queries
         std::vector<Sample> m_samples;
-
+        
         // Query points and geometry
         Position getPointAtParameter(double tQuery) const;
         Position getPointAtArcLength(double sQuery) const;
-
+        
         double getHeadingAtParameter(double tQuery) const;
         double getCurvatureAtParameter(double tQuery) const;
-
+        
         // Closest Point helper
         std::size_t findClosestSampleIndex(const Position& robotPos, std::size_t startIdx = 0, std::size_t endIdx = static_cast<std::size_t>(-1)) const;
 
