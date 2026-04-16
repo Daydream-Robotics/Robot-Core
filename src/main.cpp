@@ -46,7 +46,7 @@ void autonomous() {
 
 	
 
-	PurePursuit purePursuit(path2, als_path2);
+	PurePursuit purePursuit(als_path2);
 	while (not purePursuit.step()) {
 		pros::delay(10);
 	}

@@ -35,29 +35,19 @@ class PurePursuit {
         // returns the dynamic lookahead distance adjusted for the robot speed
         double getLookaheadDist();
 
-        // returns the index of the point along the path that is currently closest to the robot.
-        int getClosestPtIdx(Position robotPosition);
-
         // returns base velocity based off curvature to target point and distance to end of path
         int getBaseVelocity(double curvature);
-        
-        // DEPRICATED
-        Position getLookaheadPoint(Position currentPosition, int closestPtIdx);
-    
+            
         PID velocityPID;
-         
-        std::vector<Position> path;
+
         ALS_Path& als_path;
 
-        double lookAheadDist = 10.0; 
-        
+        double lookAheadDist = 10.0;
         int lastPassedPtIdx = 0;
-
         int stepCounter = 0;
         
     public:
-        PurePursuit(std::vector<Position> path, ALS_Path& als_path);
-        // PurePursuit(ALS_Path& als_path);
+        PurePursuit(ALS_Path& als_path);
 
         void setPath(std::vector<Position> new_path);
 
