@@ -10,15 +10,15 @@ constexpr double PurPur_KP = 1.0; // unused
 constexpr double PurPur_KI = 0.0; // unused
 constexpr double PurPur_KD = 0.0; // unused
 
-constexpr double MAX_LOOKAHEAD_DIST = 20.0;
-constexpr double MIN_LOOKAHEAD_DIST = 7.0;
-constexpr double LOOKAHEAD_SECONDS = 1; // this it the amount of time the robot looks ahead of it for pure pursuit
+constexpr double MAX_LOOKAHEAD_DIST = 25.0;
+constexpr double MIN_LOOKAHEAD_DIST = 6.2;
+constexpr double LOOKAHEAD_SECONDS = 0.5; // this it the amount of time the robot looks ahead of it for pure pursuit
 
 constexpr double TURN_RATE = 2.5; // Too high can stall the inner wheel on sharp turns
 
 // constexpr int MAX_VIEWABLE_INDEX_AHEAD = 10;
 
-constexpr double SPEED_ADJUSTMENT_CONST = 10.0; // Too high can cause the robot to overbrake on curves
+constexpr double SPEED_ADJUSTMENT_CONST = 20.0; // Too high can cause the robot to overbrake on curves
 constexpr int MIN_BASE_VEL = 40;
 constexpr int MAX_BASE_VEL = 100;
 
