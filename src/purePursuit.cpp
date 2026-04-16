@@ -25,7 +25,11 @@ bool PurePursuit::step() {
     double cur_y = odom.pos_y;
     double cur_heading_deg = odom.getYaw() - 180.0; // Remove the 180 degree offset from getYaw()
     
-    double distFromEnd = als_path.getTotalLength() - als_path.getSamples()[als_path.findClosestSampleIndex({cur_x, cur_y}, 0, -1)].s;
+    // double current_s = als_path.getSamples()[als_path.findClosestSampleIndex({cur_x, cur_y}, 0, -1)].s;
+    lastPassedPtIdx = als_path.findClosestSampleIndex({cur_x, cur_y}, lastPassedPtIdx, -1);
+    double current_s = als_path.getSamples()[lastPassedPtIdx].s;
+    
+    double distFromEnd = als_path.getTotalLength() - current_s;
 
     if (distFromEnd < END_TOLERANCE) {
         leftMotors.move_velocity(0);
@@ -41,15 +45,18 @@ bool PurePursuit::step() {
     Position robotFrameTargetPt = convertPtToRobotFrame(targetPoint);
 
     // Using actual distance to target ensures accurate curvature regardless of point sparsity
-    double curvature = calculateCurvature(robotFrameTargetPt);
+    double steeringCurvature = calculateCurvature(robotFrameTargetPt);
 
-    // Throttle base velocity based on the actual lookahead curvature
-    int base_vel = getBaseVelocity(curvature);
+    // Look ahead along the path to find the sharpest upcoming curve
+    double pathMaxCurvature = als_path.getMaxAbsCurvatureInRange(current_s, current_s + lookAheadDist);
+
+    // Throttle base velocity based on the sharpest upcoming curve
+    int base_vel = getBaseVelocity(pathMaxCurvature);
 
     // set up pid here later
 
-    double left_target = base_vel + (curvature * base_vel * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
-    double right_target = base_vel - (curvature * base_vel * TURN_RATE);
+    double left_target = base_vel + (steeringCurvature * base_vel * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
+    double right_target = base_vel - (steeringCurvature * base_vel * TURN_RATE);
 
     // Maintain the turn ratio if the requested velocity exceeds the motor's physical limit
     double max_req = std::max(std::abs(left_target), std::abs(right_target));
@@ -66,12 +73,12 @@ bool PurePursuit::step() {
         double current_vel = odom.getParallelVel();
         pros::lcd::print(5, "Velocity: %.2lf in/s", current_vel);
         pros::lcd::print(6, "LX %.2lf, LY %.2lf", robotFrameTargetPt.x, robotFrameTargetPt.y);
-        pros::lcd::print(1, "Cur: %lf", curvature);
+        pros::lcd::print(1, "Cur: %lf", steeringCurvature);
         pros::lcd::print(2, "VEL: %d", base_vel);
 
         printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d\n",
                cur_x, cur_y, cur_heading_deg, current_vel, lookAheadDist, targetPoint.x, targetPoint.y,
-               robotFrameTargetPt.x, robotFrameTargetPt.y, curvature, base_vel, left_vel, right_vel);
+               robotFrameTargetPt.x, robotFrameTargetPt.y, steeringCurvature, base_vel, left_vel, right_vel);
     }
     stepCounter++;
 
@@ -87,6 +94,10 @@ double PurePursuit::calculateCurvature(Position robotFrameTargetPt) {
     double actual_dist = calcDistBetweenPoints({0, 0}, robotFrameTargetPt);
     
     double curvature = 0.0;
+    if (actual_dist < 8.0) {
+        actual_dist = 8.0;
+    }
+
     if (actual_dist > 0.01) {
         curvature = (2.0 * robotFrameTargetPt.y) / (actual_dist * actual_dist); // Use lateral distance (Y) instead of forward distance (X)
     }

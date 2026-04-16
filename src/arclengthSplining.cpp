@@ -537,6 +537,42 @@ double ALS_Path::arcLengthToParameter(double sQuery) const {
     return a.t + alpha * (b.t - a.t); //returns a t that is linearly interpolated between a.t and b.t based on where sQuery falls between a.s and b.s
 }
 
+double ALS_Path::getMaxAbsCurvatureInRange(double sStart, double sEnd) const {
+    if (m_samples.empty()) {
+        return 0.0;
+    }
+
+    double maxCurv = 0.0;
+    
+    // Binary search to efficiently find the starting index
+    std::size_t left = 0;
+    std::size_t right = m_samples.size() - 1;
+    std::size_t startIdx = 0;
+    
+    while (left <= right) {
+        std::size_t mid = left + (right - left) / 2;
+        if (m_samples[mid].s < sStart) {
+            startIdx = mid + 1;
+            left = mid + 1;
+        } else {
+            if (mid == 0) break;
+            right = mid - 1;
+        }
+    }
+
+    // Iterate through the range to find the sharpest curve
+    for (std::size_t i = startIdx; i < m_samples.size(); i++) {
+        if (m_samples[i].s > sEnd) {
+            break;
+        }
+        double absCurv = std::abs(m_samples[i].curvature);
+        if (absCurv > maxCurv) {
+            maxCurv = absCurv;
+        }
+    }
+
+    return maxCurv;
+}
 
 // UTILITIES
 

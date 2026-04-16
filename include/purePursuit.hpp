@@ -11,14 +11,14 @@ constexpr double PurPur_KI = 0.0; // unused
 constexpr double PurPur_KD = 0.0; // unused
 
 constexpr double MAX_LOOKAHEAD_DIST = 25.0;
-constexpr double MIN_LOOKAHEAD_DIST = 6.2;
-constexpr double LOOKAHEAD_SECONDS = 0.5; // this it the amount of time the robot looks ahead of it for pure pursuit
+constexpr double MIN_LOOKAHEAD_DIST = 18.0;
+constexpr double LOOKAHEAD_SECONDS = 0.6; // this it the amount of time the robot looks ahead of it for pure pursuit
 
-constexpr double TURN_RATE = 7.0; // Half of the robot's track width in inches (e.g. 7.0 for a 14-inch track width)
+constexpr double TURN_RATE = 5; // Moderated to prevent aggressive oscillation
 
 // constexpr int MAX_VIEWABLE_INDEX_AHEAD = 10;
 
-constexpr double SPEED_ADJUSTMENT_CONST = 20.0; // Too high can cause the robot to overbrake on curves
+constexpr double SPEED_ADJUSTMENT_CONST = 10.0; // Reduced to prevent the robot from over-braking on curves
 constexpr int MIN_BASE_VEL = 40;
 constexpr int MAX_BASE_VEL = 100;
 
