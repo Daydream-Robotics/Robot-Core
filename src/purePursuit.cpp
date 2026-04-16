@@ -48,8 +48,18 @@ bool PurePursuit::step() {
 
     // set up pid here later
 
-    int left_vel = base_vel + (curvature * base_vel * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
-    int right_vel = base_vel - (curvature * base_vel * TURN_RATE);
+    double left_target = base_vel + (curvature * base_vel * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
+    double right_target = base_vel - (curvature * base_vel * TURN_RATE);
+
+    // Maintain the turn ratio if the requested velocity exceeds the motor's physical limit
+    double max_req = std::max(std::abs(left_target), std::abs(right_target));
+    if (max_req > 200.0) {
+        left_target = left_target * (200.0 / max_req);
+        right_target = right_target * (200.0 / max_req);
+    }
+
+    int left_vel = static_cast<int>(left_target);
+    int right_vel = static_cast<int>(right_target);
 
     
     if (stepCounter % 10 == 0) {

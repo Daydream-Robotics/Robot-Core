@@ -14,7 +14,7 @@ constexpr double MAX_LOOKAHEAD_DIST = 25.0;
 constexpr double MIN_LOOKAHEAD_DIST = 6.2;
 constexpr double LOOKAHEAD_SECONDS = 0.5; // this it the amount of time the robot looks ahead of it for pure pursuit
 
-constexpr double TURN_RATE = 2.7; // Too high can stall the inner wheel on sharp turns
+constexpr double TURN_RATE = 7.0; // Half of the robot's track width in inches (e.g. 7.0 for a 14-inch track width)
 
 // constexpr int MAX_VIEWABLE_INDEX_AHEAD = 10;
 
