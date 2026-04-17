@@ -39,13 +39,13 @@ class PurePursuit {
         // returns base velocity based off curvature to target point and distance to end of path
         int getBaseVelocity(double curvature);
             
-        PID velocityPID;
+        PID m_velocityPID;
 
-        ALS_Path& als_path;
+        ALS_Path& m_als_path;
 
-        double lookAheadDist = 10.0;
-        int lastPassedPtIdx = 0;
-        int stepCounter = 0;
+        double m_lookAheadDist = 10.0;
+        int m_lastPassedPtIdx = 0;
+        int m_stepCounter = 0;
         
     public:
         PurePursuit(ALS_Path& als_path);
