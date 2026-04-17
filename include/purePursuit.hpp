@@ -52,4 +52,6 @@ class PurePursuit {
         void setPath(std::vector<Position> new_path);
 
         bool step();
+
+        double m_totalDistOff = 0;
 };

@@ -10,7 +10,6 @@ PurePursuit::PurePursuit(ALS_Path& als_path)
     : velocityPID(PurPur_KP, PurPur_KI, PurPur_KD, 0.0), als_path(als_path) {
 }
 
-
 bool PurePursuit::step() {
     // Safety check to prevent a data abort if the path is empty/invalid
     if (!als_path.isValid() || als_path.getSamples().empty()) {
@@ -27,7 +26,8 @@ bool PurePursuit::step() {
     
     // double current_s = als_path.getSamples()[als_path.findClosestSampleIndex({cur_x, cur_y}, 0, -1)].s;
     lastPassedPtIdx = als_path.findClosestSampleIndex({cur_x, cur_y}, lastPassedPtIdx, -1);
-    double current_s = als_path.getSamples()[lastPassedPtIdx].s;
+    Sample curSample = als_path.getSamples()[lastPassedPtIdx];
+    double current_s = curSample.s;
     
     double distFromEnd = als_path.getTotalLength() - current_s;
 
@@ -76,9 +76,12 @@ bool PurePursuit::step() {
         pros::lcd::print(1, "Cur: %lf", steeringCurvature);
         pros::lcd::print(2, "VEL: %d", base_vel);
 
-        printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d\n",
+        lastPassedPtIdx;
+        double distFromLine = std::hypot(curSample.x - cur_x, curSample.y - cur_y);
+        m_totalDistOff += distFromLine;
+        printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d\n | DistOff: %.4f\n",
                cur_x, cur_y, cur_heading_deg, current_vel, lookAheadDist, targetPoint.x, targetPoint.y,
-               robotFrameTargetPt.x, robotFrameTargetPt.y, steeringCurvature, base_vel, left_vel, right_vel);
+               robotFrameTargetPt.x, robotFrameTargetPt.y, steeringCurvature, base_vel, left_vel, right_vel, m_totalDistOff);
     }
     stepCounter++;
 
