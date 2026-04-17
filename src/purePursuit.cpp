@@ -29,9 +29,9 @@ bool PurePursuit::step() {
     Sample curSample = als_path.getSamples()[lastPassedPtIdx];
     double current_s = curSample.s;
     
-    double distFromEnd = als_path.getTotalLength() - current_s;
+    m_distFromEnd = als_path.getTotalLength() - current_s;
 
-    if (distFromEnd < END_TOLERANCE) {
+    if (m_distFromEnd < END_TOLERANCE) {
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
         return true;
@@ -79,9 +79,9 @@ bool PurePursuit::step() {
         lastPassedPtIdx;
         double distFromLine = std::hypot(curSample.x - cur_x, curSample.y - cur_y);
         m_totalDistOff += distFromLine;
-        printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d\n | DistOff: %.4f\n",
+        printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d | OffAtStep: %.4f | TotalDistOff: %.4f\n",
                cur_x, cur_y, cur_heading_deg, current_vel, lookAheadDist, targetPoint.x, targetPoint.y,
-               robotFrameTargetPt.x, robotFrameTargetPt.y, steeringCurvature, base_vel, left_vel, right_vel, m_totalDistOff);
+               robotFrameTargetPt.x, robotFrameTargetPt.y, steeringCurvature, base_vel, left_vel, right_vel, distFromLine, m_totalDistOff);
     }
     stepCounter++;
 
@@ -139,5 +139,8 @@ double PurePursuit::getLookaheadDist() {
 
 int PurePursuit::getBaseVelocity(double curvature) {
     int base_vel = MAX_BASE_VEL / (1 + (std::abs(curvature) * SPEED_ADJUSTMENT_CONST));
+
+    // Further reduce speed if we're close to the end of the path to prevent overshooting
+
     return std::clamp(base_vel, MIN_BASE_VEL, MAX_BASE_VEL);
 }

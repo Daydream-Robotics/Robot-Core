@@ -54,4 +54,5 @@ class PurePursuit {
         bool step();
 
         double m_totalDistOff = 0;
+        double m_distFromEnd;
 };
