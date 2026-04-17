@@ -12,6 +12,7 @@
 
 ALS_Path als_path1;
 ALS_Path als_path2;
+ALS_Path als_path3;
 
 void initialize() {
 	// Initialize subsystems
@@ -36,6 +37,9 @@ void initialize() {
 	
 	als_path2.buildFromPoints(path2, 0.25); //(path id, sample spacing)
 	als_path2.isValid() ? pros::lcd::print(3, "Path build success") : pros::lcd::print(3, "Path build failure");
+
+	als_path3.buildFromPoints(path3, 0.25); //(path id, sample spacing)
+	als_path3.isValid() ? pros::lcd::print(3, "Path build success") : pros::lcd::print(3, "Path build failure");
 }
 
 void disabled() {}
