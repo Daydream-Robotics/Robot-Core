@@ -23,6 +23,7 @@ constexpr int MIN_BASE_VEL = 40;
 constexpr int MAX_BASE_VEL = 100;
 
 constexpr double END_TOLERANCE = 3;
+constexpr double END_SLOWDOWN_THRESH = 20.0;
 
 class PurePursuit {
     private:

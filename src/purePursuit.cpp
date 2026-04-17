@@ -141,6 +141,9 @@ int PurePursuit::getBaseVelocity(double curvature) {
     int base_vel = MAX_BASE_VEL / (1 + (std::abs(curvature) * SPEED_ADJUSTMENT_CONST));
 
     // Further reduce speed if we're close to the end of the path to prevent overshooting
+    if (m_distFromEnd < END_SLOWDOWN_THRESH) {
+        base_vel = static_cast<int>(base_vel * (m_distFromEnd / END_SLOWDOWN_THRESH));
+    }
 
-    return std::clamp(base_vel, MIN_BASE_VEL, MAX_BASE_VEL);
+    return std::min(base_vel, MAX_BASE_VEL);
 }
