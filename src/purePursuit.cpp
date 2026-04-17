@@ -53,10 +53,12 @@ bool PurePursuit::step() {
     // Throttle base velocity based on the sharpest upcoming curve
     int base_vel = getBaseVelocity(pathMaxCurvature);
 
-    // set up pid here later
-
-    double left_target = base_vel + (steeringCurvature * base_vel * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
-    double right_target = base_vel - (steeringCurvature * base_vel * TURN_RATE);
+    
+    
+    //copysign is used for determining if robot is going fwds or backwards
+    // !IMPORTANT! If this doesnt work, flip the sign of curvature
+    double left_target = copysign(base_vel, robotFrameTargetPt.x) + (steeringCurvature * copysign(base_vel, steeringCurvature) * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
+    double right_target = copysign(base_vel, robotFrameTargetPt.x) - (steeringCurvature * copysign(base_vel, steeringCurvature) * TURN_RATE);
 
     // Maintain the turn ratio if the requested velocity exceeds the motor's physical limit
     double max_req = std::max(std::abs(left_target), std::abs(right_target));
@@ -84,6 +86,7 @@ bool PurePursuit::step() {
                robotFrameTargetPt.x, robotFrameTargetPt.y, steeringCurvature, base_vel, left_vel, right_vel, distFromLine, m_totalDistOff/m_stepCounter);
     }
     m_stepCounter++;
+
 
     rightMotors.move_velocity(right_vel);
     leftMotors.move_velocity(left_vel);
