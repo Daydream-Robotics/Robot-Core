@@ -29,7 +29,7 @@ bool PurePursuit::step() {
     Sample curSample = m_als_path.getSamples()[m_lastPassedPtIdx];
     double current_s = curSample.s;
     
-    m_distFromEnd = als_path.getTotalLength() - current_s;
+    m_distFromEnd = m_als_path.getTotalLength() - current_s;
 
     if (m_distFromEnd < END_TOLERANCE) {
         leftMotors.move_velocity(0);
