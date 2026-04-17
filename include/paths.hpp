@@ -8,5 +8,9 @@
 
 extern std::vector<Position> path;
 extern std::vector<Position> path2;
+extern std::vector<Position> path3;
+extern std::vector<Position> path4;
+extern std::vector<Position> path5;
+extern std::vector<Position> path6;
 
 #endif // PATHS_HPP
