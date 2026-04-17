@@ -41,14 +41,14 @@ bool PurePursuit::step() {
     m_lookAheadDist = getLookaheadDist();
 
     // get target point coords local to the robot
-    Position targetPoint = als_path.returnLookaheadPoint({cur_x, cur_y}, m_lookAheadDist);
+    Position targetPoint = m_als_path.returnLookaheadPoint({cur_x, cur_y}, m_lookAheadDist);
     Position robotFrameTargetPt = convertPtToRobotFrame(targetPoint);
 
     // Using actual distance to target ensures accurate curvature regardless of point sparsity
     double steeringCurvature = calculateCurvature(robotFrameTargetPt);
 
     // Look ahead along the path to find the sharpest upcoming curve
-    double pathMaxCurvature = als_path.getMaxAbsCurvatureInRange(current_s, current_s + m_lookAheadDist);
+    double pathMaxCurvature = m_als_path.getMaxAbsCurvatureInRange(current_s, current_s + m_lookAheadDist);
 
     // Throttle base velocity based on the sharpest upcoming curve
     int base_vel = getBaseVelocity(pathMaxCurvature);
