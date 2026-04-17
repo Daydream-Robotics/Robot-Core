@@ -48,13 +48,15 @@ void competition_initialize() {}
 
 void autonomous() {
 
-	
+	Autonomous auton = Autonomous();
 
+	// Pure pursuit test
 	PurePursuit purePursuit(als_path2);
 	while (not purePursuit.step()) {
 		pros::delay(10);
 	}
 	
+	auton.travel;
 
 	// Autonomous auton = Autonomous();
 
