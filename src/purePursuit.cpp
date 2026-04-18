@@ -44,6 +44,11 @@ bool PurePursuit::step() {
 
     // get target point coords local to the robot
     Position targetPoint = m_als_path.returnLookaheadPoint({cur_x, cur_y}, m_lookAheadDist);
+    
+    // if dist to end is less than lookahead, use ghost point to prevent aggressive braking
+    if (m_distFromEnd < m_lookAheadDist) {
+        targetPoint = m_ghostPoint;
+    }
     Position robotFrameTargetPt = convertPtToRobotFrame(targetPoint);
 
     // Using actual distance to target ensures accurate curvature regardless of point sparsity
@@ -54,13 +59,14 @@ bool PurePursuit::step() {
 
     // Throttle base velocity based on the sharpest upcoming curve
     int base_vel = getBaseVelocity(pathMaxCurvature);
+    base_vel = copysign(base_vel, robotFrameTargetPt.x); // Ensure we maintain forward/reverse direction based on target point
 
     
     
     //copysign is used for determining if robot is going fwds or backwards
     // !IMPORTANT! If this doesnt work, flip the sign of curvature
-    double left_target = copysign(base_vel, robotFrameTargetPt.x) + (steeringCurvature * copysign(base_vel, steeringCurvature) * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
-    double right_target = copysign(base_vel, robotFrameTargetPt.x) - (steeringCurvature * copysign(base_vel, steeringCurvature) * TURN_RATE);
+    double left_target = base_vel + (steeringCurvature * base_vel * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
+    double right_target = base_vel - (steeringCurvature * base_vel * TURN_RATE);
 
     // Maintain the turn ratio if the requested velocity exceeds the motor's physical limit
     double max_req = std::max(std::abs(left_target), std::abs(right_target));
