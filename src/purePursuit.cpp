@@ -59,8 +59,10 @@ bool PurePursuit::step() {
 
     // Throttle base velocity based on the sharpest upcoming curve
     int base_vel = getBaseVelocity(pathMaxCurvature);
-    base_vel = copysign(base_vel, robotFrameTargetPt.x); // Ensure we maintain forward/reverse direction based on target point
-
+    bool sharpTurn = (pathMaxCurvature * m_lookAheadDist) > (M_PI / 4.0);
+    if (!sharpTurn) {
+        base_vel =std::copysign(base_vel, robotFrameTargetPt.x); // If target is behind, reverse direction
+    }
     
     
     //copysign is used for determining if robot is going fwds or backwards
