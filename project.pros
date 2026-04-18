@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "PurPur_6",
+    "project_name": "LeverProd",
     "target": "v5",
     "templates": {
       "kernel": {
@@ -592,7 +592,7 @@
       }
     },
     "upload_options": {
-      "slot": 3,
+      "slot": 6,
       "icon": "X",
       "description": "My PROS Project"
     },

@@ -18,6 +18,10 @@ pros::Motor frontIntake(FRONT_INTAKE_PORT);
 pros::Motor midIntake(MID_INTAKE_PORT);
 pros::Motor backIntake(BACK_INTAKE_PORT);
 
+pros::Motor initIntake(INITIAL_INTAKE_PORT);
+pros::Motor leverOne(LEVER_ONE_PORT, pros::MotorGears::red);
+pros::Motor leverTwo(LEVER_TWO_PORT,  pros::MotorGears::red);
+
 pros::IMU imu(IMU_PORT);
 
 pros::adi::Pneumatics unloader(UNLOADER_PORT, false);

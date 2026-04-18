@@ -18,6 +18,11 @@ extern pros::Motor frontIntake;
 extern pros::Motor midIntake;
 extern pros::Motor backIntake;
 
+extern pros::Motor initIntake;
+
+extern pros::Motor leverOne;
+extern pros::Motor leverTwo;
+
 extern pros::IMU imu;
 
 extern pros::adi::Pneumatics unloader;

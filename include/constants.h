@@ -12,12 +12,16 @@
 constexpr int PARALLEL_TRACKING_WHEEL_PORT = -6;
 constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 10;
 
-#define LEFT_DRIVE_WHEEL_PORTS {-13, -11, -1, 2}
-#define RIGHT_DRIVE_WHEEL_PORTS {-3, 18, 19, 20}
+#define LEFT_DRIVE_WHEEL_PORTS {-2, -3, -5, 11, 13}
+#define RIGHT_DRIVE_WHEEL_PORTS {12, 15, -16, 19, -20}
 
-constexpr int FRONT_INTAKE_PORT = -14;
+constexpr int FRONT_INTAKE_PORT = 1;
 constexpr int MID_INTAKE_PORT = 4;
 constexpr int BACK_INTAKE_PORT = -5;
+
+constexpr int INITIAL_INTAKE_PORT = 1;
+constexpr int LEVER_ONE_PORT = -9;
+constexpr int LEVER_TWO_PORT = 14;
 
 constexpr char IMU_PORT = 12;
 

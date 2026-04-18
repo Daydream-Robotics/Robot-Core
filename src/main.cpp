@@ -183,50 +183,68 @@ void opcontrol() {
 
 		drive(DriveType::TANK);
 
-		/* - - - - - - - - - - - - - - [MATCH UNLOADER] - - - - - - - - - - - - - - */
+		// /* - - - - - - - - - - - - - - [MATCH UNLOADER] - - - - - - - - - - - - - - */
 
-		if (controller.get_digital_new_press(DIGITAL_L1)) {
-			unloader.toggle();
-		}
+		// if (controller.get_digital_new_press(DIGITAL_L1)) {
+		// 	unloader.toggle();
+		// }
 
-		/* - - - - - - - - - - - - - - [CENTER TOGGLE] - - - - - - - - - - - - - - */
+		// /* - - - - - - - - - - - - - - [CENTER TOGGLE] - - - - - - - - - - - - - - */
 
-		if (controller.get_digital_new_press(DIGITAL_A)) {
-			centerScore.toggle();
-		}
+		// if (controller.get_digital_new_press(DIGITAL_A)) {
+		// 	centerScore.toggle();
+		// }
 
 
-		/* - - - - - - - - - - - - - - [DESCORE TOGGLE] - - - - - - - - - - - - - - */
+		// /* - - - - - - - - - - - - - - [DESCORE TOGGLE] - - - - - - - - - - - - - - */
 
-		if (controller.get_digital_new_press(DIGITAL_L2)) {
-			descorer.toggle();
-		}
+		// if (controller.get_digital_new_press(DIGITAL_L2)) {
+		// 	descorer.toggle();
+		// }
 
-		/* - - - - - - - - - - - - - - - - [AI] - - - - - - - - - - - - - - - - - - */		
-		if(controller.get_digital_new_press(DIGITAL_LEFT)){
-			matchload(false);
-		}
+		// /* - - - - - - - - - - - - - - - - [AI] - - - - - - - - - - - - - - - - - - */		
+		// if(controller.get_digital_new_press(DIGITAL_LEFT)){
+		// 	matchload(false);
+		// }
 
-		if(controller.get_digital_new_press(DIGITAL_RIGHT)){
-			collect(GamePiece::RED_BALL, 4);
-		}
+		// if(controller.get_digital_new_press(DIGITAL_RIGHT)){
+		// 	collect(GamePiece::RED_BALL, 4);
+		// }
 
-		if(controller.get_digital_new_press(DIGITAL_DOWN)){
-			collect(GamePiece::RED_BALL);
-		}
+		// if(controller.get_digital_new_press(DIGITAL_DOWN)){
+		// 	collect(GamePiece::RED_BALL);
+		// }
 		
 		/* - - - - - - - - - - - - - - [INTAKE] - - - - - - - - - - - - - - */
 		// Main intake
-		if (controller.get_digital(DIGITAL_R1)) { // intake
-			move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-		} else if (controller.get_digital(DIGITAL_R2)){ // outtake
-			move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-		} else if (controller.get_digital(DIGITAL_L1)){ // score
-			//descorer.toggle();
-		} else if (controller.get_digital(DIGITAL_B)) { // full outtake
-			move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, -HIGH_VOLTAGE);
+		// if (controller.get_digital(DIGITAL_R1)) { // intake
+		// 	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
+		// } else if (controller.get_digital(DIGITAL_R2)){ // outtake
+		// 	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
+		// } else if (controller.get_digital(DIGITAL_L1)){ // score
+		// 	//descorer.toggle();
+		// } else if (controller.get_digital(DIGITAL_B)) { // full outtake
+		// 	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, -HIGH_VOLTAGE);
+		// } else {
+		// 	move_intake(STOP);
+		// }
+
+		// NEW INTAKE
+
+		if (controller.get_digital(DIGITAL_R1)) {
+			initIntake.move(HIGH_VOLTAGE);
 		} else {
-			move_intake(STOP);
+			initIntake.move(STOP);
+		}
+
+		// Lever
+
+		if (controller.get_digital(DIGITAL_R2)) {
+			leverOne.move(MAX_VOLTAGE);
+			leverTwo.move(MAX_VOLTAGE);
+		} else {
+			leverOne.move(STOP);
+			leverTwo.move(STOP);
 		}
 
 		// Delay added to prevent crashing
