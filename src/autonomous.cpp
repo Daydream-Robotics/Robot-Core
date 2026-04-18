@@ -1,91 +1,12 @@
 #include "autonomous.hpp"
 #include "subsystems.h"
 #include "constants.h"
+#include "helpers.hpp"
+#include <cmath>
+#include <numbers>
 
-// ====== Helper functions ======
-namespace {
-	// Normalize angle between [-180, 180]
-	double normalizeAngle(double a) {
-		return std::atan2(std::sin(a), std::cos(a));
-	}
-	
-	// Return Euclidean distance btwn points p1 and p2
-	double getDistance(Position p1, Position p2) {
-		return std::sqrt(std::pow((p2.x - p1.x), 2) + std::pow((p2.y - p1.y), 2));
-	}
-	
-	// Convert Degrees to Radians
-	double convertDegToRad(double degree) {
-		return degree * (std::numbers::pi / 180.0);
-	}
-	
-	// Covert Radians to Degrees
-	double convertRadToDeg(double rad) {
-		return rad * (180.0 / M_PI);
-	}
-	
-	// Subtract angles with [-180, 180] wrapping
-	double angleDiffDeg(double a, double b) {
-		double c = a - b;
-		while (c > 180.0) c -= 360.0;
-		while (c <= -180.0) c += 360.0;
-		return c;
-	}
-	
-	// Determine deceleration speed scaling
-	double computeDecelScale(double remaining, double totalDistance) {
-		double decelDistance = std::max(0.2, std::fabs(totalDistance) * 0.15);
-	
-		if (remaining >= decelDistance)
-			return 1.0;
-	
-		double x = std::clamp(remaining / decelDistance, 0.0, 1.0);
-	
-		// Step smoothing
-		double smooth = x * x * (3.0 - 2.0 * x);
-	
-		// Return speed scaling
-		return std::clamp(smooth, 0.0, 1.0);
-	}
-	
-	// Limit acceleration takeoff
-	double accelLimit(double prev, double target, double dt, double accelLimit) {
-		double maxDelta = accelLimit * dt;
-		double delta = target - prev;
-	
-		if (delta > maxDelta) delta = maxDelta;
-		if (delta < -maxDelta) delta = -maxDelta;
-	
-		return prev + delta;
-	}
-	
-	// Utility class for smoothing heading changes
-	class HeadingFilter {
-		private:
-			double alpha;
-			double heading;
-			bool initialized = false;
-	
-		public:
-			HeadingFilter(double alpha) : alpha(alpha) {}
-	
-			double update(double raw) {
-				if (!initialized) {
-					heading = raw;
-					initialized = true;
-					return heading;
-				}
-	
-				heading += alpha * angleDiffDeg(raw, heading);
-				return heading;
-			}
-	
-			void reset() {
-				initialized = false;
-			}
-	};
-}
 
+	
 
 // TODO: Tune PID parameters
 Autonomous::Autonomous() 
@@ -116,12 +37,12 @@ void Autonomous::turnTo(double targetHeading) {
 		// Initialize clocking
 	using clock = std::chrono::steady_clock;
     auto lastTime = clock::now();
-	double prevHeading = getYaw();
+	double prevHeading = odom.getYaw();
 
 	while (true) {
 		// Heading calculation
-		double rawHeading = getYaw();
-		updatePose();
+		double rawHeading = odom.getYaw();
+		odom.updatePose();
 
 		if (rawHeading < 0) {
 			pros::lcd::print(0, "[TurnTo] IMU Failure! YAW: %lf", rawHeading);
@@ -166,14 +87,8 @@ void Autonomous::turnTo(double targetHeading) {
 	leftMotors.move_velocity(0);
     rightMotors.move_velocity(0);
     pros::delay(10);
-
-	updatePose();
 }
 
-void Autonomous::setPose(double x, double y) {
-    this->pos_x = x;
-    this->pos_y = y;
-}
 
 double Autonomous::travel(double distance, double speed, double targetHeading, double timer_s) {
 	double traveled = 0;
@@ -198,7 +113,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 
     headingPID.setTarget(0.0);
 
-    Position start(pos_x, pos_y);
+    Position start(odom.pos_x, odom.pos_y);
     double direction = (distance >= 0.0) ? 1.0 : -1.0;
 
 	double headingRad = convertDegToRad(targetHeading);
@@ -222,7 +137,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
         if (dt < 0.001) dt = 0.001; // Prevent division by zero
 		lastTime = now;
 
-        updatePose();
+        odom.updatePose();
 		
 		// if (pos_x < -1) {
 		// 	pros::lcd::print(7, "OUT OF BOUNDS!");
@@ -231,8 +146,8 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 
 		// controller.print(0,0, "%.2f, %.2f", pos_x, pos_y);
         // Compute traveled distance along heading vector
-        Position delta { pos_x - start.x, pos_y - start.y };
-		printf("X: %.2f, Y: %.2f\n", pos_x, pos_y);
+        Position delta { odom.pos_x - start.x, odom.pos_y - start.y };
+		printf("X: %.2f, Y: %.2f\n", odom.pos_x, odom.pos_y);
 
 		traveled = delta.x * headingUnit.x + delta.y * headingUnit.y;
 
@@ -248,7 +163,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
         prevVelocity = v;
 
         // Heading error
-        double rawHeading = getYaw();
+        double rawHeading = odom.getYaw();
         if (rawHeading < 0) {
             pros::lcd::print(0, "[Travel] IMU Failure!");
             break;
@@ -299,110 +214,14 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 	return traveled;
 }
 
-void Autonomous::updatePose(void) {
-	// Calculate distance travelled by each tracking wheel
-	WheelLengths arcs = getOdomWheelTravel();
-
-	const double yaw = getYaw();
-
-	if (yaw < 0) {
-		pros::lcd::print(0, "[Update Pose] IMU Failure!");
-		return;
-	}
-
-	static double prevTheta = convertDegToRad(yaw - 180);
-
-	// Get orientation from IMU
-	double theta = convertDegToRad(yaw - 180);
-	theta = normalizeAngle(theta);
-
-	// Determine change in heading 
-	double del_theta = normalizeAngle(theta - prevTheta);
-
-	// Determine change in local x and in local y
-	double dx_local = arcs.parallel;
-	double dy_local = arcs.perpendicular - (del_theta * PERPINDICULAR_TRACKING_WHEEL_DISTANCE);
-
-	double theta_mid = prevTheta + del_theta / 2.0;
-    theta_mid = normalizeAngle(theta_mid);
-
-    // Compute change in x and y based on heading and local changes
-	double del_x = std::cos(theta_mid) * dx_local - std::sin(theta_mid) * dy_local;
-	double del_y = std::sin(theta_mid) * dx_local + std::cos(theta_mid) * dy_local;
-
-	// Increment position and angle by calculated changes
-	pos_x += del_x;
-	pos_y += del_y;
-
-	// print to the controller every 100 ms
-	static uint32_t lastPrintTime = 0;
-	if (pros::millis() - lastPrintTime > 100) {
-		controller.print(0, 0, "X:%.1f Y:%.1f", pos_x, pos_y);
-		lastPrintTime = pros::millis();
-	}
-
-	prevTheta = theta;
-}
-
-double Autonomous::getYaw(void) {
-    pros::quaternion_s_t qt = imu.get_quaternion();
-
-    // If encounter IMU failure, and retry
-    if (qt.w == PROS_ERR_F) {
-        qt = imu.get_quaternion();
-        if (qt.w == PROS_ERR_F) {
-            return -1.0;
-        }
-    }
-
-    // yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
-	double yaw = atan2(2 * ((qt.w * qt.z) + (qt.x * qt.y)), 1 - (2 * ((qt.y * qt.y) + (qt.z * qt.z))));
-
-	// returns yaw converted from rad to deg; angle is returned from -180 to 180 (+ 180 for [0, 360])
-	return ((yaw * (180 / M_PI)) + 180);
-}
-
-WheelLengths Autonomous::getOdomWheelTravel(void) {
-    // Get Initial Wheel Position
-    static double lastParallel = parallelTrackingWheel.get_position();
-	static double lastPerpendicular = perpendicularTrackingWheel.get_position();
-
-
-	// pros::delay(100);
-
-    // Get current centidegree position of tracking wheels
-	double currParallel = parallelTrackingWheel.get_position();
-	double currPerpendicular = perpendicularTrackingWheel.get_position();
-
-	// controller.print(0,0, "%d", currParallel);
-    // Get delta between current and last frame
-	double dTicksL = currParallel - lastParallel; 
-	double dTicksS = currPerpendicular - lastPerpendicular;
-
-
-	// Convert centidegrees to degrees and find distance travelled by wheel
-	double delParallel = (dTicksL / 36000.0) * PARALLEL_TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
-	double delPerpendicular = (dTicksS / 36000.0) * PERPENDICULAR_TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
-
-    // Save current position as previous
-	lastParallel = currParallel;
-	lastPerpendicular = currPerpendicular;
-	// controller.print(0, 0, "O: %.2f\n", delParallel);
-	// Create a structure of lengths
-	WheelLengths del(delParallel, delPerpendicular);
-	
-
-	return del;
-}
-
 bool Autonomous::travelToPoint(double targetX, double targetY, double maxSpeed, bool reverse, int timer) {
-	updatePose();
-	Position start(pos_x, pos_y);
+	odom.updatePose();
+	Position start(odom.pos_x, odom.pos_y);
 	double dx = targetX - start.x;
 	double dy = targetY - start.y;
 	
 	double distance = std::hypot(dx, dy); //euclidean distance from start to end point	
-	double targetHeading = std::atan2(dy, dx) * 180.0  / M_PI;
+	double targetHeading = std::atan2(dy, dx) * 180.0  / std::numbers::pi;
 	
 	if (reverse) {
 		targetHeading += 180;

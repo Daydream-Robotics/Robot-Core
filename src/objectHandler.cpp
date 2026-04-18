@@ -50,7 +50,7 @@ void UpdateFrame_task_fn(void* param){
         // pros::lcd::print(7, "%d", counter++);
         
         //begin serial handshake
-        printf("A\n");
+        printf("A\n");  // !IMPORTANT! Do NOT remove, Keeps AI alive
         fflush(stdout);
 
         // pros::lcd::set_text(3, "waiting for input");       
@@ -65,7 +65,7 @@ void UpdateFrame_task_fn(void* param){
         while(token) {
             int classId;
             GamePieceData data;
-            int internalIndex = classId;
+            int internalIndex = -1;
     
             if(!parseObject(token, classId, data)) 
                 break;

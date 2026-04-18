@@ -5,9 +5,17 @@
 #include "slam.h"
 #include "objectHandler.h"
 #include <numbers>
+#include "arclengthSplining.hpp"
+#include "paths.hpp"
+#include "sd_card_logging.hpp"
+#include "purePursuit.hpp"
 
+ALS_Path als_path1;
+ALS_Path als_path2;
+ALS_Path als_path3;
 
 void initialize() {
+	// Initialize subsystems
 	pros::lcd::initialize();
 	pros::lcd::print(0, "Reg: Initialize");
 	imu.reset();
@@ -15,6 +23,23 @@ void initialize() {
 		pros::delay(20);
 	}
 	pros::Task frame_task(UpdateFrame_task_fn, (void*)"PROS_Task_Param", TASK_PRIORITY_DEFAULT, TASK_STACK_DEPTH_DEFAULT, "Vision Frame Update");
+
+	// Precompute Sample Tables (need to do this for each path)
+	// ALS_Path als_path1;
+	
+	Logger::getInstance().init("/usd/log.txt");
+    LOG("Program Start");
+
+
+	
+	als_path1.buildFromPoints(path, 0.25); //(path id, sample spacing)
+	als_path1.isValid() ? pros::lcd::print(2, "Path build success") : pros::lcd::print(2, "Path build failure");
+	
+	als_path2.buildFromPoints(path2, 0.25); //(path id, sample spacing)
+	als_path2.isValid() ? pros::lcd::print(3, "Path build success") : pros::lcd::print(3, "Path build failure");
+
+	als_path3.buildFromPoints(path3, 0.25); //(path id, sample spacing)
+	als_path3.isValid() ? pros::lcd::print(3, "Path build success") : pros::lcd::print(3, "Path build failure");
 }
 
 void disabled() {}
@@ -25,16 +50,26 @@ void autonomous() {
 
 	Autonomous auton = Autonomous();
 
-	// Go to matchloader
-	 auton.travelToPoint(-36, 0, 70, true);
+	// Pure pursuit test
+	PurePursuit purePursuit(als_path3);
+	while (not purePursuit.step()) {
+		pros::delay(10);
+	}
+	
+	// auton.travel;
+
+	// Autonomous auton = Autonomous();
+
+	// // Go to matchloader
+	//  auton.travelToPoint(-36, 0, 70, true);
 	
 
-	// Turn to matchloader
-	unloader.set_value(true);
-	auton.turnTo(90);
-	matchload(false);
+	// // Turn to matchloader
+	// unloader.set_value(true);
+	// auton.turnTo(90);
+	// matchload(false);
 
-	auton.travelToPoint(-35,-22, 80, true, 5);
+	// auton.travelToPoint(-35,-22, 80, true, 5);
 
 	
 	// trackingMode(GamePiece::BLUE_BALL);

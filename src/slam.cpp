@@ -154,8 +154,8 @@ void collect(GamePiece gamePiece, int isLoading)
         // //runns if we are matchloading
         // if(isLoading == 1){
         //     pros::lcd::print(5, "is loading = %d", isLoading);
-        //     auton.updatePose();
-        //     if(abs( prevX - auton.pos_x) < 1){
+        //     odom.updatePose();
+        //     if(abs( prevX - odom.pos_x) < 1){
         //         isLoading++;
         //         pros::lcd::print(3, "Entered Collect pt2");
         //         collect(gamePiece, isLoading);
@@ -286,7 +286,7 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece)
 
     bool searched_right = false;
 
-    double original_angle = auton.getYaw();
+    double original_angle = odom.getYaw();
 
     while (not ball.has_value() and IsConnected())
     {
@@ -302,7 +302,7 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece)
             break;
         }
 
-        double angleDiff = calcAngleDiff(original_angle, auton.getYaw());
+        double angleDiff = calcAngleDiff(original_angle, odom.getYaw());
         
         // Will turn right 30*, and then left 60* until it finds a ball, if it finds nothing, it will return a sentinel value and we will continue regular intructions
         pros::lcd::print(1,"Searching for Ball");
