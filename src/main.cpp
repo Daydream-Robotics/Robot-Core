@@ -56,7 +56,7 @@ void autonomous() {
 		pros::delay(10);
 	}
 	
-	auton.travel;
+	// auton.travel;
 
 	// Autonomous auton = Autonomous();
 

@@ -25,6 +25,8 @@ constexpr int MAX_BASE_VEL = 100;
 constexpr double END_TOLERANCE = 3;
 constexpr double END_SLOWDOWN_THRESH = 20.0;
 
+constexpr double END_GHOST_CAST = 20.0;
+
 class PurePursuit {
     private:
         // calculates the curvature of a point within the robot frame
@@ -39,10 +41,14 @@ class PurePursuit {
         // returns base velocity based off curvature to target point and distance to end of path
         int getBaseVelocity(double curvature);
             
+        // update ghost point to cast past end point
+        Position updateGhostPoint();
+
         PID m_velocityPID;
 
         ALS_Path& m_als_path;
 
+        Position m_ghostPoint;
         double m_lookAheadDist = 10.0;
         int m_lastPassedPtIdx = 0;
         int m_stepCounter = 0;

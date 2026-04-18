@@ -5,9 +5,11 @@
 #include "subsystems.h"
 #include "arclengthSplining.hpp"
 #include "main.h"
+#include "sd_card_logging.hpp"
 
 PurePursuit::PurePursuit(ALS_Path& als_path) 
     : m_velocityPID(PurPur_KP, PurPur_KI, PurPur_KD, 0.0), m_als_path(als_path) {
+    m_ghostPoint = updateGhostPoint();
 }
 
 bool PurePursuit::step() {
@@ -151,4 +153,19 @@ int PurePursuit::getBaseVelocity(double curvature) {
     }
 
     return std::clamp(base_vel, min_base_adjusted, MAX_BASE_VEL);
+}
+
+Position PurePursuit::updateGhostPoint() {
+    std::vector<Sample> samples = m_als_path.getSamples();
+
+    Sample lastPoint = samples.back();
+    
+    double heading = lastPoint.heading;
+    
+    double ux = std::cos(convertDegToRad(heading));
+    double uy = std::sin(convertDegToRad(heading));
+
+    Position ghostPoint = {lastPoint.x + END_GHOST_CAST * ux, lastPoint.y + END_GHOST_CAST * uy};
+
+    return ghostPoint;
 }
