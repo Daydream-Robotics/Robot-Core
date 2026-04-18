@@ -168,8 +168,8 @@ Position PurePursuit::updateGhostPoint() {
     
     double heading = lastPoint.heading;
     
-    double ux = std::cos(convertDegToRad(heading));
-    double uy = std::sin(convertDegToRad(heading));
+    double ux = std::cos(heading);
+    double uy = std::sin(heading);
 
     Position ghostPoint = {lastPoint.x + END_GHOST_CAST * ux, lastPoint.y + END_GHOST_CAST * uy};
 
