@@ -51,7 +51,7 @@ void autonomous() {
 	Autonomous auton = Autonomous();
 
 	// Pure pursuit test
-	PurePursuit purePursuit(als_path2);
+	PurePursuit purePursuit(als_path3);
 	while (not purePursuit.step()) {
 		pros::delay(10);
 	}
