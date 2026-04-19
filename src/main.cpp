@@ -14,6 +14,8 @@
 // ALS_Path als_path2;
 // ALS_Path als_path3;
 std::vector<ALS_Path> als_paths;
+PurePursuit purePursuit = PurePursuit();
+Autonomous auton = Autonomous();
 
 void initialize() {
 	// Initialize subsystems
@@ -50,118 +52,32 @@ void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
-	PurePursuit purePursuit = PurePursuit();
-	Autonomous auton = Autonomous();
+
+	// Path 1
 
 	// Pure pursuit test
 	purePursuit.setPath(als_paths[0]);
 	while (not purePursuit.step()) {
+		if ((purePursuit.m_distFromEnd < 10.0 && GetObject(GamePiece::RED_BALL).has_value()) && IsConnected()) { // If we're within 10 inches of the end of the path and we see a red ball, break to collect it
+			break;
+		}
 		pros::delay(10);
 	}
+
+	// Collect balls
+	if (IsConnected()) {
+		collect(GamePiece::RED_BALL);
+		auton.turnTo(-90);
+		collect(GamePiece::BLUE_BALL);
+	}
+	move_intake(STOP, STOP, STOP, 0.5);
+
+	// Path 2
 
 	purePursuit.setPath(als_paths[1]);
 	while (not purePursuit.step()) {
 		pros::delay(10);
 	}
-
-
-	// auton.travel;
-
-	// Autonomous auton = Autonomous();
-
-	// // Go to matchloader
-	//  auton.travelToPoint(-36, 0, 70, true);
-	
-
-	// // Turn to matchloader
-	// unloader.set_value(true);
-	// auton.turnTo(90);
-	// matchload(false);
-
-	// auton.travelToPoint(-35,-22, 80, true, 5);
-
-	
-	// trackingMode(GamePiece::BLUE_BALL);
-
-	// // Approach matchloader
-	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	// auton.travel(16, 50, 90, 1.150);
-
-	// Matchload
-	// for (int i = 0; i < 2; i++){
-	// 	auton.travel(-12, 50, 90, 0.15);
-	// 	auton.travel(12, 60, 90, 0.35);
-	//  	pros::delay(500);
-	// }
-	// move_intake(STOP);
-
-	// // Reverse and score on long goal
-	// auton.travel(-50, 80, 75, 2);
-	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 0.1);
-	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	// unloader.set_value(false);
-	// move_intake(MAX_VOLTAGE, MAX_VOLTAGE, MAX_VOLTAGE, 3);
-
-	// // Back away from goal
-	// auton.travel(20, 80, 90);
-
-	// // Go past goal
-	// auton.turnTo(0);
-	// auton.travel(24, 70, 0);
-	// auton.turnTo(-90);
-
-	// // Travel down field and face balls
-	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	// auton.travel(99, 85, -90);
-	// auton.turnTo(180);
-
-	// // Get side balls
-	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	// auton.travel(40, 70, 180, 2.8);
-	// auton.travel(-6, 50, 180, 0.8);
-	// auton.travel(8, 60, 180, 0.8);
-	// pros::delay(500);
-	// move_intake(STOP);
-
-	// // Back up to matchloader
-	// auton.travel(-16.25, 70, 180);
-	// unloader.set_value(true);
-	// auton.turnTo(-90);
-
-	// // Matchload
-	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	// auton.travel(16, 50, -90, 1.150);
-	// for (int i = 0; i < 2; i++){
-	// 	auton.travel(-12, 50, -90, 0.15);
-	// 	auton.travel(12, 60, -90, 0.35);
-	//  	pros::delay(500);
-	// }
-	// move_intake(STOP);
-	
-	// // Approach long goal and score
-	// auton.travel(-50, 80, -105, 2);
-	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 0.1);
-	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	// unloader.set_value(false);
-	// move_intake(MAX_VOLTAGE, MAX_VOLTAGE, MAX_VOLTAGE, 1.75);
-
-	// // Move away from goal
-	// auton.travel(6, 90, -90);
-	// auton.turnTo(0);
-	// auton.travel(24, 90, 0);
-	// auton.turnTo(90);
-
-	// // Travel down field
-	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	// auton.travel(94, 150, 90, 5.25);
-
-	// // Face goal and park
-	// auton.turnTo(15);
-	// auton.travel(72, 110, 15, 1.1);
-	// // auton.travel(-6, 60, 0, 0.5);
-
 }
 
 void opcontrol() {
