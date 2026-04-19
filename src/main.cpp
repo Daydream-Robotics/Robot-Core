@@ -1,5 +1,5 @@
 #include "main.h"
-#include "subsystems.h"
+#include "subsystems.hpp"
 #include "constants.h"
 #include "autonomous.hpp"
 #include "slam.h"
@@ -14,6 +14,8 @@
 // ALS_Path als_path2;
 // ALS_Path als_path3;
 std::vector<ALS_Path> als_paths;
+PurePursuit purePursuit;
+Autonomous auton = Autonomous();
 
 void initialize() {
 	// Initialize subsystems
@@ -266,22 +268,22 @@ void opcontrol() {
 	
 }
 
-void move_intake(int front, int mid, int back, double seconds) {
+// void move_intake(int front, int mid, int back, double seconds) {
 
-	// check for stalling later and stop motors if stalling
+// 	// check for stalling later and stop motors if stalling
 
-	frontIntake.move(front);
-	midIntake.move(mid);
-	backIntake.move(back);
+// 	frontIntake.move(front);
+// 	midIntake.move(mid);
+// 	backIntake.move(back);
 
-	if (seconds != 0) {
-		pros::delay(seconds * 1000);
+// 	if (seconds != 0) {
+// 		pros::delay(seconds * 1000);
 
-		frontIntake.move(STOP);
-		midIntake.move(STOP);
-		backIntake.move(STOP);
-	}
-}
+// 		frontIntake.move(STOP);
+// 		midIntake.move(STOP);
+// 		backIntake.move(STOP);
+// 	}
+// }
 
 void drive(DriveType type) {
 	if (!controller.get_digital(DIGITAL_UP) && !controller.get_digital(DIGITAL_DOWN)) {
