@@ -10,9 +10,10 @@
 #include "sd_card_logging.hpp"
 #include "purePursuit.hpp"
 
-ALS_Path als_path1;
-ALS_Path als_path2;
-ALS_Path als_path3;
+// ALS_Path als_path1;
+// ALS_Path als_path2;
+// ALS_Path als_path3;
+std::vector<ALS_Path> als_paths;
 
 void initialize() {
 	// Initialize subsystems
@@ -32,14 +33,16 @@ void initialize() {
 
 
 	
-	als_path1.buildFromPoints(path, 0.25); //(path id, sample spacing)
-	als_path1.isValid() ? pros::lcd::print(2, "Path build success") : pros::lcd::print(2, "Path build failure");
+	// als_path1.buildFromPoints(path, 0.25); //(path id, sample spacing)
+	// als_path1.isValid() ? pros::lcd::print(2, "Path build success") : pros::lcd::print(2, "Path build failure");
 	
-	als_path2.buildFromPoints(path2, 0.25); //(path id, sample spacing)
-	als_path2.isValid() ? pros::lcd::print(3, "Path build success") : pros::lcd::print(3, "Path build failure");
+	// als_path2.buildFromPoints(path2, 0.25); //(path id, sample spacing)
+	// als_path2.isValid() ? pros::lcd::print(3, "Path build success") : pros::lcd::print(3, "Path build failure");
 
-	als_path3.buildFromPoints(path3, 0.25); //(path id, sample spacing)
-	als_path3.isValid() ? pros::lcd::print(3, "Path build success") : pros::lcd::print(3, "Path build failure");
+	// als_path3.buildFromPoints(path3, 0.25); //(path id, sample spacing)
+	// als_path3.isValid() ? pros::lcd::print(3, "Path build success") : pros::lcd::print(3, "Path build failure");
+
+	als_paths = buildAllPaths(0.25);
 }
 
 void disabled() {}
@@ -47,15 +50,21 @@ void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
-
+	PurePursuit purePursuit = PurePursuit();
 	Autonomous auton = Autonomous();
 
 	// Pure pursuit test
-	PurePursuit purePursuit(als_path3);
+	purePursuit.setPath(als_paths[0]);
 	while (not purePursuit.step()) {
 		pros::delay(10);
 	}
-	
+
+	purePursuit.setPath(als_paths[1]);
+	while (not purePursuit.step()) {
+		pros::delay(10);
+	}
+
+
 	// auton.travel;
 
 	// Autonomous auton = Autonomous();

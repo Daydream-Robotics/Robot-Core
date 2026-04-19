@@ -29,6 +29,8 @@ constexpr double END_GHOST_CAST = 20.0;
 
 class PurePursuit {
     private:
+        void reset();
+
         // calculates the curvature of a point within the robot frame
         double calculateCurvature(Position robotFrameTargetPt);
 
@@ -46,7 +48,7 @@ class PurePursuit {
 
         PID m_velocityPID;
 
-        ALS_Path& m_als_path;
+        ALS_Path* m_als_path;
 
         Position m_ghostPoint;
         double m_lookAheadDist = 10.0;
@@ -54,9 +56,10 @@ class PurePursuit {
         int m_stepCounter = 0;
         
     public:
-        PurePursuit(ALS_Path& als_path);
+        PurePursuit();
+        ~PurePursuit();
 
-        void setPath(std::vector<Position> new_path);
+        void setPath(ALS_Path& als_path);
 
         bool step();
 
