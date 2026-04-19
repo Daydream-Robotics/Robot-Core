@@ -19,10 +19,10 @@ inline pros::MotorGroup rightMotors(RIGHT_DRIVE_WHEEL_PORTS, pros::v5::MotorGear
 
 // inline pros::Motor initIntake(INITIAL_INTAKE_PORT);
 // inline pros::Motor initIntake2(INITIAL_INTAKE_PORT2);
-inline pros::MotorGroup initIntake({INITIAL_INTAKE_PORT, INITIAL_INTAKE_PORT2});
+inline pros::MotorGroup intake({INITIAL_INTAKE_PORT, INITIAL_INTAKE_PORT2});
 // inline pros::Motor leverOne(LEVER_ONE_PORT, pros::MotorGears::red);
 // inline pros::Motor leverTwo(LEVER_TWO_PORT,  pros::MotorGears::red);
-inline pros::MotorGroup lever({LEVER_ONE_PORT, LEVER_TWO_PORT});
+inline pros::MotorGroup lever({LEVER_ONE_PORT, LEVER_TWO_PORT}, pros::v5::MotorGears::red);
 
 inline pros::IMU imu(IMU_PORT);
 

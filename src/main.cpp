@@ -33,17 +33,6 @@ void initialize() {
 	Logger::getInstance().init("/usd/log.txt");
     LOG("Program Start");
 
-
-	
-	// als_path1.buildFromPoints(path, 0.25); //(path id, sample spacing)
-	// als_path1.isValid() ? pros::lcd::print(2, "Path build success") : pros::lcd::print(2, "Path build failure");
-	
-	// als_path2.buildFromPoints(path2, 0.25); //(path id, sample spacing)
-	// als_path2.isValid() ? pros::lcd::print(3, "Path build success") : pros::lcd::print(3, "Path build failure");
-
-	// als_path3.buildFromPoints(path3, 0.25); //(path id, sample spacing)
-	// als_path3.isValid() ? pros::lcd::print(3, "Path build success") : pros::lcd::print(3, "Path build failure");
-
 	als_paths = buildAllPaths(0.25);
 }
 
@@ -164,36 +153,16 @@ void autonomous() {
 }
 
 void opcontrol() {
-	// Set chassis brake mode to coast
-
-	
-	// Autonomous auton = Autonomous();
-
-	// // Go to matchloader
-	// // auton.travel(-36, 70, 0);
-
-	// // Turn to matchloader
-	// // unloader.set_value(true);
-	// // auton.turnTo(90);
-
-	//  matchload(false);
-
-	// collect(GamePiece::RED_BALL, 4);
-
-	 
-
-
 	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 
-	frontIntake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
-	backIntake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+	intake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 
 	while(true){
 
 		/* - - - - - - - - - - - - - - [CHASSIS CONTROLS] - - - - - - - - - - - - - - */
 
-		drive(DriveType::TANK);
+		drive(DriveType::SPLIT_ARCADE);
 
 		// /* - - - - - - - - - - - - - - [MATCH UNLOADER] - - - - - - - - - - - - - - */
 
@@ -242,22 +211,48 @@ void opcontrol() {
 		// }
 
 		// NEW INTAKE
-
-		if (controller.get_digital(DIGITAL_R1)) {
-			initIntake.move(HIGH_VOLTAGE);
+		if (controller.get_digital(DIGITAL_R1)) { // intake
+			intake.move(HIGH_VOLTAGE);
+		} else if (controller.get_digital(DIGITAL_L2)) { // outtake
+			intake.move(-HIGH_VOLTAGE);
 		} else {
-			initIntake.move(STOP);
+			intake.move(STOP);
 		}
 
-		// Lever
+		// Matchloader
+		if (controller.get_digital(DIGITAL_Y)) {
+			matchloader.set_value(true);
+		} else {
+			matchloader.set_value(false);
+		}
 
+		// Descore Wing
+		if (controller.get_digital(DIGITAL_L1)) {
+			descorer.set_value(true);
+		} else {
+			descorer.set_value(false);
+		}
+
+		// Lever Hold
 		if (controller.get_digital(DIGITAL_R2)) {
-			leverOne.move(MAX_VOLTAGE);
-			leverTwo.move(MAX_VOLTAGE);
+			lever.move(HIGH_VOLTAGE);
+			if (lever.get_actual_velocity() < 3) {
+				lever.move(STOP);
+			}
 		} else {
-			leverOne.move(STOP);
-			leverTwo.move(STOP);
+			lever.move_absolute(0, 100);
 		}
+
+		// // Lever Toggle
+		// if (controller.get_digital_new_press(DIGITAL_X)) {
+		// 	lever.move(MAX_VOLTAGE);
+		// 	pros::delay(100);
+		// 	if (lever.get_actual_velocity() < 5) {
+		// 		lever.move(STOP);
+		// 	}
+		// } else if (controller.get_digital_new_press(DIGITAL_B)) {
+		// 	lever.move_absolute(0, 100);
+		// }
 
 
 
@@ -267,23 +262,6 @@ void opcontrol() {
 
 	
 }
-
-// void move_intake(int front, int mid, int back, double seconds) {
-
-// 	// check for stalling later and stop motors if stalling
-
-// 	frontIntake.move(front);
-// 	midIntake.move(mid);
-// 	backIntake.move(back);
-
-// 	if (seconds != 0) {
-// 		pros::delay(seconds * 1000);
-
-// 		frontIntake.move(STOP);
-// 		midIntake.move(STOP);
-// 		backIntake.move(STOP);
-// 	}
-// }
 
 void drive(DriveType type) {
 	if (!controller.get_digital(DIGITAL_UP) && !controller.get_digital(DIGITAL_DOWN)) {

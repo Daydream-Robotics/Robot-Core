@@ -2,7 +2,7 @@
 #include "slam.h"
 #include "objectHandler.h"
 #include "constants.h"
-#include "subsystems.h"
+#include "subsystems.hpp"
 #include "autonomous.hpp"
 
 
@@ -353,7 +353,7 @@ void matchload(bool isFar)
     if(!isFar)gamePiece = GamePiece::RED_BALL;
     else gamePiece = GamePiece::BLUE_BALL;
 
-    unloader.set_value(true);
+    matchloader.set_value(true);
 
     move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
     // pros::lcd::print(1,"moving intake");
