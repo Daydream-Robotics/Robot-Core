@@ -134,6 +134,9 @@ void collect(GamePiece gamePiece, int isLoading)
             old_y = ball->y;
             
         } else {
+            if(isLoading == 4 && empty_frames > 2){
+                return;
+            }
             empty_frames++;
         }
 
@@ -214,11 +217,12 @@ void collect(GamePiece gamePiece, int isLoading)
         collect(gamePiece, 2);
     }
     else if(isLoading == 4){
-        leftMotors.move_velocity(-30);
-        rightMotors.move_velocity(-30);
+        leftMotors.move_velocity(-100);
+        rightMotors.move_velocity(-100);
         pros::delay(400);
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
+        
         collect(gamePiece);
         leftMotors.move_velocity(-100);
         rightMotors.move_velocity(-100);

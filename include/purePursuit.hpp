@@ -12,21 +12,25 @@ constexpr double PurPur_KD = 0.0; // unused
 
 constexpr double MAX_LOOKAHEAD_DIST = 25.0;
 constexpr double MIN_LOOKAHEAD_DIST = 18.0;
-constexpr double LOOKAHEAD_SECONDS = 0.6; // this it the amount of time the robot looks ahead of it for pure pursuit
+constexpr double LOOKAHEAD_SECONDS = 0.6; // 0.6 this it the amount of time the robot looks ahead of it for pure pursuit
 
-constexpr double TURN_RATE = 5; // Moderated to prevent aggressive oscillation
+constexpr double TURN_RATE = 16;  // Moderated to prevent aggressive oscillation lo 5
 
 // constexpr int MAX_VIEWABLE_INDEX_AHEAD = 10;
 
-constexpr double SPEED_ADJUSTMENT_CONST = 10.0; // Reduced to prevent the robot from over-braking on curves
-constexpr int MIN_BASE_VEL = 10;
+constexpr double SPEED_ADJUSTMENT_CONST = 10; // 10 15 Reduced to prevent the robot from over-braking on curves
+constexpr int MIN_BASE_VEL = 30;
 constexpr int MAX_BASE_VEL = 100;
 
-constexpr double END_TOLERANCE = 3;
+constexpr double END_TOLERANCE = 0.5;
 constexpr double END_SLOWDOWN_THRESH = 20.0;
+
+constexpr double END_GHOST_CAST = 20.0;
 
 class PurePursuit {
     private:
+        void reset();
+
         // calculates the curvature of a point within the robot frame
         double calculateCurvature(Position robotFrameTargetPt);
 
@@ -39,18 +43,23 @@ class PurePursuit {
         // returns base velocity based off curvature to target point and distance to end of path
         int getBaseVelocity(double curvature);
             
+        // update ghost point to cast past end point
+        Position updateGhostPoint();
+
         PID m_velocityPID;
 
-        ALS_Path& m_als_path;
+        ALS_Path* m_als_path;
 
+        Position m_ghostPoint;
         double m_lookAheadDist = 10.0;
         int m_lastPassedPtIdx = 0;
         int m_stepCounter = 0;
         
     public:
-        PurePursuit(ALS_Path& als_path);
+        PurePursuit();
+        ~PurePursuit();
 
-        void setPath(std::vector<Position> new_path);
+        void setPath(ALS_Path& als_path);
 
         bool step();
 
