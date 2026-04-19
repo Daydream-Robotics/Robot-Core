@@ -218,6 +218,22 @@ void opcontrol() {
 		if(controller.get_digital_new_press(DIGITAL_DOWN)){
 			collect(GamePiece::RED_BALL);
 		}
+
+		if(controller.get_digital_new_press(DIGITAL_UP)){
+			trackingMode(GamePiece::RED_BALL);
+		}
+
+		if(controller.get_digital_new_press(DIGITAL_Y)){
+			while(true){
+				collect(GamePiece::RED_BALL);
+
+				if(controller.get_digital_new_press(DIGITAL_Y)){
+					break;
+				}
+			}
+		}
+
+
 		
 		/* - - - - - - - - - - - - - - [INTAKE] - - - - - - - - - - - - - - */
 		// Main intake
@@ -232,6 +248,8 @@ void opcontrol() {
 		} else {
 			move_intake(STOP);
 		}
+
+
 
 		// Delay added to prevent crashing
 		pros::delay(20);
