@@ -221,9 +221,9 @@ void opcontrol() {
 
 		// Matchloader
 		if (controller.get_digital(DIGITAL_Y)) {
-			matchloader.set_value(true);
-		} else {
 			matchloader.set_value(false);
+		} else {
+			matchloader.set_value(true);
 		}
 
 		// Descore Wing
@@ -233,9 +233,17 @@ void opcontrol() {
 			descorer.set_value(false);
 		}
 
+		// Raise Lifter
+		if (controller.get_digital(DIGITAL_RIGHT)) {
+			scoringLifter.set_value(true);
+		} else {
+			scoringLifter.set_value(false);
+		}
+
 		// Lever Hold
 		if (controller.get_digital(DIGITAL_R2)) {
 			lever.move(HIGH_VOLTAGE);
+			pros::delay(100);
 			if (lever.get_actual_velocity() < 3) {
 				lever.move(STOP);
 			}

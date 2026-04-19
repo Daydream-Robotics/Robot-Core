@@ -10,8 +10,8 @@ inline pros::Controller controller(pros::E_CONTROLLER_MASTER);
 inline pros::Rotation parallelTrackingWheel(PARALLEL_TRACKING_WHEEL_PORT);
 inline pros::Rotation perpendicularTrackingWheel(PERPENDICULAR_TRACKING_WHEEL_PORT);
 
-inline pros::MotorGroup leftMotors(LEFT_DRIVE_WHEEL_PORTS, pros::v5::MotorGears::blue);
-inline pros::MotorGroup rightMotors(RIGHT_DRIVE_WHEEL_PORTS, pros::v5::MotorGears::blue);
+inline pros::MotorGroup leftMotors(LEFT_DRIVE_WHEEL_PORTS);
+inline pros::MotorGroup rightMotors(RIGHT_DRIVE_WHEEL_PORTS);
 
 // inline pros::Motor frontIntake(FRONT_INTAKE_PORT);
 // inline pros::Motor midIntake(MID_INTAKE_PORT);

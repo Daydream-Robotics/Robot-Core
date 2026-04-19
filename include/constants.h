@@ -33,7 +33,7 @@ constexpr char DESCORE_PORT = 'D';
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
-constexpr int DEADZONE = 3;
+constexpr int DEADZONE = 2; // was 3 for steven
 
 /* - - - - - - - - - - - - - - [GENERAL] - - - - - - - - - - - - - - */
 
