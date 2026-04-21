@@ -152,35 +152,48 @@ void opcontrol() {
 			scoringLifter.set_value(false);
 		}
 
-		if (controller.get_digital_new_press(DIGITAL_X)) {
-			leverToggle = !leverToggle;
-		}
+		// if (controller.get_digital_new_press(DIGITAL_X)) {
+		// 	leverToggle = !leverToggle;
+		// }
+
+
 
 		// Lever Hold
-		if (controller.get_digital(DIGITAL_R2) || leverToggle == true) {
-			raised = false;
-			if (not raised) { // if lowered, raise
-				lever.move(MAX_VOLTAGE);
-				pros::delay(100);
-			}
-			if (lever.get_actual_velocity() < 5) {
-				lever.move(STOP);
-				raised = true;
-				lowered = false;
-			}
-		} else if (raised) {
-			if (not lowered) {
-				lever.move_absolute(0, 100);
-				pros::delay(100);
-			}
-			if (lever.get_actual_velocity() < 5) {
-				lever.move(STOP);
-				lowered = true;
-				raised = false;
-			}
-		} else {
-			lever.move(STOP);
+		if (controller.get_digital_new_press(DIGITAL_R2)) {
+			lever.move(MAX_VOLTAGE);
 		}
+
+		else if(controller.get_digital_new_release(DIGITAL_R2)){
+			lever.move_absolute(0, 100);
+		}
+
+
+
+		
+
+		// 	raised = false;
+		// 	if (not raised) { // if lowered, raise
+		// 		lever.move(MAX_VOLTAGE);
+		// 		pros::delay(100);
+		// 	}
+		// 	if (lever.get_actual_velocity() < 5) {
+		// 		lever.move(STOP);
+		// 		raised = true;
+		// 		lowered = false;
+		// 	}
+		// } else if (raised) {
+		// 	if (not lowered) {
+		// 		lever.move_absolute(0, 100);
+		// 		pros::delay(100);
+		// 	}
+		// 	if (lever.get_actual_velocity() < 5) {
+		// 		lever.move(STOP);
+		// 		lowered = true;
+		// 		raised = false;
+		// 	}
+		// } else {
+		// 	lever.move(STOP);
+		// }
 
 		// // Lever Toggle
 		// if (controller.get_digital_new_press(DIGITAL_X)) {
