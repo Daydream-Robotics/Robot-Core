@@ -49,8 +49,6 @@ bool PurePursuit::step(double velocityDirection) { // Direction = 1 for forward,
         return true;
     }
 
-    velocityDirection = (velocityDirection < 0.0) ? -1.0 : 1.0;
-
     // update dynamic lookahead
     m_lookAheadDist = getLookaheadDist();
 
@@ -73,7 +71,7 @@ bool PurePursuit::step(double velocityDirection) { // Direction = 1 for forward,
     int base_vel = static_cast<int>(getBaseVelocity(pathMaxCurvature) * velocityDirection);
     // Direction is selected externally for the whole path.
     // !IMPORTANT! If reverse tracking steers the wrong way, flip the sign of curvature
-    double left_target = base_vel + (steeringCurvature * base_vel * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
+    double left_target = base_vel + (steeringCurvature * base_vel * TURN_RATE);
     double right_target = base_vel - (steeringCurvature * base_vel * TURN_RATE);
 
     // Maintain the turn ratio if the requested velocity exceeds the motor's physical limit
