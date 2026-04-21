@@ -82,7 +82,7 @@ void autonomous() {
 	Path Notes: N/A
 	*/
 	purePursuit.setPath(als_paths[1]);
-	while (not purePursuit.step()) {
+	while (not purePursuit.step(-1)) {
 		pros::delay(10);
 	}
 
@@ -120,10 +120,12 @@ void autonomous() {
 	After Path Action: Use AI to collect balls from the mathloader
 	Path Notes: Has its starting point on the bottom left corner of the blue parking tile. Robot should travel to it then go face the matchloader. Has overshoot points
 	*/
-	purePursuit.setPath(als_paths[3]);
-	while (not purePursuit.step()) {
-		pros::delay(10);
-	}
+	// purePursuit.setPath(als_paths[3]);
+	// while (not purePursuit.step()) {
+	// 	pros::delay(10);
+	// }
+
+	
 
 
 	/*//////////////
