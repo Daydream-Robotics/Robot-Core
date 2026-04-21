@@ -34,6 +34,8 @@ void initialize() {
     LOG("Program Start");
 
 	als_paths = buildAllPaths(0.25);
+
+	matchloader.set_value(true);
 }
 
 void disabled() {}
@@ -52,104 +54,6 @@ void autonomous() {
 		pros::delay(10);
 	}
 
-
-	// auton.travel;
-
-	// Autonomous auton = Autonomous();
-
-	// // Go to matchloader
-	//  auton.travelToPoint(-36, 0, 70, true);
-	
-
-	// // Turn to matchloader
-	// unloader.set_value(true);
-	// auton.turnTo(90);
-	// matchload(false);
-
-	// auton.travelToPoint(-35,-22, 80, true, 5);
-
-	
-	// trackingMode(GamePiece::BLUE_BALL);
-
-	// // Approach matchloader
-	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	// auton.travel(16, 50, 90, 1.150);
-
-	// Matchload
-	// for (int i = 0; i < 2; i++){
-	// 	auton.travel(-12, 50, 90, 0.15);
-	// 	auton.travel(12, 60, 90, 0.35);
-	//  	pros::delay(500);
-	// }
-	// move_intake(STOP);
-
-	// // Reverse and score on long goal
-	// auton.travel(-50, 80, 75, 2);
-	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 0.1);
-	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	// unloader.set_value(false);
-	// move_intake(MAX_VOLTAGE, MAX_VOLTAGE, MAX_VOLTAGE, 3);
-
-	// // Back away from goal
-	// auton.travel(20, 80, 90);
-
-	// // Go past goal
-	// auton.turnTo(0);
-	// auton.travel(24, 70, 0);
-	// auton.turnTo(-90);
-
-	// // Travel down field and face balls
-	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	// auton.travel(99, 85, -90);
-	// auton.turnTo(180);
-
-	// // Get side balls
-	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	// auton.travel(40, 70, 180, 2.8);
-	// auton.travel(-6, 50, 180, 0.8);
-	// auton.travel(8, 60, 180, 0.8);
-	// pros::delay(500);
-	// move_intake(STOP);
-
-	// // Back up to matchloader
-	// auton.travel(-16.25, 70, 180);
-	// unloader.set_value(true);
-	// auton.turnTo(-90);
-
-	// // Matchload
-	// move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	// auton.travel(16, 50, -90, 1.150);
-	// for (int i = 0; i < 2; i++){
-	// 	auton.travel(-12, 50, -90, 0.15);
-	// 	auton.travel(12, 60, -90, 0.35);
-	//  	pros::delay(500);
-	// }
-	// move_intake(STOP);
-	
-	// // Approach long goal and score
-	// auton.travel(-50, 80, -105, 2);
-	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE, 0.1);
-	// move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, STOP, 0.2);
-	// unloader.set_value(false);
-	// move_intake(MAX_VOLTAGE, MAX_VOLTAGE, MAX_VOLTAGE, 1.75);
-
-	// // Move away from goal
-	// auton.travel(6, 90, -90);
-	// auton.turnTo(0);
-	// auton.travel(24, 90, 0);
-	// auton.turnTo(90);
-
-	// // Travel down field
-	// move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-	// auton.travel(94, 150, 90, 5.25);
-
-	// // Face goal and park
-	// auton.turnTo(15);
-	// auton.travel(72, 110, 15, 1.1);
-	// // auton.travel(-6, 60, 0, 0.5);
-
 }
 
 void opcontrol() {
@@ -157,6 +61,14 @@ void opcontrol() {
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 
 	intake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+
+	lever.move(-HIGH_VOLTAGE);
+	pros::delay(100);
+	lever.set_zero_position(lever.get_position());
+
+	bool raised = false;
+	bool lowered = true;
+	bool leverToggle = false;
 
 	while(true){
 
@@ -240,15 +152,34 @@ void opcontrol() {
 			scoringLifter.set_value(false);
 		}
 
+		if (controller.get_digital_new_press(DIGITAL_X)) {
+			leverToggle = !leverToggle;
+		}
+
 		// Lever Hold
-		if (controller.get_digital(DIGITAL_R2)) {
-			lever.move(HIGH_VOLTAGE);
-			pros::delay(100);
-			if (lever.get_actual_velocity() < 3) {
+		if (controller.get_digital(DIGITAL_R2) || leverToggle == true) {
+			raised = false;
+			if (not raised) { // if lowered, raise
+				lever.move(MAX_VOLTAGE);
+				pros::delay(100);
+			}
+			if (lever.get_actual_velocity() < 5) {
 				lever.move(STOP);
+				raised = true;
+				lowered = false;
+			}
+		} else if (raised) {
+			if (not lowered) {
+				lever.move_absolute(0, 100);
+				pros::delay(100);
+			}
+			if (lever.get_actual_velocity() < 5) {
+				lever.move(STOP);
+				lowered = true;
+				raised = false;
 			}
 		} else {
-			lever.move_absolute(0, 100);
+			lever.move(STOP);
 		}
 
 		// // Lever Toggle
