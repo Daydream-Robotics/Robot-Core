@@ -50,12 +50,15 @@ void initialize() {
 void disabled() {}
 
 void competition_initialize() {}
-
+//all after path actions are commented out for path testing purposes
 void autonomous() {
 
-	// Path 1
-
-	// Pure pursuit test
+	/* 
+	Path Name: Matchload
+	Path Action: Goes to the matchloader
+	After Path Action: Use AI to collect balls from the mathloader
+	Path Notes: Has the Overshoot points
+	*/
 	purePursuit.setPath(als_paths[0]);
 	while (not purePursuit.step()) {
 		// if ((purePursuit.m_distFromEnd < 10.0 && GetObject(GamePiece::RED_BALL).has_value()) && IsConnected()) { // If we're within 10 inches of the end of the path and we see a red ball, break to collect it
@@ -63,37 +66,109 @@ void autonomous() {
 		// }
 		pros::delay(10);
 	}
+	
 
-	// matchloads balls
-	// if (IsConnected()) {
-	// 	matchload(false);
-	// }
+	/*//////////////
+	matchload(false);
+	//////////////*/
 
-	// Path 2
 
+
+
+	/* 
+	Path Name: Score
+	Path Action: Goes to the goal
+	After Path Action: Outakes all balls
+	Path Notes: N/A
+	*/
 	purePursuit.setPath(als_paths[1]);
 	while (not purePursuit.step()) {
 		pros::delay(10);
 	}
 
-	// move_intake(HIGH, HIGH, HIGH);
 
-		purePursuit.setPath(als_paths[2]);
+	/*//////////////
+	move_intake(HIGH, HIGH, HIGH, 2);
+	pros::delay(2000);
+	//////////////*/
+
+
+
+
+	/* 
+	Path Name: WallBalls
+	Path Action: Arrives to other side of the field from in between the middle goal and the long goal. Faces the wall balls.
+	After Path Action: Use AI to collect balls from the wall
+	Path Notes: When it goes in between the long goal and the middle goal, it will run through the line of balls. Also has overshoot points.
+	*/
+	purePursuit.setPath(als_paths[2]);
 	while (not purePursuit.step()) {
 		pros::delay(10);
 	}
+
+
+	/*//////////////
+	collect(GamePiece::RED_BALL, 4);
+	//////////////*/
+
+
+
+
+	/* 
+	Path Name: Matchload
+	Path Action: Goes to the matchloader
+	After Path Action: Use AI to collect balls from the mathloader
+	Path Notes: Has its starting point on the bottom left corner of the blue parking tile. Robot should travel to it then go face the matchloader. Has overshoot points
+	*/
+	purePursuit.setPath(als_paths[3]);
+	while (not purePursuit.step()) {
+		pros::delay(10);
+	}
+
+
+	/*//////////////
+	matchload(true);
+	//////////////*/
+
+
+
+
+	/* 
+	Path Name: Score
+	Path Action: Goes to the goal
+	After Path Action: Outakes all balls
+	Path Notes: N/A
+	*/
+	purePursuit.setPath(als_paths[4]);
+	while (not purePursuit.step()) {
+		pros::delay(10);
+	}
+
+
+	/*//////////////
+	move_intake(HIGH, HIGH, HIGH, 2);
+	pros::delay(2000);
+	//////////////*/
+
+
+
+
+	/* 
+	Path Name: Park
+	Path Action: Travels to other side of the field from between the wall and long goal and attempts to park
+	After Path Action: N/A (hopefully it can be one piece)
+	Path Notes: Odom will jump but should be fine due to it being the end of the path. Has overshoot points.
+	*/
+	purePursuit.setPath(als_paths[5]);
+	while (not purePursuit.step()) {
+		pros::delay(10);
+	}
+
+
+
+	/*//////////////
 	
-			purePursuit.setPath(als_paths[3]);
-	while (not purePursuit.step()) {
-		pros::delay(10);
-	}
-
-			purePursuit.setPath(als_paths[4]);
-	while (not purePursuit.step()) {
-		pros::delay(10);
-	}
-
-
+	//////////////*/
 }
 
 void opcontrol() {
@@ -147,23 +222,29 @@ void opcontrol() {
 			descorer.toggle();
 		}
 
-		/* - - - - - - - - - - - - - - - - [AI] - - - - - - - - - - - - - - - - - - */		
+		/* - - - - - - - - - - - - - - - - [AI] - - - - - - - - - - - - - - - - - - */
+		
+		//Matchloads redballs on the bottom and blue balls on the top
 		if(controller.get_digital_new_press(DIGITAL_LEFT)){
 			matchload(false);
 		}
 
+		//collects the red balls off the wall
 		if(controller.get_digital_new_press(DIGITAL_RIGHT)){
 			collect(GamePiece::RED_BALL, 4);
 		}
 
+		//collects a single red ball
 		if(controller.get_digital_new_press(DIGITAL_DOWN)){
 			collect(GamePiece::RED_BALL);
 		}
 
+		//tracks a red ball by turning the robot but not by approaching it
 		if(controller.get_digital_new_press(DIGITAL_UP)){
 			trackingMode(GamePiece::RED_BALL);
 		}
 
+		//collects red balls until the button is pressed again (hold down the button)
 		if(controller.get_digital_new_press(DIGITAL_Y)){
 			while(true){
 				collect(GamePiece::RED_BALL);
