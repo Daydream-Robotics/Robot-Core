@@ -146,25 +146,21 @@ void opcontrol() {
 		}
 
 		// Raise Lifter
-		if (controller.get_digital(DIGITAL_RIGHT)) {
-			scoringLifter.set_value(true);
-		} else {
-			scoringLifter.set_value(false);
+		if (controller.get_digital_new_press(DIGITAL_RIGHT)) {
+			scoringLifter.toggle();
 		}
 
 		// if (controller.get_digital_new_press(DIGITAL_X)) {
 		// 	leverToggle = !leverToggle;
 		// }
 
-
-
 		// Lever Hold
 		if (controller.get_digital_new_press(DIGITAL_R2)) {
 			lever.move(MAX_VOLTAGE);
-		}
-
-		else if(controller.get_digital_new_release(DIGITAL_R2)){
+			ballBlocker.set_value(true);
+		} else if(controller.get_digital_new_release(DIGITAL_R2)){
 			lever.move_absolute(0, 100);
+			ballBlocker.set_value(false);
 		}
 
 
