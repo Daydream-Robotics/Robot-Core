@@ -22,7 +22,7 @@ void PurePursuit::setPath(ALS_Path& als_path) {
     m_ghostPoint = updateGhostPoint();
 }
 
-bool PurePursuit::step() {
+bool PurePursuit::step(double velocityDirection) { // Direction = 1 for forward, -1 for reverse
     // Safety check to prevent a data abort if the path is empty/invalid
     if (!m_als_path->isValid() || m_als_path->getSamples().empty()) {
         leftMotors.move_velocity(0);
@@ -49,6 +49,8 @@ bool PurePursuit::step() {
         return true;
     }
 
+    velocityDirection = (velocityDirection < 0.0) ? -1.0 : 1.0;
+
     // update dynamic lookahead
     m_lookAheadDist = getLookaheadDist();
 
@@ -68,15 +70,9 @@ bool PurePursuit::step() {
     double pathMaxCurvature = m_als_path->getMaxAbsCurvatureInRange(current_s, current_s + m_lookAheadDist);
 
     // Throttle base velocity based on the sharpest upcoming curve
-    int base_vel = getBaseVelocity(pathMaxCurvature);
-    bool sharpTurn = (pathMaxCurvature * m_lookAheadDist) > (M_PI / 4.0);
-    if (!sharpTurn) {
-        base_vel =std::copysign(base_vel, robotFrameTargetPt.x); // If target is behind, reverse direction
-    }
-    
-    
-    //copysign is used for determining if robot is going fwds or backwards
-    // !IMPORTANT! If this doesnt work, flip the sign of curvature
+    int base_vel = static_cast<int>(getBaseVelocity(pathMaxCurvature) * velocityDirection);
+    // Direction is selected externally for the whole path.
+    // !IMPORTANT! If reverse tracking steers the wrong way, flip the sign of curvature
     double left_target = base_vel + (steeringCurvature * base_vel * TURN_RATE); // Positive curvature means target is to the RIGHT, so left wheel goes faster
     double right_target = base_vel - (steeringCurvature * base_vel * TURN_RATE);
 
@@ -101,9 +97,9 @@ bool PurePursuit::step() {
         m_lastPassedPtIdx;
         double distFromLine = std::hypot(curSample.x - cur_x, curSample.y - cur_y);
         m_totalDistOff += distFromLine;
-        printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d | OffAtStep: %.4f | AvgDistOff: %.4f\n",
-               cur_x, cur_y, cur_heading_deg, current_vel, m_lookAheadDist, targetPoint.x, targetPoint.y,
-               robotFrameTargetPt.x, robotFrameTargetPt.y, steeringCurvature, base_vel, left_vel, right_vel, distFromLine, m_totalDistOff/m_stepCounter);
+        printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | Dir:%.0f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d | OffAtStep: %.4f | AvgDistOff: %.4f\n",
+               cur_x, cur_y, cur_heading_deg, current_vel, m_lookAheadDist, velocityDirection, targetPoint.x, targetPoint.y,
+               robotFrameTargetPt.x, robotFrameTargetPt.y, steeringCurvature, base_vel, left_vel, right_vel, distFromLine, m_totalDistOff / (m_stepCounter + 1));
     }
     m_stepCounter++;
 
