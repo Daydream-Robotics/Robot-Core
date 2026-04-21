@@ -58,19 +58,16 @@ void autonomous() {
 	// Pure pursuit test
 	purePursuit.setPath(als_paths[0]);
 	while (not purePursuit.step()) {
-		if ((purePursuit.m_distFromEnd < 10.0 && GetObject(GamePiece::RED_BALL).has_value()) && IsConnected()) { // If we're within 10 inches of the end of the path and we see a red ball, break to collect it
-			break;
-		}
+		// if ((purePursuit.m_distFromEnd < 10.0 && GetObject(GamePiece::RED_BALL).has_value()) && IsConnected()) { // If we're within 10 inches of the end of the path and we see a red ball, break to collect it
+		// 	break;
+		// }
 		pros::delay(10);
 	}
 
-	// Collect balls
-	if (IsConnected()) {
-		collect(GamePiece::RED_BALL);
-		auton.turnTo(-90);
-		collect(GamePiece::BLUE_BALL);
-	}
-	move_intake(STOP, STOP, STOP, 0.5);
+	// matchloads balls
+	// if (IsConnected()) {
+	// 	matchload(false);
+	// }
 
 	// Path 2
 
@@ -78,6 +75,25 @@ void autonomous() {
 	while (not purePursuit.step()) {
 		pros::delay(10);
 	}
+
+	// move_intake(HIGH, HIGH, HIGH);
+
+		purePursuit.setPath(als_paths[2]);
+	while (not purePursuit.step()) {
+		pros::delay(10);
+	}
+	
+			purePursuit.setPath(als_paths[3]);
+	while (not purePursuit.step()) {
+		pros::delay(10);
+	}
+
+			purePursuit.setPath(als_paths[4]);
+	while (not purePursuit.step()) {
+		pros::delay(10);
+	}
+
+
 }
 
 void opcontrol() {
@@ -255,3 +271,4 @@ void drive(DriveType type) {
 		}
 	}
 }
+
