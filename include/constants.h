@@ -9,8 +9,11 @@
  #include <stdio.h>
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
-constexpr int PARALLEL_TRACKING_WHEEL_PORT = -6;
-constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 10;
+// 8 front/back
+// 16 left/right
+
+constexpr int PARALLEL_TRACKING_WHEEL_PORT = -8;
+constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 16;
 
 #define LEFT_DRIVE_WHEEL_PORTS {-2, -3, -5, 11, 13}
 #define RIGHT_DRIVE_WHEEL_PORTS {12, 15, -16, 19, -20}
@@ -46,7 +49,7 @@ constexpr int STOP = 0;
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 
-constexpr double PERPINDICULAR_TRACKING_WHEEL_DISTANCE = 2.25;
+constexpr double PERPINDICULAR_TRACKING_WHEEL_DISTANCE = 0.0;
 
 constexpr double PARALLEL_TRACKING_WHEEL_DIAMETER = 2.03895;
 constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.0425;
