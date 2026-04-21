@@ -14,7 +14,7 @@
 // ALS_Path als_path2;
 // ALS_Path als_path3;
 std::vector<ALS_Path> als_paths;
-PurePursuit purePursuit;
+PurePursuit purePursuit = PurePursuit();
 Autonomous auton = Autonomous();
 
 void initialize() {
@@ -41,15 +41,59 @@ void initialize() {
 void disabled() {}
 
 void competition_initialize() {}
-
+//all after path actions are commented out for path testing purposes
 void autonomous() {
 	// Pure pursuit test
+
+	/* 
+	Path Name: Matchload
+	Path Action: Goes to the matchloader
+	After Path Action: Use AI to collect balls from the mathloader
+	Path Notes: Has the Overshoot points
+	*/
 	purePursuit.setPath(als_paths[0]);
 	while (not purePursuit.step()) {
+		// if ((purePursuit.m_distFromEnd < 10.0 && GetObject(GamePiece::RED_BALL).has_value()) && IsConnected()) { // If we're within 10 inches of the end of the path and we see a red ball, break to collect it
+		// 	break;
+		// }
+		pros::delay(10);
+	}
+	
+
+	/*//////////////
+	matchload(false);
+	//////////////*/
+
+
+
+
+	/* 
+	Path Name: Score
+	Path Action: Goes to the goal
+	After Path Action: Outakes all balls
+	Path Notes: N/A
+	*/
+	purePursuit.setPath(als_paths[1]);
+	while (not purePursuit.step(-1)) {
 		pros::delay(10);
 	}
 
-	purePursuit.setPath(als_paths[1]);
+
+	/*//////////////
+	move_intake(HIGH, HIGH, HIGH, 2);
+	pros::delay(2000);
+	//////////////*/
+
+
+
+
+	/* 
+	Path Name: WallBalls
+	Path Action: Arrives to other side of the field from in between the middle goal and the long goal. Faces the wall balls.
+	After Path Action: Use AI to collect balls from the wall
+	Path Notes: When it goes in between the long goal and the middle goal, it will run through the line of balls. Also has overshoot points.
+	*/
+	purePursuit.setPath(als_paths[2]);
 	while (not purePursuit.step()) {
 		pros::delay(10);
 	}
@@ -266,3 +310,4 @@ void drive(DriveType type) {
 		}
 	}
 }
+
