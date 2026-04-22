@@ -254,15 +254,15 @@ void drive(DriveType type) {
 
 				// Dead zone for both motors
 				if(abs(leftY) > DEADZONE) {
-					leftMotors.move(leftY);
+					leftMotors.move_voltage(leftY * 12000 / 127);
 				} else {
-					leftMotors.move(STOP);
+					leftMotors.move_voltage(0);
 				}
 
 				if(abs(rightY) > DEADZONE) {
-					rightMotors.move(rightY);
+					rightMotors.move_voltage(rightY * 12000 / 127);
 				} else { 
-					rightMotors.move(STOP);
+					rightMotors.move_voltage(0);
 				}
 				break;
 			}
@@ -274,31 +274,31 @@ void drive(DriveType type) {
 				int left = power + turn;
 				int right = power - turn;
 
-				int left_adjusted = left * 600 / 127;
-				int right_adjusted = right * 600 / 127;
+				// int left_adjusted = left * 600 / 127;
+				// int right_adjusted = right * 600 / 127;
 
 				// Dead zone for both motors
 				if(abs(left) > DEADZONE) {
-					leftMotors.move_velocity(left_adjusted);
+					leftMotors.move_voltage(left * 12000 / 127);
 				} else {
-					leftMotors.move(0);
+					leftMotors.move_voltage(0);
 				}
 
 				if(abs(right) > DEADZONE) {
-					rightMotors.move_velocity(right_adjusted);
+					rightMotors.move_voltage(right * 12000 / 127);
 				} else { 
-					rightMotors.move(0);
+					rightMotors.move_voltage(0);
 				}
 				break;
 			}
 		}
 	} else {
 		if (controller.get_digital(DIGITAL_UP)) { // slow move forward
-			leftMotors.move(LOW_VOLTAGE);
-			rightMotors.move(LOW_VOLTAGE);
+			leftMotors.move_voltage(LOW_VOLTAGE * 12000 / 127);
+			rightMotors.move_voltage(LOW_VOLTAGE * 12000 / 127);
 		} else if (controller.get_digital(DIGITAL_DOWN)){ // slow move backward
-			leftMotors.move(-LOW_VOLTAGE);
-			rightMotors.move(-LOW_VOLTAGE);
+			leftMotors.move_voltage(-LOW_VOLTAGE * 12000 / 127);
+			rightMotors.move_voltage(-LOW_VOLTAGE * 12000 / 127);
 		}
 	}
 }

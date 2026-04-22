@@ -76,9 +76,9 @@ bool PurePursuit::step(double velocityDirection) { // Direction = 1 for forward,
 
     // Maintain the turn ratio if the requested velocity exceeds the motor's physical limit
     double max_req = std::max(std::abs(left_target), std::abs(right_target));
-    if (max_req > 200.0) {
-        left_target = left_target * (200.0 / max_req);
-        right_target = right_target * (200.0 / max_req);
+    if (max_req > 600.0) {
+        left_target = left_target * (600.0 / max_req);
+        right_target = right_target * (600.0 / max_req);
     }
 
     int left_vel = static_cast<int>(left_target);
@@ -94,7 +94,7 @@ bool PurePursuit::step(double velocityDirection) { // Direction = 1 for forward,
 
         m_lastPassedPtIdx;
         double distFromLine = std::hypot(curSample.x - cur_x, curSample.y - cur_y);
-        m_totalDistOff += distFromLine;
+        m_totalDistOff += std::abs(distFromLine);
         printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | Dir:%.0f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d | OffAtStep: %.4f | AvgDistOff: %.4f\n",
                cur_x, cur_y, cur_heading_deg, current_vel, m_lookAheadDist, velocityDirection, targetPoint.x, targetPoint.y,
                robotFrameTargetPt.x, robotFrameTargetPt.y, steeringCurvature, base_vel, left_vel, right_vel, distFromLine, m_totalDistOff / (m_stepCounter + 1));
