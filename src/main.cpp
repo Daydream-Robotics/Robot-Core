@@ -285,15 +285,18 @@ void drive(DriveType type) {
 				int left = power + turn;
 				int right = power - turn;
 
+				int left_adjusted = left * 600 / 127;
+				int right_adjusted = right * 600 / 127;
+
 				// Dead zone for both motors
 				if(abs(left) > DEADZONE) {
-					leftMotors.move(left);
+					leftMotors.move_velocity(left_adjusted);
 				} else {
 					leftMotors.move(0);
 				}
 
 				if(abs(right) > DEADZONE) {
-					rightMotors.move(right);
+					rightMotors.move_velocity(right_adjusted);
 				} else { 
 					rightMotors.move(0);
 				}
