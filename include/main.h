@@ -129,6 +129,10 @@ void move_intake(int front, int mid = STOP, int back = STOP, double seconds = 0.
  */
 void drive(DriveType type);
 
+void score();
+void matchload();
+void wallBall();
+
 #ifdef __cplusplus
 }
 #endif

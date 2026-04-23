@@ -22,7 +22,7 @@ void PurePursuit::setPath(ALS_Path& als_path) {
     m_ghostPoint = updateGhostPoint();
 }
 
-bool PurePursuit::step(double velocityDirection) { // Direction = 1 for forward, -1 for reverse
+bool PurePursuit::step(double velocityDirection, double speedPercentage) { // Direction = 1 for forward, -1 for reverse
     // Safety check to prevent a data abort if the path is empty/invalid
     if (!m_als_path->isValid() || m_als_path->getSamples().empty()) {
         leftMotors.move_velocity(0);
@@ -68,7 +68,7 @@ bool PurePursuit::step(double velocityDirection) { // Direction = 1 for forward,
     double pathMaxCurvature = m_als_path->getMaxAbsCurvatureInRange(current_s, current_s + m_lookAheadDist);
 
     // Throttle base velocity based on the sharpest upcoming curve
-    int base_vel = static_cast<int>(getBaseVelocity(pathMaxCurvature) * velocityDirection);
+    int base_vel = static_cast<int>(getBaseVelocity(pathMaxCurvature, speedPercentage) * velocityDirection);
     // Direction is selected externally for the whole path.
     // !IMPORTANT! If reverse tracking steers the wrong way, flip the sign of curvature
     double left_target = base_vel + (steeringCurvature * base_vel * TURN_RATE);
@@ -87,10 +87,10 @@ bool PurePursuit::step(double velocityDirection) { // Direction = 1 for forward,
     
     if (m_stepCounter % 10 == 0) {
         double current_vel = odom.getParallelVel();
-        pros::lcd::print(5, "Velocity: %.2lf in/s", current_vel);
-        pros::lcd::print(6, "LX %.2lf, LY %.2lf", robotFrameTargetPt.x, robotFrameTargetPt.y);
-        pros::lcd::print(1, "Cur: %lf", steeringCurvature);
-        pros::lcd::print(2, "VEL: %d", base_vel);
+        // pros::lcd::print(5, "Velocity: %.2lf in/s", current_vel);
+        // pros::lcd::print(6, "LX %.2lf, LY %.2lf", robotFrameTargetPt.x, robotFrameTargetPt.y);
+        // pros::lcd::print(1, "Cur: %lf", steeringCurvature);
+        // pros::lcd::print(2, "VEL: %d", base_vel);
 
         m_lastPassedPtIdx;
         double distFromLine = std::hypot(curSample.x - cur_x, curSample.y - cur_y);
@@ -154,8 +154,9 @@ double PurePursuit::getLookaheadDist() {
 }
 
 
-int PurePursuit::getBaseVelocity(double curvature) {
-    int base_vel = MAX_BASE_VEL / (1 + (std::abs(curvature) * SPEED_ADJUSTMENT_CONST));
+int PurePursuit::getBaseVelocity(double curvature, double speedPercentage) {
+    int max_base_vel_adjusted = MAX_BASE_VEL * speedPercentage;
+    int base_vel = max_base_vel_adjusted / (1 + (std::abs(curvature) * SPEED_ADJUSTMENT_CONST));
     int min_base_adjusted = MIN_BASE_VEL;
 
     // Further reduce speed if we're close to the end of the path to prevent overshooting
