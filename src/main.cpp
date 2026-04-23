@@ -207,6 +207,7 @@ void opcontrol() {
 
 	lever.move(-HIGH_VOLTAGE);
 	pros::delay(100);
+    lever.move(STOP);
 	lever.set_zero_position(lever.get_position());
 
 	// bool raised = false;
