@@ -132,6 +132,7 @@ void drive(DriveType type);
 void score();
 void matchload();
 void wallBall();
+void fullMatchload();
 
 #ifdef __cplusplus
 }
