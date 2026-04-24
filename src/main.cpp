@@ -46,6 +46,8 @@ void autonomous() {
 	uint32_t startTime;
     double startDist;
 
+	descorer.set_value(true);
+
     intake.move(MAX_VOLTAGE);
     matchloader.set_value(false);
     
@@ -91,126 +93,20 @@ void autonomous() {
 	startTime = pros::millis();
 	pros::lcd::print(0, "Path: WING");
 	purePursuit.setPath(als_paths[PathName::WING]);
-	while (not purePursuit.step()) {
-        if (pros::millis() - startTime > 6000) {
+	while (not purePursuit.step(1.0, 0.6)) {
+        if (pros::millis() - startTime > 10000) {
             pros::lcd::print(1, "Timeout: FIRST_SCORE");
 			leftMotors.move_velocity(0);
 			rightMotors.move_velocity(0);
 			break;
 		}
+
+		if (odom.getPosY() < -30) {
+			descorer.set_value(false);
+		}
+
 		pros::delay(10);
 	}
-
-
-
-
-//     // move to wall balls
-//     intake.move(MAX_VOLTAGE);
-// 	startTime = pros::millis();
-// 	pros::lcd::print(0, "Path: WALL_BALLS");
-// 	purePursuit.setPath(als_paths[PathName::WALL_BALLS]);
-//     startDist = purePursuit.m_distFromEnd;
-// 	while (not purePursuit.step()) {
-//         if (startDist - purePursuit.m_distFromEnd > 3) {
-//             // stop score
-//             scoringLifter.set_value(false);
-//         }
-
-// 		if (pros::millis() - startTime > 6000) {
-// 			pros::lcd::print(1, "Timeout: WALL_BALLS");
-// 			leftMotors.move_velocity(0);
-// 			rightMotors.move_velocity(0);
-// 			break;
-// 		}
-// 		pros::delay(10);
-// 	}
-
-//     // grab wall balls
-//     wallBall();
-
-//     // prepare for score
-//     scoringLifter.set_value(true);
-//     // ballBlocker.set_value(true);
-
-//     // prepare for score before matchload
-// 	startTime = pros::millis();
-// 	pros::lcd::print(0, "Path: PREPARE_FOR_2ND_MATCHLOADER");
-// 	purePursuit.setPath(als_paths[PathName::PREPARE_FOR_2ND_MATCHLOADER]);
-// 	while (not purePursuit.step(-1)) {
-// 		if (pros::millis() - startTime > 3000) {
-// 			pros::lcd::print(1, "Timeout: PREPARE_FOR_2ND_MATCHLOADER");
-// 			leftMotors.move_velocity(0);
-// 			rightMotors.move_velocity(0);
-// 			break;
-// 		}
-// 		pros::delay(10);
-// 	}
-
-//     // score
-//     score();
-
-//     // stop score
-//     scoringLifter.set_value(false);
-//     // ballBlocker.set_value(false);
-
-//     // prep for 2nd matchload
-//     intake.move(MAX_VOLTAGE);
-//     matchloader.set_value(false);
-
-// 	startTime = pros::millis();
-// 	pros::lcd::print(0, "Path: SECOND_MATCHLOAD");
-// 	purePursuit.setPath(als_paths[PathName::SECOND_MATCHLOAD]);
-// 	while (not purePursuit.step()) {
-// 		if (pros::millis() - startTime > 3000) {
-// 			pros::lcd::print(1, "Timeout: SECOND_MATCHLOAD");
-// 			leftMotors.move_velocity(0);
-// 			rightMotors.move_velocity(0);
-// 			break;
-// 		}
-// 		pros::delay(10);
-// 	}
-
-//     // matchload
-//     matchload();
-
-//     // prep for score
-//     scoringLifter.set_value(true);
-//     // ballBlocker.set_value(true);
-    
-//     // move to score
-// 	startTime = pros::millis();
-// 	pros::lcd::print(0, "Path: SECOND_SCORE");
-// 	purePursuit.setPath(als_paths[PathName::SECOND_SCORE]);
-// 	while (not purePursuit.step(-1)) {
-//         if (pros::millis() - startTime > 3000) {
-//             pros::lcd::print(1, "Timeout: SECOND_SCORE");
-// 			leftMotors.move_velocity(0);
-// 			rightMotors.move_velocity(0);
-// 			break;
-// 		}
-// 		pros::delay(10);
-// 	}
-   
-//     // score
-//     score();
-
-//     // stop all
-//     matchloader.set_value(true);
-//     scoringLifter.set_value(false);
-//     ballBlocker.set_value(false);
-//     intake.move(STOP);
-
-// 	pros::lcd::print(0, "Path: PARK");
-// 	purePursuit.setPath(als_paths[PathName::PARK]);
-// 	while (not purePursuit.step()) {
-// 		pros::delay(10);
-// 	}
-
-//     leftMotors.move_velocity(600);
-// 	rightMotors.move_velocity(600);
-//     pros::delay(2000);
-//     leftMotors.move_velocity(0);
-// 	rightMotors.move_velocity(0);
 
 
 }
@@ -467,14 +363,22 @@ void drive(DriveType type) {
 
 
 
+// score
 void score() {
-    // score
-    lever.move(MAX_VOLTAGE);
+	// lever up
     intake.move(MAX_VOLTAGE);
+	pros::delay(500);
+
+    lever.move(125);
     pros::delay(500);
     intake.move(-MAX_VOLTAGE);
     pros::delay(500);
-    lever.move_absolute(0, 100);
+
+	// lever down
+	lever.move(-MAX_VOLTAGE);
+	pros::delay(600);
+	lever.move(STOP);
+
     intake.move(STOP);
     pros::delay(100);
 }
@@ -482,15 +386,19 @@ void score() {
 
 void matchload() {
     intake.move(MAX_VOLTAGE);
-    pros::delay(1500);
-    // leftMotors.move_velocity(-40);
-    // rightMotors.move_velocity(-40);
-    // pros::delay(800);
-    // leftMotors.move_velocity(60);
-    // rightMotors.move_velocity(60);
-    // pros::delay(1200);
+    pros::delay(300);
+    leftMotors.move_velocity(-70);
+    rightMotors.move_velocity(-70);
+    pros::delay(250);
+	leftMotors.move_velocity(0);
+	rightMotors.move_velocity(0);
+	pros::delay(250);
+    leftMotors.move_velocity(70);
+    rightMotors.move_velocity(70);
+    pros::delay(250);
     leftMotors.move_velocity(0);
     rightMotors.move_velocity(0);
+	pros::delay(400);
     intake.move(STOP);
 }
 
