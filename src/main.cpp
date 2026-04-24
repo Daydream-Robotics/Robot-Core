@@ -72,6 +72,7 @@ void autonomous() {
     scoringLifter.set_value(true);
     pros::delay(50);
     ballBlocker.set_value(true);
+	// intake.move(-MAX_VOLTAGE);
     
 	startTime = pros::millis();
 	pros::lcd::print(0, "Path: FIRST_SCORE");
@@ -83,12 +84,18 @@ void autonomous() {
 			rightMotors.move_velocity(0);
 			break;
 		}
+
+		// if (odom.getPosY() < 3) {
+		// 	matchloader.set_value(true);
+		// }
 		pros::delay(10);
 	}
+	// matchloader.set_value(true);
 	
     // score
     score();
-	intake.move_velocity(MAX_VOLTAGE);
+	intake.move(-MAX_VOLTAGE);
+	matchloader.set_value(false);
 
 	// SECOND_MATCHLOAD
 	startTime = pros::millis();
@@ -102,11 +109,52 @@ void autonomous() {
 			break;
 		}
 		
+		if (odom.getPosY() > 5) {
+			intake.move(MAX_VOLTAGE);
+			// lever.move(STOP);
+		} 
+		// else if (odom.getPosY() > 0) {
+		// 	lever.move(-MAX_VOLTAGE);
+		// } else if (odom.getPosY() > -15) {
+		// 	lever.move(MAX_VOLTAGE);
+		// } 
+		
 		pros::delay(10);
 	}
 
-	scoringLifter.set_value(false);
+
+
+	lever.move(STOP);
+
+	// lever.move(MAX_VOLTAGE);
+	// pros::delay(500);
+	// lever.move(-MAX_VOLTAGE);
+	// pros::delay(200);
+	// lever.move(STOP);
+
+	// scoringLifter.set_value(false);
 	matchload();
+
+	// leftMotors.move_velocity(-100);
+	// rightMotors.move_velocity(-100);
+	// pros::delay(600);
+	// leftMotors.move_velocity(0);
+	// rightMotors.move_velocity(0);
+	lever.move(MAX_VOLTAGE);
+	pros::delay(500);
+	lever.move(-MAX_VOLTAGE);
+	pros::delay(500);
+	lever.move(STOP);
+	// pros::delay(500);
+	// leftMotors.move_velocity(100);
+	// rightMotors.move_velocity(100);
+	// pros::delay(600);
+	// leftMotors.move_velocity(0);
+	// rightMotors.move_velocity(0);
+
+	matchload();
+
+
 	
 	
 	// BEFORE_MIDDLE
@@ -145,9 +193,15 @@ void autonomous() {
 		pros::delay(10);
 	}
 
-	intake.move(-HIGH_VOLTAGE);
+	// low mid score
+	// leftMotors.move_velocity(80);
+	// rightMotors.move_velocity(80);
+	// pros::delay(100);
+	intake.move(-90);
 	pros::delay(1000);
 	intake.move(STOP);
+	// leftMotors.move_velocity(0);
+	// rightMotors.move_velocity(0);
 
 	// BEFORE_WING
 	startTime = pros::millis();
@@ -170,7 +224,7 @@ void autonomous() {
 	startTime = pros::millis();
 	pros::lcd::print(0, "Path: WING");
 	purePursuit.setPath(als_paths[PathName::WING]);
-	while (not purePursuit.step(1.0, 0.6)) {
+	while (not purePursuit.step(1.0, 0.7)) {
         if (pros::millis() - startTime > 10000) {
             pros::lcd::print(1, "Timeout: FIRST_SCORE");
 			leftMotors.move_velocity(0);
@@ -464,38 +518,41 @@ void score() {
 void matchload() {
     intake.move(MAX_VOLTAGE);
     pros::delay(300);
-    leftMotors.move_velocity(-70);
-    rightMotors.move_velocity(-70);
-    pros::delay(250);
-	leftMotors.move_velocity(0);
-	rightMotors.move_velocity(0);
-	pros::delay(250);
-    leftMotors.move_velocity(70);
-    rightMotors.move_velocity(70);
-    pros::delay(250);
-    leftMotors.move_velocity(0);
-    rightMotors.move_velocity(0);
-	pros::delay(400);
+
+	for (int i = 0; i < 1; i++) {
+		leftMotors.move_velocity(-70);
+		rightMotors.move_velocity(-70);
+		pros::delay(400);
+		leftMotors.move_velocity(0);
+		rightMotors.move_velocity(0);
+		pros::delay(400);
+		leftMotors.move_velocity(70);
+		rightMotors.move_velocity(70);
+		pros::delay(400);
+		leftMotors.move_velocity(0);
+		rightMotors.move_velocity(0);
+		pros::delay(400);
+	}
     intake.move(STOP);
 }
 
-void fullMatchload() {
-	intake.move(MAX_VOLTAGE);
-    pros::delay(300);
-    leftMotors.move_velocity(-70);
-    rightMotors.move_velocity(-70);
-    pros::delay(250);
-	leftMotors.move_velocity(0);
-	rightMotors.move_velocity(0);
-	pros::delay(250);
-    leftMotors.move_velocity(70);
-    rightMotors.move_velocity(70);
-    pros::delay(250);
-    leftMotors.move_velocity(0);
-    rightMotors.move_velocity(0);
-	pros::delay(400);
-    intake.move(STOP);
-}
+// void fullMatchload() {
+// 	intake.move(MAX_VOLTAGE);
+//     pros::delay(300);
+//     leftMotors.move_velocity(-70);
+//     rightMotors.move_velocity(-70);
+//     pros::delay(250);
+// 	leftMotors.move_velocity(0);
+// 	rightMotors.move_velocity(0);
+// 	pros::delay(250);
+//     leftMotors.move_velocity(70);
+//     rightMotors.move_velocity(70);
+//     pros::delay(250);
+//     leftMotors.move_velocity(0);
+//     rightMotors.move_velocity(0);
+// 	pros::delay(400);
+//     intake.move(STOP);
+// }
 
 void wallBall() {
     int turnSpeed = 40;
