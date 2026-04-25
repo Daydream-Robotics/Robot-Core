@@ -198,7 +198,7 @@ void autonomous() {
 	// leftMotors.move_velocity(80);
 	// rightMotors.move_velocity(80);
 	// pros::delay(100);
-	intake.move(-90);
+	intake.move(-127);
 	pros::delay(1000);
 	intake.move(STOP);
 	// leftMotors.move_velocity(0);
@@ -258,8 +258,8 @@ void opcontrol() {
 	// bool lowered = true;
 	// bool leverToggle = false;
 
-
-    bool lifterUp =  false;
+	
+    bool lifterUp =  true;
 
     uint32_t leverMoveStart = pros::millis();
     bool leverMovingDown = false;
