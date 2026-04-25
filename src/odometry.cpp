@@ -42,7 +42,7 @@ void Odometry::updatePose(void) {
 	// print to the controller every 100 ms
 	static uint32_t lastPrintTime = 0;
 	if (pros::millis() - lastPrintTime > 100) {
-		controller.print(0, 0, "X:%.1f Y:%.1f", pos_x, pos_y);
+		// controller.print(0, 0, "X:%.1f Y:%.1f", pos_x, pos_y);
 		lastPrintTime = pros::millis();
 	}
 
