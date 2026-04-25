@@ -96,7 +96,7 @@ void autonomous() {
     // score
     score();
 	intake.move(-MAX_VOLTAGE);
-	matchloader.set_value(ture); //r
+	matchloader.set_value(true); //r
 
 	// SECOND_MATCHLOAD
 	startTime = pros::millis();
