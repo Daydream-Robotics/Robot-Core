@@ -147,7 +147,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 		// controller.print(0,0, "%.2f, %.2f", pos_x, pos_y);
         // Compute traveled distance along heading vector
         Position delta { odom.pos_x - start.x, odom.pos_y - start.y };
-		printf("X: %.2f, Y: %.2f\n", odom.pos_x, odom.pos_y);
+		// printf("X: %.2f, Y: %.2f\n", odom.pos_x, odom.pos_y);
 
 		traveled = delta.x * headingUnit.x + delta.y * headingUnit.y;
 

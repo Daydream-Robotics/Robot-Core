@@ -64,9 +64,9 @@ void collect(GamePiece gamePiece, int isLoading)
     int humpCount = 0;
     pros::lcd::print(1, "test");
     // declares a GamePieceData variable which is assigned to getObject()
-    printf("[Collect] Calling findBall...\n");
+    // printf("[Collect] Calling findBall...\n");
     std::optional<GamePieceData> ball =  findBall(gamePiece);
-    printf("[Collect] findBall returned.\n");
+    // printf("[Collect] findBall returned.\n");
     
     double error, integral=0, derivative=0, pid_total;
     std::optional<double> previousError;
@@ -148,8 +148,8 @@ void collect(GamePiece gamePiece, int isLoading)
         
         // DEBUG
         bool condition = std::abs(error) > MAX_PIXEL_OFFSET;
-        printf("[TurnTo] X: %.2f | Error: %.2f | TurnSpeed: %d | Loop Cond: %d\n", 
-               ball->x, error, turnSpeed, condition);
+        // printf("[TurnTo] X: %.2f | Error: %.2f | TurnSpeed: %d | Loop Cond: %d\n", 
+        //        ball->x, error, turnSpeed, condition);
         // END DEBUG
 
         // pros::lcd::print(1, "turning with %d velocity", turnSpeed);
@@ -231,7 +231,7 @@ void collect(GamePiece gamePiece, int isLoading)
         rightMotors.move_velocity(0);
     }
     // DEBUG
-    printf("[TurnTo] Exiting loop. Final Error: %.2f\n", error); // DEBUG
+    // printf("[TurnTo] Exiting loop. Final Error: %.2f\n", error); // DEBUG
     // END DEBUG
 
     // frontIntake.move_velocity(0);
@@ -285,7 +285,7 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece)
     std::optional<GamePieceData> ball;
 
     // DEBUG
-    printf("[FindBall] Searching...\n");
+    // printf("[FindBall] Searching...\n");
     // END DEBUG
 
     bool searched_right = false;
@@ -302,7 +302,7 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece)
         ball = GetObject(gamePiece);
         
         if (ball.has_value()) {
-            printf("[FindBall] Found ball at X: %.2f\n", ball->x);
+            // printf("[FindBall] Found ball at X: %.2f\n", ball->x);
             break;
         }
 
@@ -421,8 +421,8 @@ void trackingMode(GamePiece GamePiece) {
    
         // DEBUG
         bool condition = std::abs(error) > MAX_PIXEL_OFFSET;
-        printf("[TurnTo] X: %.2f | Error: %.2f | TurnSpeed: %d | Loop Cond: %d\n", 
-               ball->x, error, turnSpeed, condition);
+        // printf("[TurnTo] X: %.2f | Error: %.2f | TurnSpeed: %d | Loop Cond: %d\n", 
+        //        ball->x, error, turnSpeed, condition);
         // END DEBUG
 
         //pros::lcd::print(1, "turning with %d velocity", turnSpeed);

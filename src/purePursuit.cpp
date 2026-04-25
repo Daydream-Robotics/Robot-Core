@@ -95,9 +95,9 @@ bool PurePursuit::step(double velocityDirection, double speedPercentage) { // Di
         m_lastPassedPtIdx;
         double distFromLine = std::hypot(curSample.x - cur_x, curSample.y - cur_y);
         m_totalDistOff += std::abs(distFromLine);
-        printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | Dir:%.0f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d | OffAtStep: %.4f | AvgDistOff: %.4f\n",
-               cur_x, cur_y, cur_heading_deg, current_vel, m_lookAheadDist, velocityDirection, targetPoint.x, targetPoint.y,
-               robotFrameTargetPt.x, robotFrameTargetPt.y, steeringCurvature, base_vel, left_vel, right_vel, distFromLine, m_totalDistOff / (m_stepCounter + 1));
+        // printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | Dir:%.0f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d | OffAtStep: %.4f | AvgDistOff: %.4f\n",
+        //        cur_x, cur_y, cur_heading_deg, current_vel, m_lookAheadDist, velocityDirection, targetPoint.x, targetPoint.y,
+        //        robotFrameTargetPt.x, robotFrameTargetPt.y, steeringCurvature, base_vel, left_vel, right_vel, distFromLine, m_totalDistOff / (m_stepCounter + 1));
     }
     m_stepCounter++;
 
