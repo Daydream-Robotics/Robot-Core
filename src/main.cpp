@@ -153,7 +153,7 @@ void autonomous() {
 	// leftMotors.move_velocity(0);
 	// rightMotors.move_velocity(0);
 
-	matchload();
+	matchload(2);
 
 
 	
@@ -247,6 +247,8 @@ void opcontrol() {
 	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 
+	descorer.set_value(true);
+
 	intake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 
 	lever.move(-HIGH_VOLTAGE);
@@ -267,55 +269,7 @@ void opcontrol() {
 
 	while(true){
 
-		/* - - - - - - - - - - - - - - [CHASSIS CONTROLS] - - - - - - - - - - - - - - */
-
 		drive(DriveType::SPLIT_ARCADE);
-
-		// /* - - - - - - - - - - - - - - [MATCH UNLOADER] - - - - - - - - - - - - - - */
-
-		// if (controller.get_digital_new_press(DIGITAL_L1)) {
-		// 	unloader.toggle();
-		// }
-
-		// /* - - - - - - - - - - - - - - [CENTER TOGGLE] - - - - - - - - - - - - - - */
-
-		// if (controller.get_digital_new_press(DIGITAL_A)) {
-		// 	centerScore.toggle();
-		// }
-
-
-		// /* - - - - - - - - - - - - - - [DESCORE TOGGLE] - - - - - - - - - - - - - - */
-
-		// if (controller.get_digital_new_press(DIGITAL_L2)) {
-		// 	descorer.toggle();
-		// }
-
-		// /* - - - - - - - - - - - - - - - - [AI] - - - - - - - - - - - - - - - - - - */		
-		// if(controller.get_digital_new_press(DIGITAL_LEFT)){
-		// 	matchload(false);
-		// }
-
-		// if(controller.get_digital_new_press(DIGITAL_RIGHT)){
-		// 	collect(GamePiece::RED_BALL, 4);
-		// }
-
-		// if(controller.get_digital_new_press(DIGITAL_DOWN)){
-		// 	collect(GamePiece::RED_BALL);
-		// }
-		
-		/* - - - - - - - - - - - - - - [INTAKE] - - - - - - - - - - - - - - */
-		// Main intake
-		// if (controller.get_digital(DIGITAL_R1)) { // intake
-		// 	move_intake(STOP, HIGH_VOLTAGE, HIGH_VOLTAGE);
-		// } else if (controller.get_digital(DIGITAL_R2)){ // outtake
-		// 	move_intake(HIGH_VOLTAGE, HIGH_VOLTAGE, HIGH_VOLTAGE);
-		// } else if (controller.get_digital(DIGITAL_L1)){ // score
-		// 	//descorer.toggle();
-		// } else if (controller.get_digital(DIGITAL_B)) { // full outtake
-		// 	move_intake(-HIGH_VOLTAGE, -HIGH_VOLTAGE, -HIGH_VOLTAGE);
-		// } else {
-		// 	move_intake(STOP);
-		// }
 
 		// NEW INTAKE
 		if (controller.get_digital(DIGITAL_R1)) { // intake
@@ -346,11 +300,6 @@ void opcontrol() {
             descorer.set_value(lifterUp);
         }
 
-
-		// if (controller.get_digital_new_press(DIGITAL_X)) {
-		// 	leverToggle = !leverToggle;
-		// }
-
 		// Lever Hold
 		if (controller.get_digital_new_press(DIGITAL_R2)) {
             leverMovingDown = false;
@@ -372,55 +321,11 @@ void opcontrol() {
             }
         }
 
-
-
-
-
-
-		
-
-		// 	raised = false;
-		// 	if (not raised) { // if lowered, raise
-		// 		lever.move(MAX_VOLTAGE);
-		// 		pros::delay(100);
-		// 	}
-		// 	if (lever.get_actual_velocity() < 5) {
-		// 		lever.move(STOP);
-		// 		raised = true;
-		// 		lowered = false;
-		// 	}
-		// } else if (raised) {
-		// 	if (not lowered) {
-		// 		lever.move_absolute(0, 100);
-		// 		pros::delay(100);
-		// 	}
-		// 	if (lever.get_actual_velocity() < 5) {
-		// 		lever.move(STOP);
-		// 		lowered = true;
-		// 		raised = false;
-		// 	}
-		// } else {
-		// 	lever.move(STOP);
-		// }
-
-		// // Lever Toggle
-		// if (controller.get_digital_new_press(DIGITAL_X)) {
-		// 	lever.move(MAX_VOLTAGE);
-		// 	pros::delay(100);
-		// 	if (lever.get_actual_velocity() < 5) {
-		// 		lever.move(STOP);
-		// 	}
-		// } else if (controller.get_digital_new_press(DIGITAL_B)) {
-		// 	lever.move_absolute(0, 100);
-		// }
-
         scoringLifter.set_value(lifterUp);
 
 		// Delay added to prevent crashing
 		pros::delay(20);
 	}
-
-	
 }
 
 void drive(DriveType type) {
@@ -516,23 +421,23 @@ void score() {
 }
 
 
-void matchload() {
+void matchload(int numRam) {
     intake.move(MAX_VOLTAGE);
     pros::delay(300);
 
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < numRam; i++) {
 		leftMotors.move_velocity(-70);
 		rightMotors.move_velocity(-70);
 		pros::delay(400);
 		leftMotors.move_velocity(0);
 		rightMotors.move_velocity(0);
-		pros::delay(400);
+		pros::delay(300);
 		leftMotors.move_velocity(70);
 		rightMotors.move_velocity(70);
 		pros::delay(400);
 		leftMotors.move_velocity(0);
 		rightMotors.move_velocity(0);
-		pros::delay(400);
+		pros::delay(500);
 	}
     intake.move(STOP);
 }

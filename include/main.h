@@ -130,7 +130,7 @@ void move_intake(int front, int mid = STOP, int back = STOP, double seconds = 0.
 void drive(DriveType type);
 
 void score();
-void matchload();
+void matchload(int numRam = 1);
 void wallBall();
 void fullMatchload();
 
