@@ -67,7 +67,7 @@ void autonomous() {
 	}
 
     // matchload
-    matchload();
+    matchload(1);
 
     // prepare for score
     scoringLifter.set_value(true);
@@ -93,6 +93,10 @@ void autonomous() {
 	}
 	// matchloader.set_value(true);
 	
+	intake.move(-MAX_VOLTAGE);
+	pros::delay(500);
+	intake.move(STOP);
+
     // score
     score();
 	intake.move(-MAX_VOLTAGE);
@@ -198,47 +202,47 @@ void autonomous() {
 	// leftMotors.move_velocity(80);
 	// rightMotors.move_velocity(80);
 	// pros::delay(100);
-	intake.move(-127);
-	pros::delay(1000);
+	intake.move(-115);
+	pros::delay(5000);
 	intake.move(STOP);
 	// leftMotors.move_velocity(0);
 	// rightMotors.move_velocity(0);
 
-	// BEFORE_WING
-	startTime = pros::millis();
-	pros::lcd::print(0, "Path: BEFORE_WING");
-	purePursuit.setPath(als_paths[PathName::BEFORE_WING]);
-	while (not purePursuit.step(-1.0)) {
-        if (pros::millis() - startTime > 10000) {
-            pros::lcd::print(1, "Timeout: BEFORE_WING");
-			leftMotors.move_velocity(0);
-			rightMotors.move_velocity(0);
-			break;
-		}
+	// // BEFORE_WING
+	// startTime = pros::millis();
+	// pros::lcd::print(0, "Path: BEFORE_WING");
+	// purePursuit.setPath(als_paths[PathName::BEFORE_WING]);
+	// while (not purePursuit.step(-1.0, 1.25)) {
+    //     if (pros::millis() - startTime > 10000) {
+    //         pros::lcd::print(1, "Timeout: BEFORE_WING");
+	// 		leftMotors.move_velocity(0);
+	// 		rightMotors.move_velocity(0);
+	// 		break;
+	// 	}
 
-		pros::delay(10);
-	}
+	// 	pros::delay(10);
+	// }
 
-	scoringLifter.set_value(true);
+	// scoringLifter.set_value(true);
 
 
-	startTime = pros::millis();
-	pros::lcd::print(0, "Path: WING");
-	purePursuit.setPath(als_paths[PathName::WING]);
-	while (not purePursuit.step(1.0, 0.7)) {
-        if (pros::millis() - startTime > 10000) {
-            pros::lcd::print(1, "Timeout: FIRST_SCORE");
-			leftMotors.move_velocity(0);
-			rightMotors.move_velocity(0);
-			break;
-		}
+	// startTime = pros::millis();
+	// pros::lcd::print(0, "Path: WING");
+	// purePursuit.setPath(als_paths[PathName::WING]);
+	// while (not purePursuit.step(1.0, 1)) {
+    //     if (pros::millis() - startTime > 10000) {
+    //         pros::lcd::print(1, "Timeout: FIRST_SCORE");
+	// 		leftMotors.move_velocity(0);
+	// 		rightMotors.move_velocity(0);
+	// 		break;
+	// 	}
 
-		if (odom.getPosY() < -29) {
-			descorer.set_value(false);
-		}
+	// 	if (odom.getPosY() < -29.5) {
+	// 		descorer.set_value(false);
+	// 	}
 
-		pros::delay(10);
-	}
+	// 	pros::delay(10);
+	// }
 
 
 }
@@ -434,7 +438,7 @@ void matchload(int numRam) {
 		pros::delay(300);
 		leftMotors.move_velocity(70);
 		rightMotors.move_velocity(70);
-		pros::delay(400);
+		pros::delay(350); //400
 		leftMotors.move_velocity(0);
 		rightMotors.move_velocity(0);
 		pros::delay(500);
