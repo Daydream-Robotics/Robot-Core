@@ -1,0 +1,47 @@
+name: Send to Release Review
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  send-to-release:
+    if: github.event.label.name == 'awaiting-review'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create issue in release repo
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.RELEASE_REPO_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+
+            const body = `
+## Source Repo
+${context.repo.repo}
+
+## Original Issue
+${issue.html_url}
+
+## Original Author
+@${issue.user.login}
+
+## Review Status
+Awaiting Review
+
+## Notes
+This issue was promoted automatically after being marked Awaiting Review.
+
+---
+
+${issue.body || "No description provided."}
+            `;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: "release",
+              title: `[${context.repo.repo}] ${issue.title}`,
+              body,
+              labels: ["awaiting-review"]
+            });
