@@ -80,6 +80,13 @@ void Odometry::setPose(Pose pose) {
 	m_mutex.give();
 }
 
+Position Odometry::getPosition() {
+	m_mutex.take();
+	Position pos = {m_currentPosition.x, m_currentPosition.y};
+	m_mutex.give();
+	return pos;
+}
+
 double Odometry::getPosX() {
 	m_mutex.take();
     double x = m_currentPosition.x;

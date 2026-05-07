@@ -67,6 +67,12 @@ public:
     void setPose(Pose pose);
 
     /**
+     * @brief Gets the robot's global position
+     * @returns  position  A position struct of the the robot's latest global position
+     */
+    Position getPosition();
+
+    /**
      * @brief Gets the robots x position
      * @note task safe
      * @returns The global X coordinate of the robot in inches
