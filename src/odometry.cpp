@@ -10,19 +10,19 @@ void Odometry::updatePose(void) {
 
 	const double yaw = getYaw();
 
-	if (yaw < 0) {
-		pros::lcd::print(0, "[Update Pose] IMU Failure!");
+	if (yaw < -180.0) {
+		pros::lcd::print(0, "[Update Pose] IMU Failure! %lf", yaw);
 		return;
 	}
 
-	static double prevTheta = convertDegToRad(yaw - 180);
+	static double prevTheta = convertDegToRad(yaw);
 
 	// Get orientation from IMU
-	double theta = convertDegToRad(yaw - 180);
-	theta = normalizeAngle(theta);
+	double theta_rad = convertDegToRad(yaw);
+	theta_rad = normalizeAngle(theta_rad);
 
 	// Determine change in heading 
-	double del_theta = normalizeAngle(theta - prevTheta);
+	double del_theta = normalizeAngle(theta_rad - prevTheta);
 
 	// Determine change in local x and in local y
 	double dx_local = arcs.parallel;
@@ -46,25 +46,38 @@ void Odometry::updatePose(void) {
 		lastPrintTime = pros::millis();
 	}
 
-	prevTheta = theta;
+	prevTheta = theta_rad;
 }
 
 double Odometry::getYaw(void) {
-    pros::quaternion_s_t qt = imu.get_quaternion();
 
+	// imu disconnected
+	if (!imu.is_installed()) {
+		return -180.1;
+	}
+
+	// imu still calibrating
+	if (imu.is_calibrating()) {
+		return -180.2;
+	}
+
+    pros::quaternion_s_t qt = imu.get_quaternion();
+	
     // If encounter IMU failure, and retry
-    if (qt.w == PROS_ERR_F) {
+    if (std::isnan(qt.w) || qt.w == PROS_ERR_F) {
         qt = imu.get_quaternion();
-        if (qt.w == PROS_ERR_F) {
-            return -1.0;
-        }
+		// pros comm error
+        if (std::isnan(qt.w) || qt.w == PROS_ERR_F) return -180.3;
     }
 
     // yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
-	double yaw = std::atan2(2 * ((qt.w * qt.z) + (qt.x * qt.y)), 1 - (2 * ((qt.y * qt.y) + (qt.z * qt.z))));
+	double yaw_rad = std::atan2(2 * ((qt.w * qt.z) + (qt.x * qt.y)), 1 - (2 * ((qt.y * qt.y) + (qt.z * qt.z))));
 
-	// returns yaw converted from rad to deg; angle is returned from -180 to 180 (+ 180 for [0, 360])
-	return ((yaw * (180.0 / std::numbers::pi)) + 180.0);
+	// convert to degrees
+	double yaw_deg = yaw_rad * (180.0 / std::numbers::pi);
+
+	// angle is returned from -180 to 180
+	return -yaw_deg;
 }
 
 double Odometry::getPosX() {

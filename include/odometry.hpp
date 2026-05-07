@@ -18,7 +18,14 @@ public:
     // Update position and orientation
     void updatePose(void);
 
-    // Returns the current yaw (deg) from IMU; Returns -1 if IMU failure
+    /** 
+     * @brief gets the yaw of the robot
+     * @note Counter clockwise is positive
+     * @returns returns yaw/heading in degrees bounded by [-180, 180]
+     * @retval	-180.1	IMU disconnected
+     * @retval	-180.2	IMU calibrating
+     * @retval	-180.3	Pros communication failure
+    */
     double getYaw(void);
     
     double getPosX();
