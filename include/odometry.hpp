@@ -1,6 +1,13 @@
 #pragma once
 #include "pros/rtos.hpp"
 
+struct OdomConfig {
+    double parallelWheelDiameter;
+    double perpendicularWheelDiameter;
+    double parallelTrackingWheelOffset;
+    double perpendicularTrackingWheelOffset;
+};
+
 struct WheelLengths {
     double parallel;
     double perpendicular;
@@ -33,6 +40,12 @@ struct Pose {
 class Odometry {
     
 public:
+
+    /**
+     * @brief Constructs Odometry tracking instance
+     * @param config The physical odometry dimensions of the robot
+     */
+    Odometry(OdomConfig config);
 
     /**
      * @brief Calculates and updates the robot's global pose
@@ -94,6 +107,9 @@ public:
     static void odomTask();
 
 private:
+    // the config for the robot
+    OdomConfig m_config;
+
     // stores the latest global position and heading on the robot
     Pose m_currentPosition = {0, 0, 0};
 

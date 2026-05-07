@@ -1,8 +1,11 @@
 #include "odometry.hpp"
+#include "constants.h"
 #include "subsystems.hpp"
 #include "helpers.hpp"
 #include <cmath>
 #include <numbers>
+
+Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
 void Odometry::updatePose(void) {
 	const double yaw_deg = getYaw(); 
@@ -34,8 +37,8 @@ void Odometry::updatePose(void) {
 	double del_theta = normalizeAngle(theta_rad - m_prevTheta);
 
 	// Determine change in local x and in local y
-	double dx_local = arcs.parallel;
-	double dy_local = arcs.perpendicular - (del_theta * PERPINDICULAR_TRACKING_WHEEL_DISTANCE);
+	double dx_local = arcs.parallel - (del_theta * m_config.parallelTrackingWheelOffset);
+	double dy_local = arcs.perpendicular - (del_theta * m_config.perpendicularTrackingWheelOffset);
 
 	double theta_mid = m_prevTheta + del_theta / 2.0;
     theta_mid = normalizeAngle(theta_mid);
@@ -136,8 +139,8 @@ WheelLengths Odometry::getOdomWheelTravel(void) {
 	double dTicksS = currPerpendicular - m_prevPerpendicular;
 
 	// Convert centidegrees to degrees and find distance travelled by wheel
-	double delParallel = (dTicksL / 36000.0) * PARALLEL_TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
-	double delPerpendicular = (dTicksS / 36000.0) * PERPENDICULAR_TRACKING_WHEEL_DIAMETER * std::numbers::pi; 
+	double delParallel = (dTicksL / 36000.0) * m_config.parallelWheelDiameter * std::numbers::pi; 
+	double delPerpendicular = (dTicksS / 36000.0) * m_config.perpendicularWheelDiameter * std::numbers::pi; 
 
     // Save current position as previous
 	m_prevParallel = currParallel;
@@ -148,7 +151,7 @@ WheelLengths Odometry::getOdomWheelTravel(void) {
 
 double Odometry::getParallelVel() {
 	double deg_s = parallelTrackingWheel.get_velocity();
-	return (deg_s / 360.0) * PARALLEL_TRACKING_WHEEL_DIAMETER * std::numbers::pi;
+	return (deg_s / 360.0) * m_config.parallelWheelDiameter * std::numbers::pi;
 }
 
 // could be used to do odom in background
@@ -159,4 +162,9 @@ void Odometry::odomTask() {
 	}
 }
 
-Odometry odom;
+Odometry odom({
+	PARALLEL_TRACKING_WHEEL_DIAMETER,
+	PERPENDICULAR_TRACKING_WHEEL_DIAMETER,
+	PARALLEL_TRACKING_WHEEL_OFFSET,
+	PERPINDICULAR_TRACKING_WHEEL_OFFSET	
+});
