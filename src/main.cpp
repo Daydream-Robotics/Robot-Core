@@ -9,14 +9,11 @@
 #include "paths.hpp"
 #include "sd_card_logging.hpp"
 #include "purePursuit.hpp"
-#include "trajectory.hpp"
 
-// ALS_Path als_path1;
-// ALS_Path als_path2;
-// ALS_Path als_path3;
-std::vector<ALS_Path> als_paths;
 PurePursuit purePursuit = PurePursuit();
 Autonomous auton = Autonomous();
+
+std::vector<ALS_Path> paths;
 
 void initialize() {
 	// Initialize subsystems
@@ -33,17 +30,22 @@ void initialize() {
 		pros::delay(20);
 	}
 
-	// trajectory setup
-	trajectories = Trajectory::loadAllFromJerryIO("/usd/path.jerryio.txt");
-	if (trajectories.size() != TrajectoryName::COUNT) {
+	// path setup
+	printf("[MAIN] Loading paths...\n");
+	paths = Path::buildAllPathsFromJerryIO("/usd/path.jerryio.txt");
+	printf("[MAIN] Paths loaded: %zu\n", paths.size());
+	if (paths.size() != PathName::COUNT) {
+		printf("[MAIN] ERROR: Path count mismatch\n");
 		pros::lcd::print(1, "ERROR: Path count mismatch");
-		pros::lcd::print(2, "Expected: %d, Actual: %d", TrajectoryName::COUNT, trajectories.size());
+		pros::lcd::print(2, "Expected: %d, Actual: %d", PathName::COUNT, paths.size());
 	} else {
+		printf("[MAIN] Trajectories Loaded successfully\n");
 		pros::lcd::print(1, "Trajectories Loaded");
 	}
 
 	// object handler setup
 	// pros::Task frame_task(UpdateFrame_task_fn, (void*)"PROS_Task_Param", TASK_PRIORITY_DEFAULT, TASK_STACK_DEPTH_DEFAULT, "Vision Frame Update");
+	printf("[MAIN] Initialize complete\n");
 }
 
 void disabled() {}
@@ -51,7 +53,36 @@ void disabled() {}
 void competition_initialize() {}
 //all after path actions are commented out for path testing purposes
 void autonomous() {
+	printf("[MAIN] Starting autonomous()\n");
+	
+	if (paths.size() <= PathName::FIRST_PATH) {
+		printf("[MAIN-ERROR] FIRST_PATH index out of bounds! Array size is %zu\n", paths.size());
+		return;
+	}
 
+	printf("[MAIN] Setting FIRST_PATH...\n");
+	purePursuit.setPath(paths[PathName::FIRST_PATH]);
+	printf("[MAIN] FIRST_PATH set. Tracking...\n");
+	while (not purePursuit.step()) {
+		pros::delay(20);
+	}
+	printf("[MAIN] FIRST_PATH tracking complete.\n");
+
+	printf("[MAIN] Delaying 2000ms...\n");
+	pros::delay(2000);
+
+	if (paths.size() <= PathName::SECOND_PATH) {
+		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
+		return;
+	}
+
+	printf("[MAIN] Setting SECOND_PATH...\n");
+	purePursuit.setPath(paths[PathName::SECOND_PATH]);
+	printf("[MAIN] SECOND_PATH set. Tracking...\n");
+	while (not purePursuit.step()) {
+		pros::delay(20);
+	}
+	printf("[MAIN] SECOND_PATH tracking complete.\n");
 
 }
 
