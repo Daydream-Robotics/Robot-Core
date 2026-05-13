@@ -6,7 +6,7 @@
 
 // ====== Helper functions ======
 
-// Normalize angle between [-180, 180]
+// Normalize angle between [-180, 180] (actually radians)
 double normalizeAngle(double a) {
     return std::atan2(std::sin(a), std::cos(a));
 }

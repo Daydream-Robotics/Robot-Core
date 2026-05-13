@@ -7,6 +7,7 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
  #include <stdio.h>
+
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
 // 8 front/back
@@ -44,10 +45,13 @@ constexpr int STOP = 0;
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 
-constexpr double PERPINDICULAR_TRACKING_WHEEL_DISTANCE = 0.0;
-
+// diameter of tracking wheels in inches
 constexpr double PARALLEL_TRACKING_WHEEL_DIAMETER = 2.03895;
 constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.0425;
+
+// distance from tracking center to wheels
+constexpr double PARALLEL_TRACKING_WHEEL_OFFSET = 0.0; // positive is to the right of tracking center
+constexpr double PERPINDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behind tracking center
 
 /* - - - - - - - - - - - - - - [PIDS] - - - - - - - - - - - - - - */
 

@@ -32,9 +32,9 @@ bool PurePursuit::step(double velocityDirection, double speedPercentage) { // Di
 
     odom.updatePose();
     
-    double cur_x = odom.pos_x;
-    double cur_y = odom.pos_y;
-    double cur_heading_deg = odom.getYaw() - 180.0; // Remove the 180 degree offset from getYaw()
+    double cur_x = odom.getPosX();
+    double cur_y = odom.getPosY();
+    double cur_heading_deg = odom.getYaw(); // Remove the 180 degree offset from getYaw()
     
     // double current_s = als_path.getSamples()[als_path.findClosestSampleIndex({cur_x, cur_y}, 0, -1)].s;
     m_lastPassedPtIdx = m_als_path->findClosestSampleIndex({cur_x, cur_y}, m_lastPassedPtIdx, -1);
@@ -128,9 +128,9 @@ double PurePursuit::calculateCurvature(Position robotFrameTargetPt) {
 
 // converts a target point to a point local to the robot's frame of reference
 Position PurePursuit::convertPtToRobotFrame(Position targetPoint) {
-    double robot_x = odom.pos_x;
-    double robot_y = odom.pos_y;
-    double robot_heading_deg = odom.getYaw() - 180.0; // Remove the 180 degree offset from getYaw()
+    double robot_x = odom.getPosX();
+    double robot_y = odom.getPosY();
+    double robot_heading_deg = odom.getYaw(); // Remove the 180 degree offset from getYaw()
     
     double dx = targetPoint.x - robot_x;
     double dy = targetPoint.y - robot_y;
