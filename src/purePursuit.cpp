@@ -16,15 +16,19 @@ PurePursuit::~PurePursuit() {
 }
 
 void PurePursuit::setPath(ALS_Path& als_path) {
+    printf("[PP] setPath called. Checking if valid...\n");
     m_als_path = &als_path;
     m_stepCounter = 0;
     m_lastPassedPtIdx = 0;
+    printf("[PP] Updating ghost point...\n");
     m_ghostPoint = updateGhostPoint();
+    printf("[PP] setPath complete.\n");
 }
 
 bool PurePursuit::step(double velocityDirection, double speedPercentage) { // Direction = 1 for forward, -1 for reverse
     // Safety check to prevent a data abort if the path is empty/invalid
     if (!m_als_path->isValid() || m_als_path->getSamples().empty()) {
+        printf("[PP-ERROR] Step called but path is invalid or empty!\n");
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
         return true;
@@ -38,12 +42,19 @@ bool PurePursuit::step(double velocityDirection, double speedPercentage) { // Di
     
     // double current_s = als_path.getSamples()[als_path.findClosestSampleIndex({cur_x, cur_y}, 0, -1)].s;
     m_lastPassedPtIdx = m_als_path->findClosestSampleIndex({cur_x, cur_y}, m_lastPassedPtIdx, -1);
+
+    if (m_lastPassedPtIdx >= m_als_path->getSamples().size()) {
+        printf("[PP-ERROR] m_lastPassedPtIdx (%d) is out of bounds (size %zu)!\n", m_lastPassedPtIdx, m_als_path->getSamples().size());
+        return true;
+    }
+
     Sample curSample = m_als_path->getSamples()[m_lastPassedPtIdx];
     double current_s = curSample.s;
     
     m_distFromEnd = m_als_path->getTotalLength() - current_s;
 
     if (m_distFromEnd < END_TOLERANCE) {
+        printf("[PP] Reached end of path (Dist: %.2f < %.2f)\n", m_distFromEnd, END_TOLERANCE);
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
         return true;
@@ -53,7 +64,8 @@ bool PurePursuit::step(double velocityDirection, double speedPercentage) { // Di
     m_lookAheadDist = getLookaheadDist();
 
     // get target point coords local to the robot
-    Position targetPoint = m_als_path->returnLookaheadPoint({cur_x, cur_y}, m_lookAheadDist);
+    Waypoint targetWP = m_als_path->returnLookaheadPoint({cur_x, cur_y}, m_lookAheadDist);
+    Position targetPoint = {targetWP.x, targetWP.y};
     
     // if dist to end is less than lookahead, use ghost point to prevent aggressive braking
     if (m_distFromEnd < m_lookAheadDist) {
@@ -71,8 +83,8 @@ bool PurePursuit::step(double velocityDirection, double speedPercentage) { // Di
     int base_vel = static_cast<int>(getBaseVelocity(pathMaxCurvature, speedPercentage) * velocityDirection);
     // Direction is selected externally for the whole path.
     // !IMPORTANT! If reverse tracking steers the wrong way, flip the sign of curvature
-    double left_target = base_vel + (steeringCurvature * base_vel * TURN_RATE);
-    double right_target = base_vel - (steeringCurvature * base_vel * TURN_RATE);
+    double left_target = base_vel - (steeringCurvature * base_vel * TURN_RATE);
+    double right_target = base_vel + (steeringCurvature * base_vel * TURN_RATE);
 
     // Maintain the turn ratio if the requested velocity exceeds the motor's physical limit
     double max_req = std::max(std::abs(left_target), std::abs(right_target));
@@ -169,7 +181,13 @@ int PurePursuit::getBaseVelocity(double curvature, double speedPercentage) {
 }
 
 Position PurePursuit::updateGhostPoint() {
+    printf("[PP] Getting samples for ghost point...\n");
     std::vector<Sample> samples = m_als_path->getSamples();
+
+    if (samples.empty()) {
+        printf("[PP-ERROR] Cannot update ghost point, samples vector is empty!\n");
+        return {0, 0};
+    }
 
     Sample lastPoint = samples.back();
     
