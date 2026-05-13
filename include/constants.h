@@ -10,9 +10,6 @@
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
-// 8 front/back
-// 16 left/right
-
 constexpr int PARALLEL_TRACKING_WHEEL_PORT = 8;
 constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 10;
 
@@ -31,18 +28,6 @@ constexpr char SCORING_LIFTER = 'B';
 constexpr char MATCHLOADER_PORT = 'C';
 constexpr char DESCORE_PORT = 'D'; 
 
-/* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
-
-constexpr int DEADZONE = 2; // was 3 for steven
-
-/* - - - - - - - - - - - - - - [GENERAL] - - - - - - - - - - - - - - */
-
-constexpr int MAX_VOLTAGE = 127;
-constexpr int HIGH_VOLTAGE = 100;
-constexpr int MID_VOLTAGE = 60;
-constexpr int LOW_VOLTAGE = 40;
-constexpr int STOP = 0;
-
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 
 // diameter of tracking wheels in inches
@@ -52,6 +37,22 @@ constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.0425;
 // distance from tracking center to wheels
 constexpr double PARALLEL_TRACKING_WHEEL_OFFSET = 0.0; // positive is to the right of tracking center
 constexpr double PERPINDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behind tracking center
+
+/* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
+
+constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 2.0;
+
+/* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
+
+constexpr int DEADZONE = 2;
+
+/* - - - - - - - - - - - - - - [GENERAL] - - - - - - - - - - - - - - */
+
+constexpr int MAX_VOLTAGE = 127;
+constexpr int HIGH_VOLTAGE = 100;
+constexpr int MID_VOLTAGE = 60;
+constexpr int LOW_VOLTAGE = 40;
+constexpr int STOP = 0;
 
 /* - - - - - - - - - - - - - - [PIDS] - - - - - - - - - - - - - - */
 
