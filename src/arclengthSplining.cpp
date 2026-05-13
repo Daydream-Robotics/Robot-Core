@@ -8,36 +8,17 @@
 //             MAIN INTERFACE
 // ----------------------------------------
 
-
-
-Position ALS_Path::returnLookaheadPoint(const Position& curPosition, double lookaheadDistance) {
+Waypoint ALS_Path::returnLookaheadPoint(const Position& curPosition, double lookaheadDistance) {
     if (m_samples.empty()) {
         LOG("No samples in returnLookaheadPoint");
-        return Position{};
+        return Waypoint{};
     }
 
     // Get current closest point on line
-    std::size_t closestIdx = findClosestSampleIndex(curPosition, m_lastIndex, getSamples().size());
+    std::size_t closestIdx = findClosestSampleIndex(curPosition, m_lastIndex, m_samples.size());
     const Sample& currentSample = getSamples()[closestIdx];
 
     m_lastIndex = closestIdx; // update last index for faster search
-
-    // ================================
-    // LOOKAHEAD CALCULATIONS
-    // equation = some constant + curvature gain * abs(curvature at closest point), clamped between min & max
-    // base = some constant
-    // min = minimum clamp
-    // max = maximum clamp
-    // curvature = curvature at CURRENT CLOSEST POINT
-    // ================================
-    // double baseLookahead = 5.0;
-    // double minLookahead  = 2.0;
-    // double maxLookahead  = 12.0;
-    // double curvatureGain = 20.0;
-
-    // double lookaheadDistance = baseLookahead / (1.0 + curvatureGain * std::abs(currentSample.curvature));
-    // lookaheadDistance = std::clamp(lookaheadDistance, minLookahead, maxLookahead);
-
 
     double targetS = currentSample.s + lookaheadDistance; 
     if (targetS > m_totalLength) {
@@ -252,7 +233,7 @@ const std::vector<SplineSegment>& CubicSpline::getSegments() const {
 // ----------------------------------------
 //    ARC-LENGTH PARAM. & PATHBUILDING
 // ----------------------------------------
-std::vector<double> ALS_Path::computeChordLengthParameters(const std::vector<Position>& points) {
+std::vector<double> ALS_Path::computeChordLengthParameters(const std::vector<Waypoint>& points) {
     std::vector<double> t;
 
     if (points.empty()) {
@@ -273,7 +254,7 @@ std::vector<double> ALS_Path::computeChordLengthParameters(const std::vector<Pos
     return t;
 }
 
-bool ALS_Path::buildFromPoints(const std::vector<Position>& points, double sampleSpacing) {
+bool ALS_Path::buildFromPoints(const std::vector<Waypoint>& points, double sampleSpacing) {
     m_valid = false;
     m_parameters.clear();
     m_samples.clear();
@@ -304,10 +285,12 @@ bool ALS_Path::buildFromPoints(const std::vector<Position>& points, double sampl
     // Split points into x and y
     std::vector<double> xVals(points.size());
     std::vector<double> yVals(points.size());
+    std::vector<double> vVals(points.size());
 
     for (std::size_t i = 0; i < points.size(); i++) {
         xVals[i] = points[i].x;
         yVals[i] = points[i].y;
+        vVals[i] = points[i].v;
     }
 
     // Build parametric splines
@@ -318,6 +301,11 @@ bool ALS_Path::buildFromPoints(const std::vector<Position>& points, double sampl
 
     if (!m_splineY.buildSpline(m_parameters, yVals)) {
         LOG("Failed to build Y spline");
+        return false;
+    }
+
+    if (!m_splineV.buildSpline(m_parameters, vVals)) {
+        LOG("Failed to build V spline");
         return false;
     }
 
@@ -333,20 +321,21 @@ bool ALS_Path::buildFromPoints(const std::vector<Position>& points, double sampl
     return true;
 }
 
-Position ALS_Path::getPointAtParameter(double tQuery) const {
-    Position p;
+Waypoint ALS_Path::getPointAtParameter(double tQuery) const {
+    Waypoint p;
     p.x = m_splineX.evaluate(tQuery);
     p.y = m_splineY.evaluate(tQuery);
+    p.v = m_splineV.evaluate(tQuery);
     return p;
 }
 
-Position ALS_Path::getPointAtArcLength(double sQuery) const {
+Waypoint ALS_Path::getPointAtArcLength(double sQuery) const {
     double tQuery = arcLengthToParameter(sQuery);
-    Position p;
-
+    Waypoint p;
 
     p.x = m_splineX.evaluate(tQuery);
     p.y = m_splineY.evaluate(tQuery);
+    p.v = m_splineV.evaluate(tQuery);
     return p;
 }
 
@@ -378,7 +367,7 @@ void ALS_Path::buildSamples(double sampleSpacing) {
     m_samples.clear();
     m_totalLength = 0.0;
 
-    if (!m_splineX.isValid() || !m_splineY.isValid()) {
+    if (!m_splineX.isValid() || !m_splineY.isValid() || !m_splineV.isValid()) {
         LOG("Splines invalid in buildSamples");
         return;
     }
@@ -396,13 +385,14 @@ void ALS_Path::buildSamples(double sampleSpacing) {
     const double tStart = m_parameters.front();
     const double tEnd   = m_parameters.back();
 
-    Position prev = getPointAtParameter(tStart);
+    Waypoint prev = getPointAtParameter(tStart);
 
     Sample first;
     first.t = tStart;
     first.s = 0.0;
     first.x = prev.x;
     first.y = prev.y;
+    first.v = prev.v;
     first.heading = getHeadingAtParameter(tStart);
     first.curvature = getCurvatureAtParameter(tStart);
     m_samples.push_back(first);
@@ -428,7 +418,11 @@ void ALS_Path::buildSamples(double sampleSpacing) {
             nextT = tEnd;
         }
 
-        Position curr = getPointAtParameter(nextT);
+        Waypoint curr = getPointAtParameter(nextT);
+
+        if (curr.v < 0.0) {
+            curr.v = 0.0;
+        }
 
         double ds = std::hypot(curr.x - prev.x, curr.y - prev.y);
         accumulatedS += ds;
@@ -438,8 +432,10 @@ void ALS_Path::buildSamples(double sampleSpacing) {
         sample.s = accumulatedS;
         sample.x = curr.x;
         sample.y = curr.y;
+        sample.v = curr.v;
         sample.heading = getHeadingAtParameter(nextT);
         sample.curvature = getCurvatureAtParameter(nextT);
+        sample.omega = sample.v * sample.curvature;
 
         m_samples.push_back(sample);
 
@@ -598,4 +594,8 @@ const CubicSpline& ALS_Path::getXSpline() const {
 
 const CubicSpline& ALS_Path::getYSpline() const {
     return m_splineY;
+}
+
+const CubicSpline& ALS_Path::getVSpline() const {
+    return m_splineV;
 }

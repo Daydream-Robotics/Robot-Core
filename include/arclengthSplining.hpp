@@ -10,6 +10,10 @@ struct Sample {
     double y = 0.0;
     double heading = 0.0; // direction of motion
     double curvature = 0.0;
+
+    double time_s = 0.0;
+    double v = 0.0;
+    double omega = 0.0;
 };
 
 struct SplineSegment {
@@ -22,6 +26,12 @@ struct SplineSegment {
 
     double t0 = 0.0;
     double t1 = 0.0;
+};
+
+struct Waypoint {
+    double x;
+    double y;
+    double v;
 };
 
 
@@ -59,10 +69,10 @@ class ALS_Path {
         //    MAIN PATH BUILDING & QUERY INTERFACE
         //  Primary External Query Interface for lookahead point
         // ===============================================
-        Position returnLookaheadPoint(const Position& currentPos, double lookaheadDistance);
+        Waypoint returnLookaheadPoint(const Position& currentPos, double lookaheadDistance);
         
         // Main build function, computes paramterization, fit, and sample table
-        bool buildFromPoints(const std::vector<Position>& points, double sampleSpacing = 0.25);
+        bool buildFromPoints(const std::vector<Waypoint>& points, double sampleSpacing = 0.25);
 
         // Closest Point helper
         std::size_t findClosestSampleIndex(const Position& robotPos, std::size_t startIdx = 0, std::size_t endIdx = static_cast<std::size_t>(-1)) const;
@@ -74,19 +84,21 @@ class ALS_Path {
         const std::vector<Sample>& getSamples() const;
         const CubicSpline& getXSpline() const;
         const CubicSpline& getYSpline() const;
+        const CubicSpline& getVSpline() const;
         
         bool isValid() const;
         double getTotalLength() const;
         
     private:
         // Build Helpers
-        static std::vector<double> computeChordLengthParameters(const std::vector<Position>& points);
+        static std::vector<double> computeChordLengthParameters(const std::vector<Waypoint>& points);
         
         void buildSamples(double sampleSpacing);
         double arcLengthToParameter(double sQuery) const;
     
         CubicSpline m_splineX;
         CubicSpline m_splineY;
+        CubicSpline m_splineV;
         
         // Original params for points
         std::vector<double> m_parameters;
@@ -95,13 +107,11 @@ class ALS_Path {
         std::vector<Sample> m_samples;
         
         // Query points and geometry
-        Position getPointAtParameter(double tQuery) const;
-        Position getPointAtArcLength(double sQuery) const;
+        Waypoint getPointAtParameter(double tQuery) const;
+        Waypoint getPointAtArcLength(double sQuery) const;
         
         double getHeadingAtParameter(double tQuery) const;
         double getCurvatureAtParameter(double tQuery) const;
-        
-        
         
         // globals
         double m_totalLength = 0.0;
