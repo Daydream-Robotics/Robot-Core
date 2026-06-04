@@ -19,7 +19,7 @@ Robot-Core is responsible for the low-level and mid-level robot functionality us
 - SD card logging
 - SLAM / positioning experiments
 
-The repository currently includes `src`, `include`, `paths`, and `firmware` directories, along with PROS build files such as `project.pros`, `Makefile`, and `common.mk`. :contentReference[oaicite:0]{index=0}
+The repository currently includes `src`, `include`, `paths`, and `firmware` directories, along with PROS build files such as `project.pros`, `Makefile`, and `common.mk`.
 
 ## Repository Structure
 
