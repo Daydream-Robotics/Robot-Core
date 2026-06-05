@@ -7,81 +7,58 @@
 #include "main.h"
 #include "sd_card_logging.hpp"
 
-PurePursuit::PurePursuit() 
-    : m_velocityPID(PurPur_KP, PurPur_KI, PurPur_KD, 0.0) {
-    // m_ghostPoint = updateGhostPoint();
-}
+PurePursuitController::PurePursuitController() {}
+PurePursuitController::~PurePursuitController() {}
 
-PurePursuit::~PurePursuit() {
-}
 
-void PurePursuit::setPath(ALS_Path& als_path) {
-    printf("[PP] setPath called. Checking if valid...\n");
-    m_als_path = &als_path;
+void PurePursuitController::reset() {
+    m_totalDistOff = 0;
     m_stepCounter = 0;
-    m_lastPassedPtIdx = 0;
-    printf("[PP] Updating ghost point...\n");
-    m_ghostPoint = updateGhostPoint();
-    printf("[PP] setPath complete.\n");
 }
 
-bool PurePursuit::step(double velocityDirection, double speedPercentage) { // Direction = 1 for forward, -1 for reverse
-    // Safety check to prevent a data abort if the path is empty/invalid
-    if (!m_als_path->isValid() || m_als_path->getSamples().empty()) {
-        printf("[PP-ERROR] Step called but path is invalid or empty!\n");
-        leftMotors.move_velocity(0);
-        rightMotors.move_velocity(0);
-        return true;
-    }
 
-    odom.updatePose();
-    
-    double cur_x = odom.getPosX();
-    double cur_y = odom.getPosY();
-    double cur_heading_deg = odom.getYaw(); // Remove the 180 degree offset from getYaw()
-    
-    // double current_s = als_path.getSamples()[als_path.findClosestSampleIndex({cur_x, cur_y}, 0, -1)].s;
-    m_lastPassedPtIdx = m_als_path->findClosestSampleIndex({cur_x, cur_y}, m_lastPassedPtIdx, -1);
+WheelVelocities PurePursuitController::compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) {
 
-    if (m_lastPassedPtIdx >= m_als_path->getSamples().size()) {
-        printf("[PP-ERROR] m_lastPassedPtIdx (%d) is out of bounds (size %zu)!\n", m_lastPassedPtIdx, m_als_path->getSamples().size());
-        return true;
-    }
-
-    Sample curSample = m_als_path->getSamples()[m_lastPassedPtIdx];
-    double current_s = curSample.s;
-    
-    m_distFromEnd = m_als_path->getTotalLength() - current_s;
-
-    if (m_distFromEnd < END_TOLERANCE) {
-        printf("[PP] Reached end of path (Dist: %.2f < %.2f)\n", m_distFromEnd, END_TOLERANCE);
-        leftMotors.move_velocity(0);
-        rightMotors.move_velocity(0);
-        return true;
-    }
+    Sample currentSample = als_path.getSamples()[closestSampleIdx];
 
     // update dynamic lookahead
     m_lookAheadDist = getLookaheadDist();
-
-    // get target point coords local to the robot
-    Waypoint targetWP = m_als_path->returnLookaheadPoint({cur_x, cur_y}, m_lookAheadDist);
-    Position targetPoint = {targetWP.x, targetWP.y};
     
-    // if dist to end is less than lookahead, use ghost point to prevent aggressive braking
-    if (m_distFromEnd < m_lookAheadDist) {
-        targetPoint = m_ghostPoint;
-    }
-    Position robotFrameTargetPt = convertPtToRobotFrame(targetPoint);
+    Position targetPoint;
 
-    // Using actual distance to target ensures accurate curvature regardless of point sparsity
+    // if dist to end is less than lookahead, use ghost point to prevent aggressive braking
+    m_distFromEnd = als_path.getTotalLength() - currentSample.s;
+    if (m_distFromEnd < m_lookAheadDist) {
+        // create ghost point
+        Sample lastPoint = als_path.getSamples().back();
+        targetPoint = {
+            lastPoint.x + END_GHOST_CAST * std::cos(lastPoint.heading),
+            lastPoint.y + END_GHOST_CAST * std::sin(lastPoint.heading)
+        };
+    } else {
+        // get global target point coords
+        double targetS = currentSample.s + m_lookAheadDist;
+        if (targetS > als_path.getTotalLength()) {
+            targetS = als_path.getTotalLength();
+        }
+        Waypoint targetWP = als_path.getPointAtArcLength(targetS);
+        targetPoint = {targetWP.x, targetWP.y};
+    }
+
+    // translate coordinates to robot frame
+    Position robotFrameTargetPt = convertPtToRobotFrame(targetPoint, currentPose);
+
+    // get the curvature to the target point
     double steeringCurvature = calculateCurvature(robotFrameTargetPt);
 
     // Look ahead along the path to find the sharpest upcoming curve
-    double pathMaxCurvature = m_als_path->getMaxAbsCurvatureInRange(current_s, current_s + m_lookAheadDist);
+    double pathMaxCurvature = als_path.getMaxAbsCurvatureInRange(currentSample.s, currentSample.s + m_lookAheadDist);
 
     // Throttle base velocity based on the sharpest upcoming curve
-    int base_vel = static_cast<int>(getBaseVelocity(pathMaxCurvature, speedPercentage) * velocityDirection);
     // Direction is selected externally for the whole path.
+    // int base_vel = static_cast<int>(getBaseVelocity(pathMaxCurvature, m_speedAdjustmentConst) * velocityDirection);
+    int base_vel = static_cast<int>(getBaseVelocity(pathMaxCurvature));
+    
     // !IMPORTANT! If reverse tracking steers the wrong way, flip the sign of curvature
     double left_target = base_vel - (steeringCurvature * base_vel * TURN_RATE);
     double right_target = base_vel + (steeringCurvature * base_vel * TURN_RATE);
@@ -93,10 +70,7 @@ bool PurePursuit::step(double velocityDirection, double speedPercentage) { // Di
         right_target = right_target * (600.0 / max_req);
     }
 
-    int left_vel = static_cast<int>(left_target);
-    int right_vel = static_cast<int>(right_target);
 
-    
     if (m_stepCounter % 10 == 0) {
         double current_vel = odom.getParallelVel();
         // pros::lcd::print(5, "Velocity: %.2lf in/s", current_vel);
@@ -104,8 +78,7 @@ bool PurePursuit::step(double velocityDirection, double speedPercentage) { // Di
         // pros::lcd::print(1, "Cur: %lf", steeringCurvature);
         // pros::lcd::print(2, "VEL: %d", base_vel);
 
-        m_lastPassedPtIdx;
-        double distFromLine = std::hypot(curSample.x - cur_x, curSample.y - cur_y);
+        double distFromLine = std::hypot(currentSample.x - currentPose.x, currentSample.y - currentPose.y);
         m_totalDistOff += std::abs(distFromLine);
         // printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | Dir:%.0f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d | OffAtStep: %.4f | AvgDistOff: %.4f\n",
         //        cur_x, cur_y, cur_heading_deg, current_vel, m_lookAheadDist, velocityDirection, targetPoint.x, targetPoint.y,
@@ -113,42 +86,31 @@ bool PurePursuit::step(double velocityDirection, double speedPercentage) { // Di
     }
     m_stepCounter++;
 
-
-    rightMotors.move_velocity(right_vel);
-    leftMotors.move_velocity(left_vel);
-
-    return false;
+    return WheelVelocities{left_target, right_target};
 }
 
 
 // calculates the curvature of a point within the robot frame
-double PurePursuit::calculateCurvature(Position robotFrameTargetPt) {
+double PurePursuitController::calculateCurvature(Position robotFrameTargetPt) {
     double actual_dist = calcDistBetweenPoints({0, 0}, robotFrameTargetPt);
     
     double curvature = 0.0;
     if (actual_dist < 8.0) {
         actual_dist = 8.0;
     }
-
-    if (actual_dist > 0.01) {
-        curvature = (2.0 * robotFrameTargetPt.y) / (actual_dist * actual_dist); // Use lateral distance (Y) instead of forward distance (X)
-    }
+    curvature = (2.0 * robotFrameTargetPt.y) / (actual_dist * actual_dist); // Use lateral distance (Y) instead of forward distance (X)
 
     return curvature;
 }
 
 
 // converts a target point to a point local to the robot's frame of reference
-Position PurePursuit::convertPtToRobotFrame(Position targetPoint) {
-    double robot_x = odom.getPosX();
-    double robot_y = odom.getPosY();
-    double robot_heading_deg = odom.getYaw(); // Remove the 180 degree offset from getYaw()
-    
-    double dx = targetPoint.x - robot_x;
-    double dy = targetPoint.y - robot_y;
+Position PurePursuitController::convertPtToRobotFrame(Position targetPoint, const Pose& currentPose) {
+    double dx = targetPoint.x - currentPose.x;
+    double dy = targetPoint.y - currentPose.y;
+    double robot_heading_rad = currentPose.theta;
 
     // localize displacements relative to orientation of robot
-    double robot_heading_rad = convertDegToRad(robot_heading_deg);
     double localX = dx * cos(robot_heading_rad) + dy * sin(robot_heading_rad);
     double localY = dx * (-sin(robot_heading_rad)) + dy * cos(robot_heading_rad);
 
@@ -157,7 +119,7 @@ Position PurePursuit::convertPtToRobotFrame(Position targetPoint) {
 
 
 // gets the dynamic lookahead distance based off of the forward velocity of the robot.
-double PurePursuit::getLookaheadDist() {
+double PurePursuitController::getLookaheadDist() {
     double vel = std::abs(odom.getParallelVel());
     // pros::lcd::print(5, "Velocity: %lf in/s", vel); // Commented out to prevent LVGL crashes
     double dynamicLookahead = std::clamp(LOOKAHEAD_SECONDS * vel, MIN_LOOKAHEAD_DIST, MAX_LOOKAHEAD_DIST);
@@ -166,8 +128,8 @@ double PurePursuit::getLookaheadDist() {
 }
 
 
-int PurePursuit::getBaseVelocity(double curvature, double speedPercentage) {
-    int max_base_vel_adjusted = MAX_BASE_VEL * speedPercentage;
+int PurePursuitController::getBaseVelocity(double curvature) {
+    int max_base_vel_adjusted = MAX_BASE_VEL * m_speedMultiplier;
     int base_vel = max_base_vel_adjusted / (1 + (std::abs(curvature) * SPEED_ADJUSTMENT_CONST));
     int min_base_adjusted = MIN_BASE_VEL;
 
@@ -178,25 +140,4 @@ int PurePursuit::getBaseVelocity(double curvature, double speedPercentage) {
     }
 
     return std::clamp(base_vel, min_base_adjusted, MAX_BASE_VEL);
-}
-
-Position PurePursuit::updateGhostPoint() {
-    printf("[PP] Getting samples for ghost point...\n");
-    std::vector<Sample> samples = m_als_path->getSamples();
-
-    if (samples.empty()) {
-        printf("[PP-ERROR] Cannot update ghost point, samples vector is empty!\n");
-        return {0, 0};
-    }
-
-    Sample lastPoint = samples.back();
-    
-    double heading = lastPoint.heading;
-    
-    double ux = std::cos(heading);
-    double uy = std::sin(heading);
-
-    Position ghostPoint = {lastPoint.x + END_GHOST_CAST * ux, lastPoint.y + END_GHOST_CAST * uy};
-
-    return ghostPoint;
 }
