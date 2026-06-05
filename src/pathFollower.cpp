@@ -1,11 +1,11 @@
-#include "trajectoryFollower.hpp"
+#include "pathFollower.hpp"
 #include "subsystems.hpp"
 #include "constants.h"
 
-TrajectoryFollower::TrajectoryFollower(MotionController& controller)
+PathFollower::PathFollower(MotionController& controller)
      : m_controller(controller) {}
 
-void TrajectoryFollower::setPath(ALS_Path& path) {
+void PathFollower::setPath(ALS_Path& path) {
     m_path = &path;
     m_currentSampleIdx = 0;
     m_isFinished = false;
@@ -14,7 +14,7 @@ void TrajectoryFollower::setPath(ALS_Path& path) {
     }
 }
 
-bool TrajectoryFollower::step() {
+bool PathFollower::step() {
     if (m_isFinished || !m_path || !m_path->isValid() || m_path->getSamples().empty()) {
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
