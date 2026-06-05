@@ -1,17 +1,21 @@
 #include "main.h"
-#include "subsystems.hpp"
-#include "constants.h"
-#include "autonomous.hpp"
-// #include "slam.h"
-#include "objectHandler.h"
-#include <numbers>
-#include "arclengthSplining.hpp"
-#include "paths.hpp"
 #include "sd_card_logging.hpp"
+// #include "constants.h"
+#include "subsystems.hpp"
+#include "autonomous.hpp"
+#include "paths.hpp"
+#include "pathFollower.hpp"
 #include "purePursuit.hpp"
 
-PurePursuit purePursuit = PurePursuit();
+// #include "slam.h"
+// #include "objectHandler.h"
+// #include <numbers>
+// #include "arclengthSplining.hpp"
+
 Autonomous auton = Autonomous();
+
+PurePursuitController purePursuit = PurePursuitController();
+PathFollower pathFollower = PathFollower(purePursuit);
 
 std::vector<ALS_Path> paths;
 
@@ -61,9 +65,9 @@ void autonomous() {
 	}
 
 	printf("[MAIN] Setting FIRST_PATH...\n");
-	purePursuit.setPath(paths[PathName::FIRST_PATH]);
+	pathFollower.setPath(paths[PathName::FIRST_PATH]);
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
-	while (not purePursuit.step()) {
+	while (not pathFollower.step()) {
 		pros::delay(20);
 	}
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
@@ -77,9 +81,9 @@ void autonomous() {
 	}
 
 	printf("[MAIN] Setting SECOND_PATH...\n");
-	purePursuit.setPath(paths[PathName::SECOND_PATH]);
+	pathFollower.setPath(paths[PathName::SECOND_PATH]);
 	printf("[MAIN] SECOND_PATH set. Tracking...\n");
-	while (not purePursuit.step()) {
+	while (not pathFollower.step()) {
 		pros::delay(20);
 	}
 	printf("[MAIN] SECOND_PATH tracking complete.\n");
