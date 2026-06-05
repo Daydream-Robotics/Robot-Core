@@ -8,6 +8,7 @@
 #include "sd_card_logging.hpp"
 
 PurePursuitController::PurePursuitController() {}
+PurePursuitController::~PurePursuitController() {}
 
 
 void PurePursuitController::reset() {
