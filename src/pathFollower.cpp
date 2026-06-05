@@ -12,6 +12,7 @@ void PathFollower::setPath(ALS_Path& path) {
     if (m_path->isValid()) {
         m_distanceFromEnd = m_path->getTotalLength();
     }
+    m_controller.reset();
 }
 
 bool PathFollower::step() {
@@ -27,6 +28,7 @@ bool PathFollower::step() {
     m_currentSampleIdx = m_path->findClosestSampleIndex({currentPose.x, currentPose.y}, m_currentSampleIdx);
 
     if (m_currentSampleIdx >= m_path->getSamples().size()) {
+        printf("[PF-ERROR] m_currentSampleIdx (%zu) is out of bounds (size %zu)!\n", m_currentSampleIdx, m_path->getSamples().size());
         m_isFinished = true;
         return true;
     }
@@ -41,7 +43,7 @@ bool PathFollower::step() {
         return true;
     }
 
-    WheelVelocities wheelVelocities = m_controller.compute(currentPose, targetSample);
+    WheelVelocities wheelVelocities = m_controller.compute(currentPose, *m_path, m_currentSampleIdx);
     
     leftMotors.move_velocity(wheelVelocities.left);
     rightMotors.move_velocity(wheelVelocities.right);
