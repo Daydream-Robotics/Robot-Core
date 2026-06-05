@@ -2,10 +2,10 @@
 #include "arclengthSplining.hpp"
 #include "motionController.hpp"
 
-class TrajectoryFollower {
+class PathFollower {
     public:
-        TrajectoryFollower(MotionController& controller);
-        ~TrajectoryFollower() = default;
+        PathFollower(MotionController& controller);
+        ~PathFollower() = default;
 
         void setPath(ALS_Path& path);
         bool step();
