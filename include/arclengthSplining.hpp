@@ -71,6 +71,9 @@ class ALS_Path {
         // ===============================================
         Waypoint returnLookaheadPoint(const Position& currentPos, double lookaheadDistance);
         
+        // moved to public to support other controllers
+        Waypoint getPointAtArcLength(double sQuery) const;
+
         // Main build function, computes paramterization, fit, and sample table
         bool buildFromPoints(const std::vector<Waypoint>& points, double sampleSpacing = 0.25);
 
@@ -108,7 +111,6 @@ class ALS_Path {
         
         // Query points and geometry
         Waypoint getPointAtParameter(double tQuery) const;
-        Waypoint getPointAtArcLength(double sQuery) const;
         
         double getHeadingAtParameter(double tQuery) const;
         double getCurvatureAtParameter(double tQuery) const;

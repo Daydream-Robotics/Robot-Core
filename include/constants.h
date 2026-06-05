@@ -72,6 +72,9 @@ constexpr double TURN_KD = 0.001;
 constexpr double TURN_KI_THRESHOLD = 15.0;
 
 
+/* - - - - - - - - - - - - - - [Motion Controllers] - - - - - - - - - - - - - - */
+constexpr double END_TOLERANCE = 0.5;
+
 enum class DriveType {
     SPLIT_ARCADE,
     TANK
