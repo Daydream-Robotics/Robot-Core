@@ -22,7 +22,6 @@ constexpr double SPEED_ADJUSTMENT_CONST = 12; // 4.5) Reduced to prevent the rob
 constexpr int MIN_BASE_VEL = 50;
 constexpr int MAX_BASE_VEL = 350;
 
-constexpr double END_TOLERANCE = 0.5;
 constexpr double END_SLOWDOWN_THRESH = 20.0; // 20
 
 constexpr double END_GHOST_CAST = 20.0;
