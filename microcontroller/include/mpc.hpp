@@ -7,8 +7,9 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-#include <vector>
+#include <cstddef>
 
+template<std::size_t V, std::size_t F>
 class MPCController : public MotionController {
     public:
         struct Params {
@@ -17,12 +18,13 @@ class MPCController : public MotionController {
             double a; //motor time-constant
             double b; //motor gain constant
             double h; //sampling period (s)
-            std::size_t f; //prediction horizon (steps)
-            std::size_t v; //control horizon (steps)
             double p_x; //output weight for x
             double p_y; //output weight for y
             double p_theta; //output weight for theta
             double q_u; //input penalty
+            double q_zero_multiplier; //multiplier for first Q_i
+            double q_final_multiplier; //multiplier for last Q_i
+            double p_final_multiplier; //multiplier for last P_i
             double V_max; //voltage max
             double R_internal; //internal resistance of battery
             double delta_u_max; //max positive change in voltage between steps
@@ -37,11 +39,13 @@ class MPCController : public MotionController {
                 double motorA,
                 double motorB,
                 double samplePeriod,
-                std::size_t predictionHorizon,
-                std::size_t controlHorizon,
                 double pX,
                 double pY,
                 double pTheta,
+                double qU,
+                double qZeroMultiplier,
+                double qFinalMultiplier,
+                double pFinalMultiplier,
                 double maxVoltage,
                 double rBattery,
                 double maxDeltaU,
@@ -62,6 +66,7 @@ class MPCController : public MotionController {
             static constexpr std::size_t n_states = 5;
             static constexpr std::size_t m_inputs = 2;
             static constexpr std::size_t r_states = 3;
+            static constexpr std::size_t num_constr = 6;
 
             Params m_params;
 
@@ -69,34 +74,44 @@ class MPCController : public MotionController {
             Eigen::Matrix<double, n_states, n_states> m_A;
             Eigen::Matrix<double, n_states, m_inputs> m_Bc;
             Eigen::Matrix<double, n_states, m_inputs> m_B;
+            Eigen::Matrix<double, n_states, n_states> C;
+            Eigen::Matrix<double, 2, n_states> C_xy;
+            Eigen::Matrix<double, 2, n_states> C_omega;
 
-            Eigen::MatrixXd m_O;
-            Eigen::MatrixXd m_M;
+            Eigen::Matrix<double, 2, 2*V> S;
 
-            Eigen::MatrixXd m_W_one;
-            Eigen::MatrixXd m_W_two;
-            Eigen::MatrixXd m_W_three;
-            Eigen::MatrixXd m_W_four;
+            Eigen::Matrix<double, r_states*F, n_states> m_O;
+            Eigen::Matrix<double, r_states*F, m_inputs*V> m_M;
 
-            Eigen::MatrixXd m_G_delta;
-            Eigen::MatrixXd m_G_u;
-            Eigen::MatrixXd m_G_b;
-            Eigen::MatrixXd m_G_z_xy;
-            Eigen::MatrixXd m_G_z_theta;
-            Eigen::MatrixXd m_G_z_omega;
+            Eigen::Matrix<double, m_inputs*V, m_inputs*V> m_W_one;
+            Eigen::Matrix<double, m_inputs*V, m_inputs*V> m_W_two;
+            Eigen::Matrix<double, m_inputs*V, m_inputs*V> m_W_three;
+            Eigen::Matrix<double, n_states*F, n_states*F> m_W_four;
+
+            Eigen::Matrix<double, m_inputs, m_inputs> m_Q_i;
+            Eigen::Matrix<double, n_states, n_states> m_P_i;
+
+
+            Eigen::Matrix<double, 2*m_inputs*V, m_inputs*V> m_G_delta;
+            Eigen::Matrix<double, 2*m_inputs*V, m_inputs*V> m_G_u;
+            Eigen::Matrix<double, 2*m_inputs*V, m_inputs*V> m_G_b;
+            Eigen::Matrix<double, 4*F, m_inputs*V> m_G_z_xy;
+            Eigen::Matrix<double, 4*F, m_inputs*V> m_G_z_omega;
 
             Eigen::SparseMatrix<double> m_G;
 
-            Eigen::VectorXd m_b_delta;
-            Eigen::VectorXd m_b_u;
-            Eigen::VectorXd m_b_b;
-            Eigen::VectorXd m_b_z_xy;
-            Eigen::VectorXd m_b_z_theta;
-            Eigen::VectorXd m_b_z_omega;
+            Eigen::Matrix<double, 2*m_inputs*V, 1> m_b_delta;
+            Eigen::Matrix<double, 2*m_inputs*V, 1> m_b_u;
+            Eigen::Matrix<double, 2*m_inputs*V, 1> m_b_b;
+            Eigen::Matrix<double, 4*F, 1> m_b_z_xy;
+            Eigen::Matrix<double, 4*F, 1> m_b_z_omega;
 
-            Eigen::VectorXd m_b;
+            Eigen::Matrix<double, 6*m_inputs*V + 8*F, 1> m_b;
 
-            
+            Eigen::Matrix<double, 2*F, 1> m_z_xy_max;
+            Eigen::Matrix<double, 2*F, 1> m_z_omega_max;
+
+
             void linearize(const Pose& x_hat, double omega_L, double omega_R);
             void discretize();
             void buildPredictionMatrices();
