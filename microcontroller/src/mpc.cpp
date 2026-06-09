@@ -210,4 +210,9 @@ void MPCController<V, F>::buildConstraintOmega() {
 
 }
 
-template class MPCController<10, 20>;
+template<std::size_t V, std::size_t F>
+Eigen::Matrix<double, MPCController<V, F>::r_states * F, 1> buildZDesired(const ALS_Path& als_path, std::size_t closestSampleIdx) {
+
+}
+
+template class MPCController<40, 40>;

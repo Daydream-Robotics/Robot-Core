@@ -125,6 +125,7 @@ class MPCController : public MotionController {
             void buildConstraintPosition(); 
             void buildConstraintHeading();
             void buildConstraintOmega();
+            Eigen::Vector<double,r_states*F, 1> buildZDesired(const ALS_Path& als_path, std::size_t closestSampleIdx);
             
 };
 #endif
