@@ -11,7 +11,7 @@ struct RamseteConfig {
 struct WheelVelocities {
     double left;
     double right;
-}
+};
 
 /**
  * @class Ramsete Controller
