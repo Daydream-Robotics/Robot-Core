@@ -56,13 +56,18 @@ MPCController<V, F>::MPCController(const Params& params)
     m_Bc.setZero();
     m_B.setZero();
     C.setZero(); 
-    C_xy.setZero();
-    C_omega.setZero();
+    m_C_xy.setZero();
+    m_C_omega.setZero();
 
     S.setZero();
     
     m_O.setZero();
     m_M.setZero();
+
+    m_O_xy.setZero();
+    m_O_omega.setZero();
+    m_M_xy.setZero();
+    m_M_omega.setZero();
 
     m_W_one.setZero();
     m_W_two.setZero();
@@ -147,71 +152,150 @@ MPCController<V, F>::MPCController(const Params& params)
         m_z_omega_max.template segment<2>(2*i) << omega_motor_max, omega_motor_max;
     }
     //initialize C_xy
-    C_xy(0,0) = 1;
-    C_xy(1,1) = 1;
+    m_C_xy(0,0) = 1;
+    m_C_xy(1,1) = 1;
     //initialize C_omega
-    C_omega(0,3) = 1;
-    C_omega(1,4) = 1;
+    m_C_omega(0,3) = 1;
+    m_C_omega(1,4) = 1;
 }
 
 
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::linearize(const Pose& x_hat, double omega_L, double omega_R) {
-
+    this->x_hat.x = pose.x;
+    this->x_hat.y = pose.y;
+    this->x_hat.theta = pose.theta;
+    this->x_hat.omega_L = omega_L;
+    this->x_hat.omega_R = omega_R;
+    //store cos and sin
+    double cos_theta = cos(x_hat.theta);
+    double sin_theta = sin(x_hat.theta);
+    //initailize A^c_k
+    m_Ac = << 
+    0, 0, -R_TWO*(omega_L+omega_R)*sin_theta, R_TWO*cos_theta, R_TWO*cos_theta,
+    0,0,   R_TWO*(omega_L+omega_R)*cos_theta, R_2*sin_theta, R_TWO*sin_theta,
+    0,0,0, -R_L, R_L,
+    0,0,0, -m_params.a, 0,
+    0,0,0,0, -m_params.a;
 }
 
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::discretize() {
-
+    //declares a matrix to hold exp version of continuous A&B matrices
+    Eigen::Matrix<double, n_states + m_inputs, n_states + m_inputs> m_exp;
+    M.setZero();
+    //puts A^C_K and B^c in exp matrix
+    M.template block<n_states, n_states>(0, 0) = m_Ac;
+    M.template block<n_states, m_inputs>(0, n_states) = m_Bc;
+    //multiplies exp matrix by sample period
+    m_exp *= m_params.h;
+    // exponentiates matrix
+    auto Md = M.exp();
+    // extract A_k
+    m_A = Md.template block<n_states, n_states>(0, 0);
+    // extract B_k
+    m_B = Md.template block<n_states, m_inputs>(0, n_states);
 }
 
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::buildPredictionMatrices() {
+    //makes matrix to hold A to a power
+    Eigen::Matrix<double, n_states, n_states> m_A_power = m_A;
+    //makes O matrix
+    for (std::size_t i = 0; i<F; i++){
+        m_O.template block<r_states, n_states> (i*r_states, 0) = m_C * m_A_power;
+        m_A_power *= m_A 
+    }
+    //initialize M
+    for (std::size_t i = 0; i < F; i++) {
 
-}
-
-template<std::size_t V, std::size_t F>
-void MPCController<V, F>::assembleQP(const Eigen::VectorXd& z_ref, const Eigen::VectorXd& x_hat) {
-
+        for (std::size_t j = 0; j < V; j++) {
+            // upper triangular zero region
+            if (j > i) {
+                continue;
+            }
+            Eigen::Matrix<double, n_states, n_states> A_term = Eigen::Matrix<double, n_states, n_states>::Identity();
+            //normal region
+            if (i < V || j < V - 1) {
+                for (std::size_t k = 0; k < (i - j); k++)
+                    A_term *= m_A;
+                m_M.template block<r_states, m_inputs>(i * r_states, j * m_inputs) = C * A_term * m_B;
+            }
+            //held control region
+            else {
+                Eigen::Matrix<double, n_states, n_states> A_bar = Eigen::Matrix<double, n_states, n_states>::Zero();
+                Eigen::Matrix<double, n_states, n_states> A_sum = Eigen::Matrix<double, n_states, n_states>::Identity();
+                for (std::size_t k = 0; k <= (i - V + 1); k++) {
+                    if (k > 0) {
+                        A_sum *= m_A;
+                    }
+                    A_bar += A_sum;
+                }
+                for (std::size_t k = 0; k < (V - 1 - j); k++) {
+                    A_term *= m_A;
+                }
+                m_M.template block<r_states, m_inputs>(i * r_states, j * m_inputs) = C * A_term * A_bar * m_B;
+            }
+        }
+    }
+    m_O_xy=C_xy*O;
+    m_O_omega=C_omega*O;
+    m_M_xy=C_xy*M;
+    m_M_omega=C_omega*M;
 }
 
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::assembleConstraints(double V_batt, const Eigen::Vector2d& u_prev) {
-
+    buildConstraintDelta(u_prev);
+    buildConstraintU();
+    buildConstraintBattery();
+    buildConstraintPosition();
+    buildConstraintOmega();
 }
 
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::buildConstraintDelta(const Eigen::Vector2d& u_prev) {
-
+    //add prev u to b_Dleta
+    m_b_b.template segment<m_inputs>(0) += u_prev;
+    m_b_b.template segment<m_inputs>(m_inputs * V) -= u_prev;
 }
 
 template<std::size_t V, std::size_t F>
-void MPCController<V, F>::buildConstraintU() {
-
-}
-
-template<std::size_t V, std::size_t F>
-void MPCController<V, F>::buildConstraintBattery(double V_battery) {
+void MPCController<V, F>::buildConstraintBattery(double V_battery, double I_total) {
+    //initialize max input due to battery sag
+    double u_b_max = V_battery - m_params.R_internal*I_total
+    //initialize b_battery 
+    m_b_delta.topRows<m*V>().setConstant(u_b_max);
+    m_b_delta.bottomRows<m*V>().setConstant(u_b_max);
 
 }
 
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::buildConstraintPosition() {
-
-}
-
-template<std::size_t V, std::size_t F>
-void MPCController<V, F>::buildConstraintHeading() {
-
+    //initialize b_z,xy
+    m_b_z_xy.topRows(2 * F) = z_max_xy+ m_O_xy*x_hat;    
+    m_b_z_xy.bottomRows(2 * F) = z_max_xy - m_O_xy*x_hat;
 }
 
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::buildConstraintOmega() {
-
+    //initialize b_z,omega
+    m_b_z_omega.topRows(2 * F) = z_max_omega+ m_O_omega*x_hat;    
+    m_b_z_omega.bottomRows(2 * F) = z_max_xy - m_O_omega*x_hat;
 }
 
 template<std::size_t V, std::size_t F>
 Eigen::Matrix<double, MPCController<V, F>::r_states * F, 1> buildZDesired(const ALS_Path& als_path, std::size_t closestSampleIdx) {
+
+}
+
+template<std::size_t V, std::size_t F>
+void MPCController<V, F>::assembleQP() {
+
+}
+
+template<std::size_t V, std::size_t F>
+void MPCController<V, F>::solveQP() {
 
 }
 

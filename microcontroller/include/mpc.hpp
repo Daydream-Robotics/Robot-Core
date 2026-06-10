@@ -63,11 +63,35 @@ class MPCController : public MotionController {
         void reset() override;
 
         private:
+
+            struct State {
+                // x-position of bot (inches)
+                double x;
+
+                // y-position of bot (inches)
+                double y;
+
+                // Heading of bot (rads)
+                double theta;
+
+                double omega_L;
+
+                double omega_R;
+            };
+
             static constexpr std::size_t n_states = 5;
             static constexpr std::size_t m_inputs = 2;
             static constexpr std::size_t r_states = 3;
             static constexpr std::size_t num_constr = 6;
 
+            const double R_L = r/L;
+            const double R_TWO = r/2;
+
+            double battery_voltage;
+            double total_current; 
+
+            State x_hat;
+            
             Params m_params;
 
             Eigen::Matrix<double, n_states, n_states> m_Ac;
@@ -75,13 +99,18 @@ class MPCController : public MotionController {
             Eigen::Matrix<double, n_states, m_inputs> m_Bc;
             Eigen::Matrix<double, n_states, m_inputs> m_B;
             Eigen::Matrix<double, n_states, n_states> C;
-            Eigen::Matrix<double, 2, n_states> C_xy;
-            Eigen::Matrix<double, 2, n_states> C_omega;
+            Eigen::Matrix<double, 2, n_states> m_C_xy;
+            Eigen::Matrix<double, 2, n_states> m_C_omega;
 
             Eigen::Matrix<double, 2, 2*V> S;
 
             Eigen::Matrix<double, r_states*F, n_states> m_O;
             Eigen::Matrix<double, r_states*F, m_inputs*V> m_M;
+
+            Eigen::Matrix<double, 2*F, n_states> m_O_xy;
+            Eigen::Matrix<double, 2*F, n_states> m_O_omega;
+            Eigen::Matrix<double, 2*F, n_states> m_M_xy;
+            Eigen::Matrix<double, 2*F, n_states> m_M_omega;
 
             Eigen::Matrix<double, m_inputs*V, m_inputs*V> m_W_one;
             Eigen::Matrix<double, m_inputs*V, m_inputs*V> m_W_two;
@@ -115,17 +144,17 @@ class MPCController : public MotionController {
             void linearize(const Pose& x_hat, double omega_L, double omega_R);
             void discretize();
             void buildPredictionMatrices();
-            void assembleQP(const Eigen::VectorXd& z_ref, const Eigen::VectorXd& x_hat);
+            Eigen::Vector<double,r_states*F, 1> buildZDesired(const ALS_Path& als_path, std::size_t closestSampleIdx);
             // Assemble all into m_G and m_b
             void assembleConstraints(double V_batt, const Eigen::Vector2d& u_prev);
             // Helper methods to build each constraint type
             void buildConstraintDelta(const Eigen::Vector2d& u_prev); 
             void buildConstraintU();        
-            void buildConstraintBattery(double V_battery);  
+            void buildConstraintBattery(double V_battery, double I_total);  
             void buildConstraintPosition(); 
-            void buildConstraintHeading();
             void buildConstraintOmega();
-            Eigen::Vector<double,r_states*F, 1> buildZDesired(const ALS_Path& als_path, std::size_t closestSampleIdx);
+            void assembleQP();
+            void solveQP();
             
 };
 #endif
