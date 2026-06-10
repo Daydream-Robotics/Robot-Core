@@ -8,6 +8,9 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <cstddef>
+extern "C" {
+    #include "osqp/osqp.h"
+}
 
 template<std::size_t V, std::size_t F>
 class MPCController : public MotionController {
