@@ -9,7 +9,9 @@
 #include "paths.hpp"
 #include "sd_card_logging.hpp"
 #include "purePursuit.hpp"
+#include "stanley.hpp"
 
+StanleyController stan;
 PurePursuit purePursuit = PurePursuit();
 Autonomous auton = Autonomous();
 
@@ -36,7 +38,7 @@ void initialize() {
 	printf("[MAIN] Paths loaded: %zu\n", paths.size());
 	if (paths.size() != PathName::COUNT) {
 		printf("[MAIN] ERROR: Path count mismatch\n");
-		pros::lcd::print(1, "ERROR: Path count mismatch");
+		pros::lcd::print(1, "EsRROR: Path count mismatch");
 		pros::lcd::print(2, "Expected: %d, Actual: %d", PathName::COUNT, paths.size());
 	} else {
 		printf("[MAIN] Trajectories Loaded successfully\n");
@@ -61,9 +63,9 @@ void autonomous() {
 	}
 
 	printf("[MAIN] Setting FIRST_PATH...\n");
-	purePursuit.setPath(paths[PathName::FIRST_PATH]);
+	stan.setPath(paths[PathName::FIRST_PATH]);
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
-	while (not purePursuit.step()) {
+	while (not stan.step()) {
 		pros::delay(20);
 	}
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
@@ -71,18 +73,31 @@ void autonomous() {
 	printf("[MAIN] Delaying 2000ms...\n");
 	pros::delay(2000);
 
-	if (paths.size() <= PathName::SECOND_PATH) {
-		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
-		return;
-	}
+	// if (paths.size() <= PathName::SECOND_PATH) {
+	// 	printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
+	// 	return;
+	// }
 
-	printf("[MAIN] Setting SECOND_PATH...\n");
-	purePursuit.setPath(paths[PathName::SECOND_PATH]);
-	printf("[MAIN] SECOND_PATH set. Tracking...\n");
-	while (not purePursuit.step()) {
-		pros::delay(20);
-	}
-	printf("[MAIN] SECOND_PATH tracking complete.\n");
+	// printf("[MAIN] Setting SECOND_PATH...\n");
+	// stan.setPath(paths[PathName::SECOND_PATH]);
+	// printf("[MAIN] SECOND_PATH set. Tracking...\n");
+	// while (not stan.step()) {
+	// 	pros::delay(20);
+	// }
+	// printf("[MAIN] SECOND_PATH tracking complete.\n");
+
+	// 	if (paths.size() <= PathName::THIRD_PATH) {
+	// 	printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
+	// 	return;
+	// }
+
+	// printf("[MAIN] Setting THIRD_PATH...\n");
+	// stan.setPath(paths[PathName::THIRD_PATH]);
+	// printf("[MAIN] THIRD_PATH set. Tracking...\n");
+	// while (not stan.step()) {
+	// 	pros::delay(20);
+	// }
+	// printf("[MAIN] THIRD_PATH tracking complete.\n");
 
 }
 
