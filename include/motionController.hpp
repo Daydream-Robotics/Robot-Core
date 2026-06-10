@@ -2,9 +2,18 @@
 #include "arclengthSplining.hpp"
 #include "odometry.hpp"
 
+
+enum class ControlMode {
+    INPUT_VELOCITY,
+    INPUT_VOLTAGE
+};
+
+
 struct WheelVelocities {
     double left;
     double right;
+    //! IMPORTANT: Would have renamed WheelVelocities but didn't want to make merging everyone else's code too difficult
+    ControlMode input = ControlMode::INPUT_VELOCITY;
 };
 
 class MotionController {

@@ -45,8 +45,19 @@ bool PathFollower::step() {
 
     WheelVelocities wheelVelocities = m_controller.compute(currentPose, *m_path, m_currentSampleIdx);
     
-    leftMotors.move_velocity(wheelVelocities.left);
-    rightMotors.move_velocity(wheelVelocities.right);
+    switch(wheelVelocities.input){
+        case ControlMode::INPUT_VELOCITY:
+            leftMotors.move_velocity(wheelVelocities.left);
+            rightMotors.move_velocity(wheelVelocities.right);
+            break;
+        case ControlMode::INPUT_VOLTAGE:
+            leftMotors.move_voltage(wheelVelocities.left);
+            rightMotors.move_voltage(wheelVelocities.right);
+            break;
+        default:
+            break;
+    }
+    
 
     return false;
 }
