@@ -42,7 +42,7 @@ public:
 
 
     //constructor with defaults
-    SerialProtocol(char field_seperator = ',', char message_seperator = '|', char end_char = '\n');
+    SerialProtocol(int buffer_size, char field_seperator = ',', char message_seperator = '|', char end_char = '\n');
     
     
     //serializes packet into string then sends it over USB serial
@@ -54,6 +54,7 @@ public:
 
 private:
     //holds special chars
+    int buffer_size;
     char field_seperator;
     char message_seperator;
     char end_char;
