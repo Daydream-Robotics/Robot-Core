@@ -70,16 +70,19 @@ class MPCController : public MotionController {
             struct State {
                 // x-position of bot (inches)
                 double x;
-
                 // y-position of bot (inches)
                 double y;
-
                 // Heading of bot (rads)
                 double theta;
-
                 double omega_L;
-
                 double omega_R;
+            };
+
+            struct InterpSample {
+                double x       = 0.0;
+                double y       = 0.0;
+                double theta = 0.0;
+                double v       = 0.0;
             };
 
             static constexpr std::size_t n_states = 5;
@@ -143,11 +146,12 @@ class MPCController : public MotionController {
             Eigen::Matrix<double, 2*F, 1> m_z_xy_max;
             Eigen::Matrix<double, 2*F, 1> m_z_omega_max;
 
+            Eigen::Matrix<double, r_states*F, 1> z_desired;
+
 
             void linearize(const Pose& x_hat, double omega_L, double omega_R);
             void discretize();
             void buildPredictionMatrices();
-            Eigen::Vector<double,r_states*F, 1> buildZDesired(const ALS_Path& als_path, std::size_t closestSampleIdx);
             // Assemble all into m_G and m_b
             void assembleConstraints(double V_batt, const Eigen::Vector2d& u_prev);
             // Helper methods to build each constraint type
@@ -156,6 +160,8 @@ class MPCController : public MotionController {
             void buildConstraintBattery(double V_battery, double I_total);  
             void buildConstraintPosition(); 
             void buildConstraintOmega();
+            InterpSample sampleAtArcLength(const std::vector<Sample>& samples, double sQuery);
+            Eigen::Vector<double,r_states*F, 1> buildZDesired(const ALS_Path& als_path, std::size_t closestSampleIdx);
             void assembleQP();
             void solveQP();
             

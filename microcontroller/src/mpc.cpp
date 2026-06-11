@@ -93,6 +93,8 @@ MPCController<V, F>::MPCController(const Params& params)
 
     m_z_xy_max.setZero();
     m_z_omega.setZero();
+
+    z_desired.setZero();
     
     //initialize C with an I_3 matrix in top left
     C.topLeftCorner(r_states, r_states).setIdentity();
@@ -157,6 +159,12 @@ MPCController<V, F>::MPCController(const Params& params)
     //initialize C_omega
     m_C_omega(0,3) = 1;
     m_C_omega(1,4) = 1;
+}
+
+inline double wrapAngle(double angle) {
+    while (angle >  M_PI) angle -= 2.0 * M_PI;
+    while (angle < -M_PI) angle += 2.0 * M_PI;
+    return angle;
 }
 
 
@@ -285,8 +293,80 @@ void MPCController<V, F>::buildConstraintOmega() {
 }
 
 template<std::size_t V, std::size_t F>
-Eigen::Matrix<double, MPCController<V, F>::r_states * F, 1> buildZDesired(const ALS_Path& als_path, std::size_t closestSampleIdx) {
+InterpSample sampleAtArcLength(const std::vector<Sample>& samples, double sQuery) {
+    InterpSample result;
+    if (samples.empty()) {
+        return result;
+    }
+    if (sQuery <= samples.front().s) {
+        result.x = samples.front().x;
+        result.y = samples.front().y;
+        result.theta = samples.front().theta;
+        result.v = samples.front().v;
+        return result;
+    }
+    if (sQuery >= samples.back().s) {
+        result.x = samples.back().x;
+        result.y = samples.back().y;
+        result.theta = samples.back().theta;
+        result.v = samples.back().v;
+        return result;
+    }
 
+    std::size_t left = 0;
+    std::size_t right = samples.size()-1;
+
+    while (left+1 < right) {
+        std::size_t mid = left + (right-left)/2;
+        if (samples[mid].s <= sQuery) {
+            left = mid;
+        }
+        else {
+            right = mid;
+        }
+    }
+    const Sample& a = samples[left];
+    const Sample& b = samples[right];
+
+    double ds = b.s - a.s;
+    double alpha = (std::abs(ds) < 1e-12) ? 0.0 : (sQuery - a.s) /ds
+    double dtheta = wrapAngle(b.heading-a.heading);
+
+    result.x = a.x + alpha * (b.x-a.x);
+    result.y = a.y + alpha * (b.y-a.y);
+    result.heading = wrapAngle(a.heading + alpha * dtheta);
+    result.v = a.v + alpha * (b.v-a.v)
+
+    return result;
+}
+
+template<std::size_t V, std::size_t F>
+void buildZDesired(const ALS_Path& als_path, std::size_t closestSampleIdx) {
+    const std::vector<Sample>& samples = als_path.getSamples();
+
+    if (samples.empty() || !als_path.isValid()) {
+        return;
+    }
+    if (closestSampleIdx >= samples.size()) {
+        closestSampleIdx = samples.size()-1;
+    }
+
+    double s_prev = samples[closestSampleIdx].s;
+
+    for (std::size_t i = 0; i < F; i++) {
+        InterpSample curr = sampleAtArcLength(samples, s_prev);
+        double v_path = std::max(curr.v, 0.0);
+        s_prev += v_path * m_params.h;
+
+        s_prev = std::min(s_prev, als_path.getTotalLength());
+
+        InterpSample ref = sampleAtArcLength(samples, s_prev);
+
+        const int base = i * r_states;
+        z_desired(base+0) = ref.x;
+        z_desired(base+1) = ref.y;
+        z_desired(base+2) = ref.theta;
+    }
 }
 
 template<std::size_t V, std::size_t F>
