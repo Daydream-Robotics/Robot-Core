@@ -35,6 +35,8 @@ class MPCController : public MotionController {
             double x_field_max; //max allowed x position on field
             double y_field_max; //max allowed y position on field
             double omega_motor_max; //max allowed rpm
+            double V_left_applied; //starting Voltage left
+            double V_right_applied; //starting Voltage right
 
             Params(
                 double wheelRadius,
@@ -55,15 +57,19 @@ class MPCController : public MotionController {
                 double minDeltaU,
                 double maxFieldX,
                 double maxFieldY,
-                double maxMotorOmega
+                double maxMotorOmega, 
+                double voltageLeft,
+                double voltageRight
             );
         };
 
         explicit MPCController(const Params& params);
         ~MPCController() override = default;
 
-        WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) override;
-        void reset() override;
+        WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) 
+            override = delete;
+        
+        WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx, double omega_L, double omega_R, double V_battery, double I_total);
 
         private:
 
@@ -96,6 +102,11 @@ class MPCController : public MotionController {
             double battery_voltage;
             double total_current; 
 
+            double m_u_left;
+            double m_u_right;
+
+            double u_prev = 0;
+
             State x_hat;
             
             Params m_params;
@@ -104,11 +115,9 @@ class MPCController : public MotionController {
             Eigen::Matrix<double, n_states, n_states> m_A;
             Eigen::Matrix<double, n_states, m_inputs> m_Bc;
             Eigen::Matrix<double, n_states, m_inputs> m_B;
-            Eigen::Matrix<double, n_states, n_states> C;
+            Eigen::Matrix<double, n_states, n_states> m_C;
             Eigen::Matrix<double, 2, n_states> m_C_xy;
             Eigen::Matrix<double, 2, n_states> m_C_omega;
-
-            Eigen::Matrix<double, 2, 2*V> S;
 
             Eigen::Matrix<double, r_states*F, n_states> m_O;
             Eigen::Matrix<double, r_states*F, m_inputs*V> m_M;
@@ -118,10 +127,12 @@ class MPCController : public MotionController {
             Eigen::Matrix<double, 2*F, n_states> m_M_xy;
             Eigen::Matrix<double, 2*F, n_states> m_M_omega;
 
+            Eigen::Matrix<double, n_states, 1> x_hat;
+
             Eigen::Matrix<double, m_inputs*V, m_inputs*V> m_W_one;
             Eigen::Matrix<double, m_inputs*V, m_inputs*V> m_W_two;
             Eigen::Matrix<double, m_inputs*V, m_inputs*V> m_W_three;
-            Eigen::Matrix<double, n_states*F, n_states*F> m_W_four;
+            Eigen::Matrix<double, r_states*F, r_states*F> m_W_four;
 
             Eigen::Matrix<double, m_inputs, m_inputs> m_Q_i;
             Eigen::Matrix<double, n_states, n_states> m_P_i;
@@ -146,16 +157,22 @@ class MPCController : public MotionController {
             Eigen::Matrix<double, 2*F, 1> m_z_xy_max;
             Eigen::Matrix<double, 2*F, 1> m_z_omega_max;
 
-            Eigen::Matrix<double, r_states*F, 1> z_desired;
+            Eigen::Matrix<double, r_states*F, 1> m_z_desired;
+            Eigen::Matrix<double, r_states*F, 1> m_s;
+
+            Eigen::Matrix<double, m_inputs*V, m_inputs*V> m_P;
+            Eigen::Matrix<double, m_inputs*V, 1> m_q;
+
+            Eigen::Matrix<double, m_inputs, 1> m_u_prev;
 
 
             void linearize(const Pose& x_hat, double omega_L, double omega_R);
             void discretize();
             void buildPredictionMatrices();
             // Assemble all into m_G and m_b
-            void assembleConstraints(double V_batt, const Eigen::Vector2d& u_prev);
+            void assembleConstraints(double V_batt, double I_total, const Eigen::Vector<double, m_inputs, 1> u_prev);
             // Helper methods to build each constraint type
-            void buildConstraintDelta(const Eigen::Vector2d& u_prev); 
+            void buildConstraintDelta(const Eigen::Vector<double, m_inputs, 1> u_prev); 
             void buildConstraintU();        
             void buildConstraintBattery(double V_battery, double I_total);  
             void buildConstraintPosition(); 

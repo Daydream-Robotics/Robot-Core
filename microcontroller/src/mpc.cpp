@@ -24,7 +24,9 @@ MPCController<V, F>::Params::Params(
     double minDeltaU,
     double maxFieldX,
     double maxFieldY,
-    double maxMotorOmega
+    double maxMotorOmega,
+    double V_left_applied,
+    double V_right_applied
 )
     : r(wheelRadius),
     L(trackWidth),
@@ -44,7 +46,9 @@ MPCController<V, F>::Params::Params(
     delta_u_min(minDeltaU),
     x_field_max(maxFieldX),
     y_field_max(maxFieldY),
-    omega_motor_max(maxMotorOmega) {}
+    omega_motor_max(maxMotorOmega),
+    V_left_applied(voltageLeft),
+    V_right_applied(voltageRight) {}
 
 template<std::size_t V, std::size_t F>
 MPCController<V, F>::MPCController(const Params& params)
@@ -55,11 +59,9 @@ MPCController<V, F>::MPCController(const Params& params)
     m_A.setZero();
     m_Bc.setZero();
     m_B.setZero();
-    C.setZero(); 
+    m_C.setZero(); 
     m_C_xy.setZero();
     m_C_omega.setZero();
-
-    S.setZero();
     
     m_O.setZero();
     m_M.setZero();
@@ -94,14 +96,16 @@ MPCController<V, F>::MPCController(const Params& params)
     m_z_xy_max.setZero();
     m_z_omega.setZero();
 
-    z_desired.setZero();
+    m_z_desired.setZero();
+    m_s.setZero();
+
+    m_P.setZero();
+    m_q.setZero();
     
     //initialize C with an I_3 matrix in top left
-    C.topLeftCorner(r_states, r_states).setIdentity();
+    m_C.topLeftCorner(r_states, r_states).setIdentity();
     //initialize b to have the bottom 2 rows be [b 0\\ 0 b]
     m_Bc.bottomRows<2>() = b * Eigen::Matrix2d::Identity();
-    //initialize S as [I_m 0 ... 0]
-    S.leftCols<m_inputs>().setIdentity();
     //initialize W_1
     for (std::size_t i = 0; i < V; i++) {
         // diagonal block
@@ -138,7 +142,7 @@ MPCController<V, F>::MPCController(const Params& params)
     m_G_u.template block <2*V, 2*V> (0,0) = -Eigen::Matrix<double, 2*V, 2*V>::Identity();
     m_G_u.template block <2*V, 2*V> (2*V,0) = Eigen::Matrix<double, 2*V, 2*V>::Identity();
     //initialize G_b
-    m_G_b=m_G_b;
+    m_G_b=m_G_u;
     //initialize b_Delta
     m_b_delta.topRows<m*V>().setConstant(-m_params.delta_u_min);
     m_b_delta.bottomRows<m*V>().setConstant(m_params.delta_u_max);
@@ -159,6 +163,8 @@ MPCController<V, F>::MPCController(const Params& params)
     //initialize C_omega
     m_C_omega(0,3) = 1;
     m_C_omega(1,4) = 1;
+    //initialize u_prev
+    m_u_prev << V_left_applied, V_right_applied;
 }
 
 inline double wrapAngle(double angle) {
@@ -170,11 +176,12 @@ inline double wrapAngle(double angle) {
 
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::linearize(const Pose& x_hat, double omega_L, double omega_R) {
-    this->x_hat.x = pose.x;
-    this->x_hat.y = pose.y;
-    this->x_hat.theta = pose.theta;
-    this->x_hat.omega_L = omega_L;
-    this->x_hat.omega_R = omega_R;
+    this->x_hat <<
+        pose.x,
+        pose.y,
+        pose.theta,
+        omega_L,
+        omega_R;
     //store cos and sin
     double cos_theta = cos(x_hat.theta);
     double sin_theta = sin(x_hat.theta);
@@ -227,7 +234,7 @@ void MPCController<V, F>::buildPredictionMatrices() {
             if (i < V || j < V - 1) {
                 for (std::size_t k = 0; k < (i - j); k++)
                     A_term *= m_A;
-                m_M.template block<r_states, m_inputs>(i * r_states, j * m_inputs) = C * A_term * m_B;
+                m_M.template block<r_states, m_inputs>(i * r_states, j * m_inputs) = m_C * A_term * m_B;
             }
             //held control region
             else {
@@ -242,23 +249,49 @@ void MPCController<V, F>::buildPredictionMatrices() {
                 for (std::size_t k = 0; k < (V - 1 - j); k++) {
                     A_term *= m_A;
                 }
-                m_M.template block<r_states, m_inputs>(i * r_states, j * m_inputs) = C * A_term * A_bar * m_B;
+                m_M.template block<r_states, m_inputs>(i * r_states, j * m_inputs) = m_C * A_term * A_bar * m_B;
             }
         }
     }
-    m_O_xy=C_xy*O;
-    m_O_omega=C_omega*O;
-    m_M_xy=C_xy*M;
-    m_M_omega=C_omega*M;
+    m_O_xy.noalias() = m_C_xy * m_O;
+    m_O_omega.noalias() = m_C_omega * m_O;
+    m_M_xy.noalias() = m_C_xy * m_M;
+    m_M_omega.noalias() = m_C_omega * m_M;
 }
 
 template<std::size_t V, std::size_t F>
-void MPCController<V, F>::assembleConstraints(double V_batt, const Eigen::Vector2d& u_prev) {
+void MPCController<V, F>::assembleConstraints(double V_batt, const Eigen::Matrix<double, m_inputs, 1> u_prev) {
     buildConstraintDelta(u_prev);
     buildConstraintU();
-    buildConstraintBattery();
+    buildConstraintBattery(V_battery, I_total);
     buildConstraintPosition();
     buildConstraintOmega();
+    //build G and b:
+    int row = 0;
+
+    // Delta_u constraints
+    m_G.middleRows(row, 2*m_inputs*V) = m_G_delta;
+    m_b.segment(row, 2*m_inputs*V) = m_b_delta;
+    row += 2*m_inputs*V;
+
+    // input constraints
+    m_G.middleRows(row, 2*m_inputs*V) = m_G_u;
+    m_b.segment(row, 2*m_inputs*V) = m_b_u;
+    row += 2*m_inputs*V;
+
+    // battery constraints
+    m_G.middleRows(row, 2*m_inputs*V) = m_G_b;
+    m_b.segment(row, 2*m_inputs*V) = m_b_b;
+    row += 2*m_inputs*V;
+
+    // position constraints
+    m_G.middleRows(row, 4*F) = m_G_xy;
+    m_b.segment(row, 4*F) = m_b_z_xy;
+    row += 4*F;
+
+    // omega constraints
+    m_G.middleRows(row, 4*F) = m_G_omega;
+    m_b.segment(row, 4*F) = m_b_z_omega;
 }
 
 template<std::size_t V, std::size_t F>
@@ -363,20 +396,139 @@ void buildZDesired(const ALS_Path& als_path, std::size_t closestSampleIdx) {
         InterpSample ref = sampleAtArcLength(samples, s_prev);
 
         const int base = i * r_states;
-        z_desired(base+0) = ref.x;
-        z_desired(base+1) = ref.y;
-        z_desired(base+2) = ref.theta;
+        m_z_desired(base+0) = ref.x;
+        m_z_desired(base+1) = ref.y;
+        m_z_desired(base+2) = ref.theta;
     }
 }
 
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::assembleQP() {
-
+    m_s.noalias() = m_z_desired - m_O * x_hat;
+    Eigen::Matrix<double, r_states*F, m_inputs*V> m_W_four_M;
+    m_W_four_M.noalias() = m_W_four * m_M;
+    m_P.noalias() = m_M.transpose() * m_W_four_M + m_W_three;
+    Eigen::Matrix<double, r_states*F, 1> m_W_four_s;
+    m_W_four_s.noalias() = m_W_four * m_s;
+    m_q.noalias() = m_M.transpose() * m_W_four_s;  
 }
 
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::solveQP() {
+    //convert dens matrices to sparse
+    Eigen::SparseMatrix<double> P_sparse = m_P.sparseView();
 
+    Eigen::Matrix<double, m_inputs * V, 1> q_osqp = -m_q;
+
+    Eigen::Matrix<double, num_constr * F, 1> lower_bound;
+
+    //lower bound
+    lower_bound.setConstant(-OSQP_INFTY);
+
+    //upper bound
+    Eigen::Matrix<double, num_constr * F, 1> upper_bound = m_b;
+
+    //create solver
+    OsqpEigen::Solver solver;
+
+    //set sttings
+    solver.settings()->setWarmStart(true);
+    solver.settings()->setVerbosity(false);
+
+    //set dimensions
+    solver.data()->setNumberOfVariables(m_inputs * V);
+    solver.data()->setNumberOfConstraints(m_b.rows());
+
+    //pass Hessian
+    if(!solver.data()->setHessianMatrix(P_sparese)) {
+        throw std::runtime_error("Failed to set Hessian");
+    }
+    //pass gradient
+    if (!solver.data()->setGradient(q_osqp)) {
+        throw std::runtime_error("Failed to set gradient");
+    }
+    // pass constraint matrix
+    if (!solver.data()->setLinearConstraintsMatrix(m_G)) {
+        throw std::runtime_error("Failed to set constraint matrix");
+    }
+    // pass lower bound
+    if (!solver.data()->setLowerBound(lower_bound)) {
+        throw std::runtime_error("Failed to set lower bound");
+    }
+    // pass upper bound
+    if (!solver.data()->setUpperBound(upper_bound)) {
+        throw std::runtime_error("Failed to set upper bound");
+    }
+    // initialize solver
+    if (!solver.initSolver()) {
+        throw std::runtime_error("Failed to initialize OSQP");
+    }
+
+    //solve
+    OsqpEigen::ErrorExitFlag status = solver.solveProblem();
+    // check solve status
+    if (status != OsqpEigen::ErrorExitFlag::NoError) {
+        throw std::runtime_error("OSQP solve failed");
+    }
+    // optimal solution:
+    // [u0_L, u0_R, u1_L, u1_R, ...]^T
+    Eigen::Matrix<double, m_inputs * V, 1> u_star = solver.getSolution();
+    // apply first control only
+    Eigen::Matrix<double, m_inputs, 1> u_apply = u_star.template segment<m_inputs>(0);
+    // store outputs
+    m_u_left = u_apply(0);
+    m_u_right = u_apply(1);
+    //set u_prev 
+    m_u_prev = u_apply;
+}
+
+template<std::size_t V, std::size_t F>
+void MPCController<V, F>::reset() {
+    m_x_hat.setZero();
+
+    m_z_desired.setZero();
+    m_s.setZero();
+
+    m_q.setZero();
+    m_P.setZero();
+
+    m_b.setZero();
+
+    m_b_delta.setZero();
+    m_b_u.setZero();
+    m_b_b.setZero();
+    m_b_z_xy.setZero();
+    m_b_z_omega.setZero();
+
+    m_u_left = 0.0;
+    m_u_right = 0.0;
+}
+
+template<std::size_t V, std::size_t F>
+WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx, double omega_L, double omega_R, double V_battery, double I_total) {
+
+    // 1. linearize system
+    linearize(currentPose, omega_L, omega_R);
+
+    // 2. discretize
+    discretize();
+
+    // 3. build prediction matrices
+    buildPredictionMatrices();
+
+    // 4. build reference trajectory
+    buildZDesired(als_path, closestSampleIdx);
+
+    // 5. assemble constraints
+    assembleConstraints(V_battery, I_total, u_prev);
+
+    // 6. build QP
+    assembleQP();
+
+    // 7. solve QP
+    solveQP();
+
+    return WheelVelocities{m_u_left, m_u_right, INPUT_VOLTAGE};
 }
 
 template class MPCController<40, 40>;
