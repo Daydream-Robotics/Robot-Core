@@ -5,8 +5,9 @@
 #include <sstream>
 
 //constructor
-SerialProtocol::SerialProtocol(char fieldSep, char messageSep, char term)
-    : field_seperator(fieldSep),
+SerialProtocol::SerialProtocol(int bufferSize, char fieldSep, char messageSep, char term)
+    : buffer_size(bufferSize),
+      field_seperator(fieldSep),
       message_seperator(messageSep),
       end_char(term) {}
 
@@ -25,7 +26,7 @@ bool SerialProtocol::sendPacket(const Packet& packet){
 //reads one line from USB serial and deserializes into a packet struct
 std::optional<SerialProtocol::Packet> SerialProtocol::receivePacket() {
     //temporary recieve buffer
-    char buffer[256];
+    char buffer[buffer_size];
 
     /* reads line from USB serial until newline, buffer is full, or error
         returns nullptr on failure */

@@ -4,6 +4,7 @@
 #include "motionController.hpp"
 #include "odometry.hpp"
 #include "arclengthSplining.hpp"
+#include "serial_protocol.hpp"
 
 #include <cstddef>
 #include <string>
@@ -72,7 +73,7 @@ public:
 private:
 
     Params m_params;
-    
+    bool sendWakeup(const std::string& wakeup = "A\n");
 
 };
 
