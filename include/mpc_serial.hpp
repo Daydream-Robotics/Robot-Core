@@ -72,15 +72,7 @@ public:
 private:
 
     Params m_params;
-
-    std::string tx_buffer;
-    std::string rx_buffer;
-
-    int serial_port;
     
-    void serializePacket();
-    bool sendPacket();
-    bool receivePacket(WheelVelocities& out);
 
 };
 
