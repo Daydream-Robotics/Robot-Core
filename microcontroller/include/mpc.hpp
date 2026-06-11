@@ -67,7 +67,7 @@ class MPCController : public MotionController {
         ~MPCController() override = default;
 
         WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) 
-            override = delete;
+            override ;
         
         WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx, double omega_L, double omega_R, double V_battery, double I_total);
 
