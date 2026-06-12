@@ -108,4 +108,144 @@ private:
     static std::optional<Packet> deserializePacket(const std::string& line, char field_seperator, char message_seperator);
 };
 
+// ---- send ----
+
+// ---- send (no type) ----
+template <typename T>
+bool SerialProtocol::send(const T& data) {
+    if (mode == Mode::ASCII) {
+        if constexpr (std::is_same_v<T, Packet>) {
+            return sendASCII(data);
+        }
+        return false;
+    }
+    if (mode == Mode::BINARY) {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            return sendBinary(0, data);
+        }
+        return false;
+    }
+    return false;
+}
+
+// ---- send (with type) ----
+template<typename T>
+bool SerialProtocol::send(uint16_t type, const T& data) {
+    if (mode == Mode::ASCII) {
+        if constexpr (std::is_same_v<T, Packet>) {
+            return sendASCII(data);
+        }
+        return false;
+    }
+    if (mode == Mode::BINARY) {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            return sendBinary(type, data);
+        }
+        return false;
+    }
+    return false;
+}
+
+// ---- receive (no expected type) ----
+template <typename T>
+std::optional<T> SerialProtocol::receive() {
+    if (mode == Mode::ASCII) {
+        if constexpr (std::is_same_v<T, Packet>) {
+            return receiveASCII();
+        }
+        return std::nullopt;
+    }
+    if (mode == Mode::BINARY) {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            return receiveBinary<T>(0);
+        }
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
+// ---- receive (with expected type) ----
+template<typename T>
+std::optional<T> SerialProtocol::receive(uint16_t expected_type) {
+    if (mode == Mode::ASCII) {
+        if constexpr (std::is_same_v<T, Packet>) {
+            return receiveASCII();
+        }
+        return std::nullopt;
+    }
+    if (mode == Mode::BINARY) {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            return receiveBinary<T>(expected_type);
+        }
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
+template <typename T>
+bool SerialProtocol::sendBinary(uint16_t type, const T& packet) {
+    static_assert(std::is_trivially_copyable_v<T>, "Binary packet must be trivially copyable");
+    BinaryHeader header;
+    header.type = type;
+    header.size = sizeof(T);
+    const uint8_t* raw = reinterpret_cast<const uint8_t*>(&packet);
+    uint8_t crc = crc8(raw, sizeof(T));
+    std::fwrite(&header, 1, sizeof(header), stdout);
+    std::fwrite(raw, 1, sizeof(T), stdout);
+    std::fwrite(&crc, 1, 1, stdout);
+    std::fflush(stdout);
+    return true;
+}
+
+template <typename T>
+std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
+    static_assert(std::is_trivially_copyable_v<T>, "Binary packet must be trivially copyable");
+    
+    BinaryHeader header;
+    while (true) {
+        if (std::fread(&header.sync, 1, sizeof(uint16_t), stdin) != sizeof(uint16_t)) {
+            return std::nullopt;
+        }
+        if (header.sync == 0xAA55) break;
+    }
+    if (std::fread(((uint8_t*)&header) + sizeof(uint16_t), 1, sizeof(BinaryHeader) - sizeof(uint16_t), stdin) 
+        != sizeof(BinaryHeader) - sizeof(uint16_t)) {
+        return std::nullopt;
+    }
+    if (header.type != expectedType) {
+        std::fseek(stdin, header.size + 1, SEEK_CUR);
+        return std::nullopt;
+    }
+    if (header.size != sizeof(T)) {
+        std::fseek(stdin, header.size + 1, SEEK_CUR);
+        return std::nullopt;
+    }
+
+    T packet;
+    uint8_t* raw = reinterpret_cast<uint8_t*>(&packet);
+    size_t read = std::fread(raw, 1, sizeof(T), stdin);
+    if (read != sizeof(T)) return std::nullopt;
+    
+    uint8_t recv_crc;
+    std::fread(&recv_crc, 1, 1, stdin);
+    if (crc8(raw, sizeof(T)) != recv_crc) return std::nullopt;
+    
+    return packet;
+}
+
+//Compute CRC-8 (polynomial 0x07) over a byte buffer
+//Used to detect corruption over USB serial
+inline uint8_t SerialProtocol::crc8(const uint8_t* data, size_t len) {
+    uint8_t crc = 0;
+    for (size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int b = 0; b < 8; b++) {
+            if (crc & 0x80)
+                crc = (crc << 1) ^ 0x07;
+            else
+                crc <<= 1;
+        }
+    }
+    return crc;
+}
 #endif

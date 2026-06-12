@@ -23,7 +23,7 @@ static inline double wrapAngle(double a) {
 MPCSerial::InterpSample MPCSerial::sampleAtArcLength(const std::vector<Sample>& samples, double sQuery) {
     InterpSample result;
     if (samples.empty()) {
-        return;
+        return result;
     }
     if (sQuery <= samples.front().s) {
         result.x = samples.front().x;
