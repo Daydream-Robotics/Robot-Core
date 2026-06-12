@@ -1,7 +1,7 @@
 #include <chrono>
 #include <thread>
 
-void main (void) {
+int main (void) {
 
 
     while (true) {

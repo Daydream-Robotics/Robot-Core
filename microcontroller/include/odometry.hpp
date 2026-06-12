@@ -119,7 +119,7 @@ private:
     Pose m_currentPosition = {0, 0, 0};
 
     // ROTS mutex to keep data task safe
-    pros::Mutex m_mutex;
+    // pros::Mutex m_mutex;
   
     // previous state tracking
     double m_prevTheta = 0;
