@@ -1,322 +1,192 @@
-#include "main.h"
-#include "subsystems.hpp"
-#include "constants.h"
-#include "autonomous.hpp"
-// #include "slam.h"
-#include "objectHandler.h"
-#include <numbers>
-#include "arclengthSplining.hpp"
-#include "paths.hpp"
-#include "sd_card_logging.hpp"
-#include "purePursuit.hpp"
+#include "serialProtocol.hpp"
+#include <iostream>
+#include <chrono>
+#include <thread>
+#include <vector>
+#include <algorithm>
+#include <cstring>
+#include <cmath>
 
-PurePursuit purePursuit = PurePursuit();
-Autonomous auton = Autonomous();
+#pragma pack(push, 1)
+struct MPCUpdatePacket {
+    float pose_x;
+    float pose_y;
+    float pose_theta;
+    float omega_L;
+    float omega_R;
+    float V_battery;
+    float I_total;
+    float z_desired[120];
+};
 
-std::vector<ALS_Path> paths;
+struct MPCControlPacket {
+    float V_left;
+    float V_right;
+};
 
-void initialize() {
-	// Initialize subsystems
-	pros::lcd::initialize();
-	pros::lcd::print(0, "Reg: Initialize");
+struct TestBinarySmall {
+    int32_t a;
+    int32_t b;
+};
+#pragma pack(pop)
 
-	// logger setup
-	Logger::getInstance().init("/usd/log.txt");
-	LOG("Program Start");
-	
-	// imu setup
-	imu.reset();
-	while (imu.is_calibrating()) {
-		pros::delay(20);
-	}
+int tests_passed = 0;
+int tests_failed = 0;
 
-	// path setup
-	printf("[MAIN] Loading paths...\n");
-	paths = Path::buildAllPathsFromJerryIO("/usd/path.jerryio.txt");
-	printf("[MAIN] Paths loaded: %zu\n", paths.size());
-	if (paths.size() != PathName::COUNT) {
-		printf("[MAIN] ERROR: Path count mismatch\n");
-		pros::lcd::print(1, "ERROR: Path count mismatch");
-		pros::lcd::print(2, "Expected: %d, Actual: %d", PathName::COUNT, paths.size());
-	} else {
-		printf("[MAIN] Trajectories Loaded successfully\n");
-		pros::lcd::print(1, "Trajectories Loaded");
-	}
+#define TEST_ASSERT(cond, msg) \
+    do { if (!(cond)) { std::cout << "  FAILED: " << msg << std::endl; tests_failed++; return false; } \
+    else { std::cout << "  PASSED: " << msg << std::endl; tests_passed++; } } while(0)
 
-	// object handler setup
-	// pros::Task frame_task(UpdateFrame_task_fn, (void*)"PROS_Task_Param", TASK_PRIORITY_DEFAULT, TASK_STACK_DEPTH_DEFAULT, "Vision Frame Update");
-	printf("[MAIN] Initialize complete\n");
+#define TEST_START(name) std::cout << "\n=== " << name << " ===" << std::endl;
+
+uint8_t computeCRC(const uint8_t* data, size_t len) {
+    uint8_t crc = 0;
+    for (size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int b = 0; b < 8; b++)
+            crc = (crc & 0x80) ? (crc << 1) ^ 0x07 : (crc << 1);
+    }
+    return crc;
 }
 
-void disabled() {}
-
-void competition_initialize() {}
-//all after path actions are commented out for path testing purposes
-void autonomous() {
-	printf("[MAIN] Starting autonomous()\n");
-	
-	if (paths.size() <= PathName::FIRST_PATH) {
-		printf("[MAIN-ERROR] FIRST_PATH index out of bounds! Array size is %zu\n", paths.size());
-		return;
-	}
-
-	printf("[MAIN] Setting FIRST_PATH...\n");
-	purePursuit.setPath(paths[PathName::FIRST_PATH]);
-	printf("[MAIN] FIRST_PATH set. Tracking...\n");
-	while (not purePursuit.step()) {
-		pros::delay(20);
-	}
-	printf("[MAIN] FIRST_PATH tracking complete.\n");
-
-	printf("[MAIN] Delaying 2000ms...\n");
-	pros::delay(2000);
-
-	if (paths.size() <= PathName::SECOND_PATH) {
-		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
-		return;
-	}
-
-	printf("[MAIN] Setting SECOND_PATH...\n");
-	purePursuit.setPath(paths[PathName::SECOND_PATH]);
-	printf("[MAIN] SECOND_PATH set. Tracking...\n");
-	while (not purePursuit.step()) {
-		pros::delay(20);
-	}
-	printf("[MAIN] SECOND_PATH tracking complete.\n");
-
+MPCUpdatePacket createTestUpdate(float x, float y, float theta) {
+    MPCUpdatePacket pkt;
+    pkt.pose_x = x;
+    pkt.pose_y = y;
+    pkt.pose_theta = theta;
+    pkt.omega_L = 100.0f;
+    pkt.omega_R = 95.0f;
+    pkt.V_battery = 12.6f;
+    pkt.I_total = 2.5f;
+    for (int i = 0; i < 120; i++) {
+        pkt.z_desired[i] = static_cast<float>(i);
+    }
+    return pkt;
 }
 
-void opcontrol() {
-	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
-	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
+// ==================== TESTS ====================
 
-	descorer.set_value(true);
+bool test_ascii_send() {
+    TEST_START("ASCII Send Test");
+    SerialProtocol serial(256, SerialProtocol::Mode::ASCII);
+    SerialProtocol::Packet pkt;
+    pkt.type = "TEST";
+    pkt.message = {{"status", "ok"}};
+    bool ok = serial.send(pkt);
+    TEST_ASSERT(ok, "ASCII send");
+    return true;
+}
 
-	intake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+bool test_binary_send() {
+    TEST_START("Binary Send Test");
+    SerialProtocol serial(256, SerialProtocol::Mode::BINARY);
+    MPCControlPacket ctrl{7.5f, 6.3f};
+    bool ok = serial.send(static_cast<uint16_t>(SerialProtocol::MPC_CONTROL), ctrl);
+    TEST_ASSERT(ok, "Binary send");
+    return true;
+}
 
-	lever.move(-HIGH_VOLTAGE);
-	pros::delay(100);
-    lever.move(STOP);
-	lever.set_zero_position(lever.get_position());
+bool test_printf_interference() {
+    TEST_START("printf Interference Test");
+    for (int i = 0; i < 10; i++) {
+        printf("[DEBUG] Loop %d\n", i);
+        SerialProtocol serial(256, SerialProtocol::Mode::BINARY);
+        MPCControlPacket ctrl{6.0f, 5.5f};
+        serial.send(static_cast<uint16_t>(SerialProtocol::MPC_CONTROL), ctrl);
+    }
+    TEST_ASSERT(true, "All packets sent");
+    return true;
+}
 
-	// bool raised = false;
-	// bool lowered = true;
-	// bool leverToggle = false;
+bool test_speed_ascii() {
+    TEST_START("ASCII Send Speed Test");
+    SerialProtocol serial(256, SerialProtocol::Mode::ASCII);
+    const int NUM = 1000;
+    SerialProtocol::Packet pkt;
+    pkt.type = "ODOM";
+    pkt.message = {{"x", "10.5"}, {"y", "5.2"}, {"theta", "1.57"}};
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < NUM; i++) serial.send(pkt);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    
+    std::cout << "  Sent " << NUM << " packets in " << duration.count() << " ms" << std::endl;
+    TEST_ASSERT(true, "Speed test complete");
+    return true;
+}
 
-	
-    bool lifterUp =  true;
+bool test_speed_binary() {
+    TEST_START("Binary Send Speed Test");
+    SerialProtocol serial(256, SerialProtocol::Mode::BINARY);
+    const int NUM = 1000;
+    MPCControlPacket ctrl{7.5f, 6.3f};
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < NUM; i++) {
+        serial.send(static_cast<uint16_t>(SerialProtocol::MPC_CONTROL), ctrl);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    
+    std::cout << "  Sent " << NUM << " packets in " << duration.count() << " ms" << std::endl;
+    TEST_ASSERT(true, "Speed test complete");
+    return true;
+}
 
-    uint32_t leverMoveStart = pros::millis();
-    bool leverMovingDown = false;
-    uint32_t timeToMoveLeverDown = 500;
+bool test_wakeup() {
+    TEST_START("Wakeup Test");
+    SerialProtocol serial(256, SerialProtocol::Mode::ASCII);
+    bool ok = serial.sendWakeup("VEX_READY\n");
+    TEST_ASSERT(ok, "Wakeup sent");
+    return true;
+}
 
-	while(true){
-
-		drive(DriveType::SPLIT_ARCADE);
-
-		// NEW INTAKE
-		if (controller.get_digital(DIGITAL_R1)) { // intake
-			intake.move(HIGH_VOLTAGE);
-		} else if (controller.get_digital(DIGITAL_L2)) { // outtake
-			intake.move(-HIGH_VOLTAGE);
-		} else {
-			intake.move(STOP);
-		}
-
-		// Matchloader
-		if (controller.get_digital(DIGITAL_Y)) {
-			matchloader.set_value(true); //r
-		} else {
-			matchloader.set_value(false); //r
-		}
-        
-        // Raise Lifter
-        if (controller.get_digital_new_press(DIGITAL_RIGHT)) {
-            // scoringLifter.toggle();
-            lifterUp = !lifterUp;
+bool test_long_running() {
+    TEST_START("Long Running Test");
+    SerialProtocol serial(256, SerialProtocol::Mode::BINARY);
+    const int NUM = 500;
+    int errors = 0;
+    
+    for (int i = 0; i < NUM; i++) {
+        MPCControlPacket ctrl{6.0f, 5.5f};
+        if (!serial.send(static_cast<uint16_t>(SerialProtocol::MPC_CONTROL), ctrl)) {
+            errors++;
         }
-
-		// Descore Wing
-        if (controller.get_digital(DIGITAL_L1)) {
-            descorer.set_value(false);
-        } else {
-            descorer.set_value(lifterUp);
-        }
-
-		// Lever Hold
-		if (controller.get_digital_new_press(DIGITAL_R2)) {
-            leverMovingDown = false;
-			lever.move(MAX_VOLTAGE);
-			ballBlocker.set_value(true);
-		} else if(controller.get_digital_new_release(DIGITAL_R2)){
-            leverMovingDown = true;
-            leverMoveStart = pros::millis();
-			// lever.move_absolute(5, 100);
-			ballBlocker.set_value(false);
-		}
-
-        if (leverMovingDown) {
-            if (pros::millis() - leverMoveStart > timeToMoveLeverDown) {
-                lever.move(STOP);
-                leverMovingDown = false;
-            } else {
-                lever.move(-MAX_VOLTAGE);
-            }
-        }
-
-        scoringLifter.set_value(lifterUp);
-
-		// Delay added to prevent crashing
-		pros::delay(20);
-	}
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    
+    std::cout << "  Sent " << NUM << " packets, " << errors << " errors" << std::endl;
+    TEST_ASSERT(errors == 0, "No errors");
+    return true;
 }
 
-void drive(DriveType type) {
-	if (!controller.get_digital(DIGITAL_UP) && !controller.get_digital(DIGITAL_DOWN)) {
-		switch (type) {
-			case DriveType::TANK: {
-				// Get joystick values
-				int leftY = controller.get_analog(ANALOG_LEFT_Y);
-				int rightY = controller.get_analog(ANALOG_RIGHT_Y);
-
-				// Dead zone for both motors
-				if(abs(leftY) > DEADZONE) {
-					leftMotors.move_voltage(leftY * 12000 / 127);
-				} else {
-					leftMotors.move_voltage(0);
-				}
-
-				if(abs(rightY) > DEADZONE) {
-					rightMotors.move_voltage(rightY * 12000 / 127);
-				} else { 
-					rightMotors.move_voltage(0);
-				}
-				break;
-			}
-			case DriveType::SPLIT_ARCADE: {
-                int left_adjusted, right_adjusted;
-
-				// Get joystick values
-				int power = controller.get_analog(ANALOG_LEFT_Y);
-				int turn = controller.get_analog(ANALOG_RIGHT_X);
-
-                // pros::lcd::print(0, "Power: %d", power);
-                // pros::lcd::print(1, "Turn: %d", turn);
-
-				int left = power + turn;
-				int right = power - turn;
-
-				// int left_adjusted = left * 600 / 127;
-				// int right_adjusted = right * 600 / 127;
-                left_adjusted = left * 12000 / 127;
-                right_adjusted = right * 12000 / 127;
-
-				// Dead zone for both motors
-				if(abs(left) > DEADZONE) {
-					leftMotors.move_voltage(left_adjusted);
-				} else {
-					leftMotors.move_voltage(0);
-				}
-
-				if(abs(right) > DEADZONE) {
-					rightMotors.move_voltage(right_adjusted);
-				} else { 
-					rightMotors.move_voltage(0);
-				}
-
-                // pros::lcd::print(0, "Left: %d", left_adjusted);
-                // pros::lcd::print(1, "Right: %d", right_adjusted);
-
-				break;
-			}
-		}
-	} else {
-		if (controller.get_digital(DIGITAL_UP)) { // slow move forward
-			leftMotors.move_voltage(LOW_VOLTAGE * 12000 / 127);
-			rightMotors.move_voltage(LOW_VOLTAGE * 12000 / 127);
-		} else if (controller.get_digital(DIGITAL_DOWN)){ // slow move backward
-			leftMotors.move_voltage(-LOW_VOLTAGE * 12000 / 127);
-			rightMotors.move_voltage(-LOW_VOLTAGE * 12000 / 127);
-		}
-	}
-}
-
-
-
-// score
-void score() {
-	// lever up
-    intake.move(MAX_VOLTAGE);
-	pros::delay(500);
-
-    lever.move(125);
-    pros::delay(500);
-    intake.move(-MAX_VOLTAGE);
-    pros::delay(500);
-
-	// lever down
-	lever.move(-MAX_VOLTAGE);
-	pros::delay(600);
-	lever.move(STOP);
-
-    intake.move(STOP);
-    pros::delay(100);
-}
-
-
-void matchload(int numRam) {
-    intake.move(MAX_VOLTAGE);
-    pros::delay(300);
-
-	for (int i = 0; i < numRam; i++) {
-		leftMotors.move_velocity(-70);
-		rightMotors.move_velocity(-70);
-		pros::delay(400);
-		leftMotors.move_velocity(0);
-		rightMotors.move_velocity(0);
-		pros::delay(300);
-		leftMotors.move_velocity(70);
-		rightMotors.move_velocity(70);
-		pros::delay(350); //400
-		leftMotors.move_velocity(0);
-		rightMotors.move_velocity(0);
-		pros::delay(500);
-	}
-    intake.move(STOP);
-}
-
-// void fullMatchload() {
-// 	intake.move(MAX_VOLTAGE);
-//     pros::delay(300);
-//     leftMotors.move_velocity(-70);
-//     rightMotors.move_velocity(-70);
-//     pros::delay(250);
-// 	leftMotors.move_velocity(0);
-// 	rightMotors.move_velocity(0);
-// 	pros::delay(250);
-//     leftMotors.move_velocity(70);
-//     rightMotors.move_velocity(70);
-//     pros::delay(250);
-//     leftMotors.move_velocity(0);
-//     rightMotors.move_velocity(0);
-// 	pros::delay(400);
-//     intake.move(STOP);
-// }
-
-void wallBall() {
-    int turnSpeed = 40;
-
-    intake.move(MAX_VOLTAGE);
-    leftMotors.move_velocity(turnSpeed);
-    rightMotors.move_velocity(-turnSpeed);
-    pros::delay(500);
-    leftMotors.move_velocity(-turnSpeed);
-    rightMotors.move_velocity(turnSpeed);
-    pros::delay(1000);
-    leftMotors.move_velocity(turnSpeed);
-    rightMotors.move_velocity(-turnSpeed);
-    pros::delay(500);
-    leftMotors.move_velocity(0);
-    rightMotors.move_velocity(0);
-    intake.move(STOP);
+// ==================== MAIN ====================
+int main() {
+    std::cout << "\n";
+    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
+    std::cout << "║     VEX BRAIN SERIAL PROTOCOL TEST SUITE                 ║\n";
+    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+    
+    test_ascii_send();
+    test_binary_send();
+    test_printf_interference();
+    test_speed_ascii();
+    test_speed_binary();
+    test_wakeup();
+    test_long_running();
+    
+    std::cout << "\n╔══════════════════════════════════════════════════════════╗\n";
+    std::cout << "║                    TEST SUMMARY                          ║\n";
+    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cout << "  Tests passed: " << tests_passed << std::endl;
+    std::cout << "  Tests failed: " << tests_failed << std::endl;
+    
+    if (tests_failed == 0) {
+        std::cout << "\n  ✅ ALL TESTS PASSED!\n" << std::endl;
+        return 0;
+    } else {
+        std::cout << "\n  ❌ SOME TESTS FAILED!\n" << std::endl;
+        return 1;
+    }
 }

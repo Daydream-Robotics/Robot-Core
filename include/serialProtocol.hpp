@@ -242,32 +242,31 @@ std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
     //declares header obj
     BinaryHeader header;
     uint8_t byte;
+    uint8_t sync_bytes_found = 0;
 
     //scan one byte at a time for sync bytes 0xAA 0x55
-    while (true) {
+    while (sync_bytes_found < 2) {
         //read next byte with 1s timeout
         if (!readBytes(&byte, 1, 1000)) {
             return std::nullopt;
         }
         //look for first sync byte
-        if (byte == 0xAA) {
-            //read potential second sync bye
-            uint8_t next_byte;
-            if (!readBytes(&next_byte, 1, 100)) {
-                return std::nullopt;
-            }
-            //check for second synce byte
-            if (next_byte == 0x55) {
-                //skip the 2 sync bytes and read the rest
-                if (!readBytes(((uint8_t*)&header) + 2, sizeof(BinaryHeader) - 2, 100)) {
-                    return std::nullopt;
-                }
-                break;
-            } 
-            else {
-                continue;
+        if (sync_bytes_found == 0 && byte == 0xAA) {
+            sync_bytes_found = 1;
+        } 
+        else if (sync_bytes_found == 1 && byte == 0x55) {
+            sync_bytes_found = 2;
+        }
+        else {
+            sync_bytes_found = 0;  
+            if (byte == 0xAA) {
+                sync_bytes_found = 1;  
             }
         }
+    }
+    //read the rest of the header (after sync bytes)
+    if (!readBytes(((uint8_t*)&header) + 2, sizeof(BinaryHeader) - 2, 100)) {
+        return std::nullopt;
     }
     //filter by type
     if (header.type != expectedType) {

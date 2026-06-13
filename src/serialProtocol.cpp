@@ -185,8 +185,10 @@ bool SerialProtocol::readBytes(void* dest, size_t n, int timeout_ms) {
         if (rx_buffer_pos > 0) {
             std::size_t to_copy = std::min(remaining, rx_buffer_pos);
             memcpy(out, rx_buffer.data(), to_copy);
-            //shifts remaining buffer data to the front
-            memmove(rx_buffer.data(), rx_buffer.data() + to_copy, rx_buffer_pos - to_copy);
+            if (rx_buffer_pos > to_copy) {
+                //shifts remaining buffer data to the front
+                memmove(rx_buffer.data(), rx_buffer.data() + to_copy, rx_buffer_pos - to_copy);
+            }
             rx_buffer_pos -= to_copy;
             out+= to_copy;
             remaining -= to_copy;
@@ -201,17 +203,14 @@ bool SerialProtocol::readBytes(void* dest, size_t n, int timeout_ms) {
         }
 
         //read available data from serial into buffer
-        std::size_t max_read = std::min(rx_buffer.size(), remaining + 1024);
-        int bytes_read = std::fread(rx_buffer.data(), 1, max_read, stdin);
-
-        //no dtat available yet, sleep shortly
-        if (bytes_read <= 0){
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        int byte = std::getc(stdin);
+        if (byte == EOF) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
             continue;
         }
-
-        //store number of bytes read into buffer
-        rx_buffer_pos = bytes_read;
+        
+        rx_buffer[0] = static_cast<uint8_t>(byte);
+        rx_buffer_pos = 1;
     }
 
     return true;
