@@ -104,6 +104,25 @@ private:
     static std::string serializePacket(const Packet& packet);
     //converts raw packet string (from serial) to a packet struct
     static std::optional<Packet> deserializePacket(const std::string& line);
+
+    //function to skip bytes
+    bool skipBytes(size_t num_bytes) {
+        //buffer to hold discarded data 
+        char discard[256];
+        //continue until all requested bytes have been discarded
+        while (num_bytes > 0) {
+            //calc num bytes to read but not more than buffer size
+            size_t to_read = std::min(num_bytes, sizeof(discard));
+            //put bytes into discard buffer and are ignored
+            size_t read = std::fread(discard, 1, to_read, stdin);
+            //hit EOF or an error
+            if (read == 0) {
+                return false;
+            }
+            num_bytes -= read;
+        }
+        return true;
+    }
 };
 
 //template functions
@@ -241,12 +260,18 @@ std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
     //filter by type
     if (header.type != expectedType) {
         // skip payload + crc
-        std::fseek(stdin, header.size + 1, SEEK_CUR);
+        skipBytes(header.size + 1);
         return std::nullopt;
     }
     //validate size
     if (header.size != sizeof(T)) {
-        std::fseek(stdin, header.size + 1, SEEK_CUR);
+        skipBytes(header.size + 1);
+        return std::nullopt;
+    }
+
+    //oversize protection
+    if (header.size > buffer_size || header.size == 0) {
+        skipBytes(header.size + 1);
         return std::nullopt;
     }
 
