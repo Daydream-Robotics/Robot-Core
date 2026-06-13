@@ -61,6 +61,9 @@ public:
         MPC_CONTROL = 2
     };
 
+    //persistent buffer for binary
+    std::vector<uint8_t> rx_buffer;
+    size_t rx_buffer_pos;
     //constructor with defaults (separators are now fixed)
     SerialProtocol(int buffer_size, Mode mode = Mode::ASCII);
     
@@ -99,6 +102,8 @@ private:
     std::optional<Packet> receiveASCII();
 
     uint8_t crc8(const uint8_t* data, size_t len);
+
+    bool readBytes(void* dest, size_t n, int timeout_ms = 100);
 
     //converts packet struct to raw string packet to send
     static std::string serializePacket(const Packet& packet);
@@ -233,23 +238,29 @@ std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
     BinaryHeader header;
     uint8_t byte;
 
-    //scan one byte at a time for sync byte 0xAA 0x55
+    //scan one byte at a time for sync bytes 0xAA 0x55
     while (true) {
+        //read next byte with 1s timeout
+        if (!readBytes(&byte, 1, 1000)) {
+            return std::nullopt;
+        }
+        //look for first sync byte
         if (byte == 0xAA) {
-            //maybe start look at next byte
-            int next = std::getc(stdin);
-            if (next == EOF) {
+            //read potential second sync bye
+            uint8_t next_byte;
+            if (!readBytes(&next_byte, 1, 100)) {
                 return std::nullopt;
             }
-            if (next == 0x55) {
-                //found sync so read rest of header
-                if (std::fread(((uint8_t*)&header) + 2, 1, sizeof(BinaryHeader) - 2, stdin) != sizeof(BinaryHeader) - 2) {
+            //check for second synce byte
+            if (next_byte == 0x55) {
+                //skip the 2 sync bytes and read the rest
+                if (!readBytes(((uint8_t*)&header) + 2, sizeof(BinaryHeader) - 2, 100)) {
                     return std::nullopt;
                 }
                 break;
-            } else {
-                //false start
-                std::ungetc(next, stdin);
+            } 
+            else {
+                continue;
             }
         }
     }
@@ -275,16 +286,16 @@ std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
     T packet;
     //Interpret struct memory as a writable byte buffer 
     uint8_t* raw = reinterpret_cast<uint8_t*>(&packet);
-    //tries to read sizeof(T) bytes from serial
-    size_t read = std::fread(raw, 1, sizeof(T), stdin);
-    // if we didn't get a full packet return nullptr
-    if (read != sizeof(T)) {
+    // read exactly sizeof(T) bytes into the struct
+    if (!readBytes(&packet, sizeof(T), 1000)) {
         return std::nullopt;
     }
     //read CRC byte
     uint8_t recv_crc;
-    std::fread(&recv_crc, 1, 1, stdin);
-    //verify message integrity using CRC comparison
+    if (!readBytes(&recv_crc, 1, 100)) {
+        return std::nullopt;
+    }
+    //compute crc and compare
     if (crc8(raw, sizeof(T)) != recv_crc) {
         return std::nullopt;
     }

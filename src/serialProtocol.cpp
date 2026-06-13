@@ -3,11 +3,15 @@
 #include <cstdio>
 #include <cstring>
 #include <sstream>
+#include <chrono>
+#include <thread>
 
 //constructor (separators are now fixed)
 SerialProtocol::SerialProtocol(int bufferSize, Mode mode)
     : buffer_size(bufferSize),
-      mode(mode) {}
+      mode(mode),
+      rx_buffer(8192),
+      rx_buffer_pos(0) {}
 
 //function to serialize packet into string then write to USB serial
 bool SerialProtocol::sendASCII(const Packet& packet){
@@ -165,6 +169,51 @@ std::optional<SerialProtocol::Packet> SerialProtocol::deserializePacket(const st
 
     return packet;
 }
+
+//reads n bytes from serial with timeout support
+bool SerialProtocol::readBytes(void* dest, size_t n, int timeout_ms) {
+    uint8_t* out = reinterpret_cast<uint8_t*>(dest);
+    std::size_t remaining = n;
+
+    auto start_time = std::chrono::steady_clock::now();
+    while (remaining>0) {
+        //use any buffered data before reading from serial
+        if (rx_buffer_pos > 0) {
+            std::size_t to_copy = std::min(remaining, rx_buffer_pos);
+            memcpy(out, rx_buffer.data(), to_copy);
+            //shifts remaining buffer data to the front
+            memmove(rx_buffer.data(), rx_buffer.data() + to_copy, rx_buffer_pos - to_copy);
+            rx_buffer_pos -= to_copy;
+            out+= to_copy;
+            remaining -= to_copy;
+            continue;
+        }
+        //check timeout before reading more data
+        if (timeout_ms > 0) {
+            auto now = std::chrono::steady_clock::now();
+            if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() > timeout_ms) {
+                return false;
+            }
+        }
+
+        //read available data from serial into buffer
+        std::size_t max_read = std::min(rx_buffer.size(), remaining + 1024);
+        int bytes_read = std::fread(rx_buffer.data(), 1, max_read, stdin);
+
+        //no dtat available yet, sleep shortly
+        if (bytes_read <= 0){
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
+
+        //store number of bytes read into buffer
+        rx_buffer_pos = bytes_read;
+    }
+
+    return true;
+}
+
+
 
 //send wakeup string
 bool SerialProtocol::sendWakeup(const std::string& wakeup) {
