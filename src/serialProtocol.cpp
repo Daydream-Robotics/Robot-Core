@@ -30,15 +30,19 @@ std::optional<SerialProtocol::Packet> SerialProtocol::receiveASCII() {
     //temporary recieve buffer
     char buffer[buffer_size];
 
-    /* reads line from USB serial until newline, buffer is full, or error
-        returns nullptr on failure */
-    if(!std::fgets(buffer, sizeof(buffer), stdin)) {
-        return std::nullopt;
+    //keep reading lines until we find a valid packet (skip debug messages)
+     while (std::fgets(buffer, sizeof(buffer), stdin)) {
+        std::string line(buffer);
+        auto packet = deserializePacket(line);
+        
+        if (packet.has_value()) {
+            //only return if it's a valid packet type (not debug output)
+            if (isValidPacketType(packet->type)) {
+                return packet;
+            }
+        }
     }
-    //converts C string into std::string
-    std::string line(buffer);
-    //parses a packet string into a packet struct and returns it
-    return deserializePacket(line);
+    return std::nullopt;
 }
 
 //converts packet struct into packet string
@@ -221,5 +225,15 @@ bool SerialProtocol::sendWakeup(const std::string& wakeup) {
     std::fwrite(wakeup.c_str(), 1, wakeup.size(), stdout);
     //force immediate output
     std::fflush(stdout);
+    return true;
+}
+
+bool SerialProtocol::isValidPacketType(const std::string& type) {
+    if (type.empty()) return true;
+    for (char c : type) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') {
+            return false;  
+        }
+    }
     return true;
 }

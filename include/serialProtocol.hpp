@@ -5,6 +5,7 @@
 #include <vector>
 #include <optional>
 #include <cstdint>
+#include <cctype>
 
 
 class SerialProtocol {
@@ -83,9 +84,13 @@ public:
     //send raw wakeup string to serial
     bool sendWakeup(const std::string& wakeup);
 
+    // Wrapper for debug output that uses same mutex
+    static void debugPrint(const char* msg);
+
 private:
     int buffer_size;
     Mode mode;
+    static bool isValidPacketType(const std::string& type);
 
     // T must be trivially copyable ie no ptrs in the struct
     template <typename T>
