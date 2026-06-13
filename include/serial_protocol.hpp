@@ -61,8 +61,8 @@ public:
         MPC_CONTROL = 2
     };
 
-    //constructor with defaults
-    SerialProtocol(int buffer_size, char field_seperator = ',', char message_seperator = '|', char end_char = '\n', Mode mode = Mode::ASCII);
+    //constructor with defaults (separators are now fixed)
+    SerialProtocol(int buffer_size, Mode mode = Mode::ASCII);
     
     // T must have a fixed memory layout
     template <typename T>
@@ -82,9 +82,6 @@ public:
 
 private:
     int buffer_size;
-    char field_seperator;
-    char message_seperator;
-    char end_char;
     Mode mode;
 
     // T must be trivially copyable ie no ptrs in the struct
@@ -104,9 +101,9 @@ private:
     uint8_t crc8(const uint8_t* data, size_t len);
 
     //converts packet struct to raw string packet to send
-    static std::string serializePacket(const Packet& packet, char field_seperator, char message_seperator, char end_char);
+    static std::string serializePacket(const Packet& packet);
     //converts raw packet string (from serial) to a packet struct
-    static std::optional<Packet> deserializePacket(const std::string& line, char field_seperator, char message_seperator);
+    static std::optional<Packet> deserializePacket(const std::string& line);
 };
 
 //template functions
@@ -215,14 +212,26 @@ std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
     
     //declares header obj
     BinaryHeader header;
+    uint8_t byte;
 
-    // find sync byte
+    //scan one byte at a time for sync byte 0xAA 0x55
     while (true) {
-        if (std::fread(&header.sync, 1, sizeof(uint16_t), stdin) != sizeof(uint16_t)) {
-            return std::nullopt;
-        }
-        if (header.sync == 0xAA55) {
-            break;
+        if (byte == 0xAA) {
+            //maybe start look at next byte
+            int next = std::getc(stdin);
+            if (next == EOF) {
+                return std::nullopt;
+            }
+            if (next == 0x55) {
+                //found sync so read rest of header
+                if (std::fread(((uint8_t*)&header) + 2, 1, sizeof(BinaryHeader) - 2, stdin) != sizeof(BinaryHeader) - 2) {
+                    return std::nullopt;
+                }
+                break;
+            } else {
+                //false start
+                std::ungetc(next, stdin);
+            }
         }
     }
     //read rest of header
