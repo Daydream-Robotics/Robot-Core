@@ -5,14 +5,15 @@
 #include <sstream>
 
 //constructor
-SerialProtocol::SerialProtocol(int bufferSize, char fieldSep, char messageSep, char term)
+SerialProtocol::SerialProtocol(int bufferSize, char fieldSep, char messageSep, char term, Mode mode)
     : buffer_size(bufferSize),
       field_seperator(fieldSep),
       message_seperator(messageSep),
-      end_char(term) {}
+      end_char(term),
+      mode(mode) {}
 
 //function to serialize packet into string then write to USB serial
-bool SerialProtocol::sendPacket(const Packet& packet){
+bool SerialProtocol::sendASCII(const Packet& packet){
     //converts packet struct into raw string packet
     std::string data = serializePacket(packet, field_seperator, message_seperator, end_char);
     //write to serial
@@ -24,7 +25,7 @@ bool SerialProtocol::sendPacket(const Packet& packet){
 }
 
 //reads one line from USB serial and deserializes into a packet struct
-std::optional<SerialProtocol::Packet> SerialProtocol::receivePacket() {
+std::optional<SerialProtocol::Packet> SerialProtocol::receiveASCII() {
     //temporary recieve buffer
     char buffer[buffer_size];
 
@@ -169,4 +170,3 @@ bool SerialProtocol::sendWakeup(const std::string& wakeup) {
     std::fflush(stdout);
     return true;
 }
-
