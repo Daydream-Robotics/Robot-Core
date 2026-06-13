@@ -4,18 +4,15 @@
 #include <cstring>
 #include <sstream>
 
-//constructor
-SerialProtocol::SerialProtocol(int bufferSize, char fieldSep, char messageSep, char term, Mode mode)
+//constructor (separators are now fixed)
+SerialProtocol::SerialProtocol(int bufferSize, Mode mode)
     : buffer_size(bufferSize),
-      field_seperator(fieldSep),
-      message_seperator(messageSep),
-      end_char(term),
       mode(mode) {}
 
 //function to serialize packet into string then write to USB serial
 bool SerialProtocol::sendASCII(const Packet& packet){
     //converts packet struct into raw string packet
-    std::string data = serializePacket(packet, field_seperator, message_seperator, end_char);
+    std::string data = serializePacket(packet);
     //write to serial
     std::fwrite(data.c_str(), 1, data.size(), stdout);
     //force serial output immediately
@@ -37,11 +34,15 @@ std::optional<SerialProtocol::Packet> SerialProtocol::receiveASCII() {
     //converts C string into std::string
     std::string line(buffer);
     //parses a packet string into a packet struct and returns it
-    return deserializePacket(line, field_seperator, message_seperator);
+    return deserializePacket(line);
 }
 
 //converts packet struct into packet string
-std::string SerialProtocol::serializePacket(const Packet& packet, char field_seperator, char message_seperator, char end_char) {
+std::string SerialProtocol::serializePacket(const Packet& packet) {
+    const char field_seperator = ',';
+    const char message_seperator = '|';
+    const char end_char = '\n';
+    
     //declares final output string
     std::string out;
 
@@ -83,7 +84,10 @@ std::string SerialProtocol::serializePacket(const Packet& packet, char field_sep
 }
 
 //convert packet string into packet struct
-std::optional<SerialProtocol::Packet> SerialProtocol::deserializePacket(const std::string& line, char field_separator, char message_separator) {
+std::optional<SerialProtocol::Packet> SerialProtocol::deserializePacket(const std::string& line) {
+    const char field_separator = ',';
+    const char message_separator = '|';
+    
     //if the packet is empty return nullptr
     if (line.empty()) {
         return std::nullopt;
