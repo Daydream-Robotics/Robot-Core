@@ -16,14 +16,14 @@ public:
     };
     /*
         Packet format:
-        TYPE,field1,field2|field1,field2|field1,field2\n
+        TYPE,field1,field2;field1,field2;field1,field2\n
         Example:
-        ODOM,x,10.5|y,5.2|theta,1.57\n
+        ODOM,x,10.5;y,5.2;theta,1.57\n
         ------------------------------------------------
         TYPE            -> packet type / command name
         ,               -> field separator
         field1,field2   -> one message block
-        |               -> separator between message blocks
+        ;               -> separator between message blocks
         \n              -> end of packet
         ------------------------------------------------
     */
@@ -42,7 +42,7 @@ public:
                 {"y", "5.2"},
                 {"theta", "1.57"}
             }
-            Represents: x,10.5|y,5.2|theta,1.57
+            Represents: x,10.5;y,5.2;theta,1.57
         */
         std::vector<std::vector<std::string>> message;
     };
