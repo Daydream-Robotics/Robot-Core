@@ -253,10 +253,6 @@ std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
             }
         }
     }
-    //read rest of header
-    if (std::fread(((uint8_t*)&header) + sizeof(uint16_t), 1, sizeof(BinaryHeader) - sizeof(uint16_t),stdin) != sizeof(BinaryHeader) - sizeof(uint16_t)) {
-        return std::nullopt;
-    }
     //filter by type
     if (header.type != expectedType) {
         // skip payload + crc
