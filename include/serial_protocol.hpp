@@ -114,7 +114,10 @@ private:
 template <typename T>
 bool SerialProtocol::send(const T& data) {
     if (mode == Mode::ASCII) {
-        return sendASCII(data);
+        if constexpr (std::is_same_v<T, Packet>) {
+            return sendASCII(data);
+        }
+        return false;
     }
     if (mode == Mode::BINARY) {
         if constexpr (std::is_trivially_copyable_v<T>) {
@@ -147,7 +150,10 @@ bool SerialProtocol::send(uint16_t type, const T& data) {
 template <typename T>
 std::optional<T> SerialProtocol::receive() {
     if (mode == Mode::ASCII) {
-        return receiveASCII();
+        if constexpr (std::is_same_v<T, Packet>) {
+            return receiveASCII();
+        }
+        return std::nullopt;
     }
     if (mode == Mode::BINARY) {
         if constexpr (std::is_trivially_copyable_v<T>) {
