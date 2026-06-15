@@ -1,0 +1,22 @@
+╔════════════════════════════════════════════════════════════════════╗
+║                    FINAL SUMMARY                                   ║
+╚════════════════════════════════════════════════════════════════════╝
+  Test duration: 90 seconds
+  Total packets received: 77
+    - MPC_CONTROL: 66
+    - MPC_UPDATE: 0
+    - GENERIC: 11
+  Responses sent: 66
+  Debug lines filtered/skipped: 436
+  Total bytes read: 22463
+  Binary bytes processed: 1155
+  Filter efficiency: 1.94097% of bytes were debug text
+
+  ✅ Packet reception with printf noise
+  ✅ MPC_CONTROL packets received
+  ❌ MPC_UPDATE packets received
+  ✅ GENERIC packets received
+  ✅ Responses sent successfully
+  ✅ Debug lines filtered correctly
+
+  ⚠️ SOME TESTS FAILED!
