@@ -12,9 +12,9 @@ constexpr double STANLEY_MAX_STEER = (std::numbers::pi/180) * 60;
 
 //END CONDITIONS
 constexpr double STANLEY_END_TOL = 1.0;
-constexpr double STANDLEY_END_SLOW = 12.0;
-constexpr int STANLEY_MAX_VEL = 200;
-constexpr int STANLEY_MIN_VEL = 40;
+constexpr double STANLEY_END_SLOW = 5.0;
+constexpr int STANLEY_MAX_VEL = 400;
+constexpr int STANLEY_MIN_VEL = 50;
 constexpr double STANLEY_TURN_SCALE = 150.0;
 
 class StanleyController {
@@ -22,10 +22,8 @@ class StanleyController {
         StanleyController() = default;
 
         void setPath(ALS_Path& path);
-        /*direction of 1 goes forward
-          direction of -1 goes backwards
-        */
-        bool step();
+
+        bool step(int direction = 1);
 
     private:
         ALS_Path* m_als_path;

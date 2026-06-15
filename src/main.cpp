@@ -65,7 +65,7 @@ void autonomous() {
 	printf("[MAIN] Setting FIRST_PATH...\n");
 	stan.setPath(paths[PathName::FIRST_PATH]);
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
-	while (not stan.step()) {
+	while (not stan.step(-1)) {
 		pros::delay(20);
 	}
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
@@ -147,9 +147,23 @@ void opcontrol() {
         
         // Raise Lifter
         if (controller.get_digital_new_press(DIGITAL_RIGHT)) {
-            // scoringLifter.toggle();
-            lifterUp = !lifterUp;
-        }
+            if (paths.size() <= PathName::FIRST_PATH) {
+				printf("[MAIN-ERROR] FIRST_PATH index out of bounds! Array size is %zu\n", paths.size());
+				return;
+			}
+
+			printf("[MAIN] Setting FIRST_PATH...\n");
+			stan.setPath(paths[PathName::FIRST_PATH]);
+			printf("[MAIN] FIRST_PATH set. Tracking...\n");
+			while (not stan.step(-1)) {
+				pros::delay(20);
+			}
+
+			printf("[MAIN] FIRST_PATH tracking complete.\n");
+
+			printf("[MAIN] Delaying 2000ms...\n");
+			pros::delay(2000);
+		}
 
 		// Descore Wing
         if (controller.get_digital(DIGITAL_L1)) {
