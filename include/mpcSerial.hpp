@@ -11,26 +11,34 @@
 
 class MPCSerial : public MotionController {
 public:
-
     struct Params {
-            double h;
+        double h;          //sample period (s)
+        double gear_ratio;  //gear multiplier: (driver teeth / driven teeth)
 
-            Params(
-                double frequency
-            );
-        };
+        Params(double frequency, double ratio = 1.0);
+    };
+
+    static constexpr std::size_t F = 40;
 
     explicit MPCSerial(const Params& params);
     ~MPCSerial() override = default;
 
-    WheelVelocities compute(const Pose&, const ALS_Path&, std::size_t&) override;
+    void reset() override {}
+    WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx) override;
 
-    WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx, double omega_L, double omega_R, double V_battery, double I_total);
+    WheelVelocities compute(
+        const Pose& currentPose, 
+        const ALS_Path& path, 
+        std::size_t& closestSampleIdx, 
+        double omega_L, 
+        double omega_R, 
+        double V_battery, 
+        double I_total
+    );
+
     static void identifyMotorModel();
-    static constexpr std::size_t F = 40;
-private:
-    
 
+private:
     #pragma pack(push, 1)
     struct MPCUpdatePacket {
         float pose_x;
@@ -40,7 +48,7 @@ private:
         float omega_R;
         float V_battery;
         float I_total;
-        float z_desired[F*3];
+        float z_desired[F * 3];
     };
     #pragma pack(pop)
 
@@ -61,12 +69,21 @@ private:
 
     SerialProtocol serial;
     Params m_params;
+
     InterpSample sampleAtArcLength(const std::vector<Sample>& samples, double sQuery);
-    MPCUpdatePacket buildUpdatePacket(const Pose& currentPose, const std::vector<Sample>& samples, std::size_t idx, double omega_L, double omega_R, double V_battery, double I_total);
+    MPCUpdatePacket buildUpdatePacket(
+        const Pose& currentPose, 
+        const std::vector<Sample>& samples, 
+        std::size_t idx, 
+        double omega_L, 
+        double omega_R, 
+        double V_battery, 
+        double I_total
+    );
+
     static double estimateA(const std::vector<double>& time, const std::vector<double>& omega, double omega_ss);
     static double estimateB(double a, double omega_ss, double voltage);
     static void runSingleIdentificationTest(int voltage);
 };
-
 
 #endif

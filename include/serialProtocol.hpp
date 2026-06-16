@@ -6,6 +6,7 @@
 #include <optional>
 #include <cstdint>
 #include <cctype>
+#include <cstdio>
 
 #define __vexbrain__
 
@@ -400,6 +401,10 @@ inline int SerialProtocol::setUpMicrocontrollerSerial(const char* port, speed_t 
     //redirect standard input/output to the serial port
     dup2(fd, STDIN_FILENO);
     dup2(fd, STDOUT_FILENO);
+    setbuf(stdin, NULL);
+    setbuf(stdout, NULL);
+    setvbuf(stdin, NULL, _IONBF, 0);
+    setvbuf(stdout, NULL, _IONBF, 0);
     //return file descriptor for later use
     return fd;
 }
