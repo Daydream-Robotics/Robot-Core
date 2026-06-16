@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <cctype>
 
-#define __microcontroller__
+#define __vexbrain__
 
 #ifdef __vexbrain__
     #include "pros/apix.h"
