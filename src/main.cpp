@@ -6,6 +6,7 @@
 #include "paths.hpp"
 #include "pathFollower.hpp"
 #include "purePursuit.hpp"
+#include "mpc_serial.hpp"
 
 // #include "slam.h"
 // #include "objectHandler.h"
@@ -93,7 +94,7 @@ void autonomous() {
 void opcontrol() {
 	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
-
+    MPCSerial::identifyMotorModel();
 	descorer.set_value(true);
 
 	intake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);

@@ -4,7 +4,7 @@
 #include "motionController.hpp"
 #include "odometry.hpp"
 #include "arclengthSplining.hpp"
-#include "serial_protocol.hpp"
+#include "serialProtocol.hpp"
 
 #include <cstddef>
 #include <string>
@@ -26,6 +26,7 @@ public:
     WheelVelocities compute(const Pose&, const ALS_Path&, std::size_t&) override;
 
     WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx, double omega_L, double omega_R, double V_battery, double I_total);
+    static void identifyMotorModel();
     static constexpr std::size_t F = 40;
 private:
     
@@ -62,6 +63,10 @@ private:
     Params m_params;
     InterpSample sampleAtArcLength(const std::vector<Sample>& samples, double sQuery);
     MPCUpdatePacket buildUpdatePacket(const Pose& currentPose, const std::vector<Sample>& samples, std::size_t idx, double omega_L, double omega_R, double V_battery, double I_total);
+    static double estimateA(const std::vector<double>& time, const std::vector<double>& omega, double omega_ss);
+    static double estimateB(double a, double omega_ss, double voltage);
+    static void runSingleIdentificationTest(int voltage);
 };
+
 
 #endif

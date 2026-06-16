@@ -1,5 +1,5 @@
 #include "mpc_serial.hpp"
-
+#include "subsystems.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -9,7 +9,7 @@ MPCSerial::Params::Params(
     : h(frequency) {}
 
 MPCSerial::MPCSerial(const Params& params)
-    : m_params(params), serial(1024, ',', '|', '\n', SerialProtocol::Mode::BINARY)
+    : m_params(params), serial(1024, SerialProtocol::Mode::BINARY)
 {
 
 }
@@ -112,4 +112,126 @@ WheelVelocities MPCSerial::compute(const Pose& currentPose, const ALS_Path& path
         res->V_left,
         res->V_right
     };
+}
+
+double MPCSerial::estimateA(const std::vector<double>& time, const std::vector<double>& omega, double omega_ss) {
+    double sum = 0.0;
+    int count = 0;
+    for (std::size_t i = 0; i < omega.size(); i++) {
+        double ratio = 1.0 - (omega[i] / omega_ss);
+        if (ratio <= 0.0) {
+            continue;
+        }
+        double a_i = -std::log(ratio) / time[i];
+        if (std::isfinite(a_i)) {
+            sum += a_i;
+            count++;
+        }
+    }
+    if (count == 0) {
+        return 0.0;
+    }
+    return sum / count;
+}
+
+double MPCSerial::estimateB(double a, double omega_ss, double voltage) {
+    return (a * omega_ss) / voltage;
+}
+
+void MPCSerial::runSingleIdentificationTest(int voltage) {
+
+    std::vector<double> time;
+    std::vector<double> omega;
+
+    pros::delay(1000);
+
+    int start = pros::millis();
+
+    
+    leftMotors.move_voltage(voltage);
+
+    while (pros::millis() - start < 2000) {
+
+        double t =
+            (pros::millis() - start) / 1000.0;
+
+        double w = leftMotors.get_actual_velocity(0)* 2.0 * M_PI / 60.0;
+
+        time.push_back(t);
+        omega.push_back(w);
+
+        pros::delay(10);
+    }
+
+    leftMotors.move_voltage(0);
+
+    double omega_ss = omega.back();
+
+    double a =
+        estimateA(time, omega, omega_ss);
+
+    double b =
+        estimateB(a, omega_ss, voltage / 12000.0);
+
+    printf("\n");
+    printf("Voltage: %d mV\n", voltage);
+    printf("omega_ss: %f rad/s\n", omega_ss);
+    printf("a: %f\n", a);
+    printf("b: %f\n", b);
+}
+
+void MPCSerial::identifyMotorModel() {
+
+    double sumA = 0.0;
+    double sumB = 0.0;
+    int count = 0;
+
+    auto test = [&](int voltage) {
+
+        std::vector<double> time;
+        std::vector<double> omega;
+
+        leftMotors.move_voltage(0);
+        pros::delay(800);
+
+        int start = pros::millis();
+        leftMotors.move_voltage(voltage);
+
+        while (pros::millis() - start < 2000) {
+
+            double t = (pros::millis() - start) / 1000.0;
+            double w = leftMotors.get_actual_velocity(0)* 2.0 * M_PI / 60.0;
+
+            time.push_back(t);
+            omega.push_back(w);
+
+            pros::delay(10);
+        }
+
+        leftMotors.move_voltage(0);
+
+        double omega_ss = omega.back();
+
+        double a = estimateA(time, omega, omega_ss);
+        double b = estimateB(a, omega_ss, voltage / 12000.0);
+
+        printf("\nV: %d mV | a: %f | b: %f\n", voltage, a, b);
+
+        sumA += a;
+        sumB += b;
+        count++;
+    };
+    test(5000);
+    test(7500);
+    test(10000);
+    test(12000);
+
+    double avgA = sumA / count;
+    double avgB = sumB / count;
+
+    printf("\n====================\n");
+    printf("AVERAGE MODEL\n");
+    printf("====================\n");
+    printf("a: %f\n", avgA);
+    printf("b: %f\n", avgB);
 }
