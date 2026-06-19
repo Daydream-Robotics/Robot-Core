@@ -11,7 +11,7 @@
 #include "purePursuit.hpp"
 #include "stanley.hpp"
 
-StanleyController stan;
+StanleyController stan = StanleyController();
 PurePursuit purePursuit = PurePursuit();
 Autonomous auton = Autonomous();
 
@@ -65,7 +65,7 @@ void autonomous() {
 	printf("[MAIN] Setting FIRST_PATH...\n");
 	stan.setPath(paths[PathName::FIRST_PATH]);
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
-	while (not stan.step(-1)) {
+	while (not stan.step()) {
 		pros::delay(20);
 	}
 	printf("[MAIN] FIRST_PATH tracking complete.\n");

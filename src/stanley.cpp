@@ -38,6 +38,8 @@ bool StanleyController::step(int direction) {
     double distFromEnd = m_als_path->getTotalLength() - nearest.s;
     printf("End Distance%.3f\n", distFromEnd);
 
+
+    //end of path exit condition
     if (distFromEnd < STANLEY_END_TOL) {
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
@@ -47,11 +49,11 @@ bool StanleyController::step(int direction) {
     
 
 
-    double pathYawRad  = nearest.heading;
-    double robotYawRad = convertDegToRad(yaw);
+    double pathYawRad  = nearest.heading; //the yaw of the path in radians
+    double robotYawRad = convertDegToRad(yaw); //the yaw of the robot in radians
 
-    double effectivePathYaw = (direction == 1) ? pathYawRad : normalizeAngle(pathYawRad + M_PI);
-    double headingError = normalizeAngle(effectivePathYaw - robotYawRad);
+    double effectivePathYaw = (direction == 1) ? pathYawRad : normalizeAngle(pathYawRad + M_PI); //adjusts path yaw for backwards travel
+    double headingError = normalizeAngle(effectivePathYaw - robotYawRad); 
 
     // CTE sign also flips when reversing
     double ex  = nearest.x - x;
@@ -67,7 +69,10 @@ bool StanleyController::step(int direction) {
     steer = std::clamp(steer, -STANLEY_MAX_STEER, STANLEY_MAX_STEER);
     printf("Steer After Clamp: %.3f\n", steer);
 
+
     int baseVel = STANLEY_MAX_VEL;
+
+    //adjusts the speed for end of path slowdown
     if (distFromEnd < STANLEY_END_SLOW) {
         double scale = distFromEnd / STANLEY_END_SLOW;
         baseVel = static_cast<int>(baseVel * scale);
@@ -76,6 +81,7 @@ bool StanleyController::step(int direction) {
 
     printf("Base Velocity: %.3f\n", baseVel);
 
+    //motor velocity creation and adjustment based off steering and direction
     double leftVel  = direction * baseVel - steer * STANLEY_TURN_SCALE;
     double rightVel = direction * baseVel + steer * STANLEY_TURN_SCALE;
     
@@ -83,6 +89,8 @@ bool StanleyController::step(int direction) {
     
    
     double maxMag = std::max(std::abs(leftVel), std::abs(rightVel));
+    
+    //adjusts both motor velocities if at least one motor is over max velocity 
     if (maxMag > STANLEY_MAX_VEL) {
         double scale = STANLEY_MAX_VEL / maxMag;
         leftVel  *= scale;
@@ -92,6 +100,7 @@ bool StanleyController::step(int direction) {
 
     else printf("No Velocity Scale\n");
 
+    //final motor velocity set
     leftMotors.move_velocity(static_cast<int>(leftVel));
     rightMotors.move_velocity(static_cast<int>(rightVel));
 
