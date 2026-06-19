@@ -15,7 +15,6 @@
 // #include "arclengthSplining.hpp"
 
 StanleyController stan = StanleyController();
-PurePursuit purePursuit = PurePursuit();
 Autonomous auton = Autonomous();
 
 PurePursuitController purePursuit = PurePursuitController();
