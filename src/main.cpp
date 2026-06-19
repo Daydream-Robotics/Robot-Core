@@ -1,19 +1,25 @@
 #include "main.h"
-#include "subsystems.hpp"
-#include "constants.h"
-#include "autonomous.hpp"
-// #include "slam.h"
-#include "objectHandler.h"
-#include <numbers>
-#include "arclengthSplining.hpp"
-#include "paths.hpp"
 #include "sd_card_logging.hpp"
+// #include "constants.h"
+#include "subsystems.hpp"
+#include "autonomous.hpp"
+#include "paths.hpp"
+#include "pathFollower.hpp"
 #include "purePursuit.hpp"
 #include "stanley.hpp"
+
+
+// #include "slam.h"
+// #include "objectHandler.h"
+// #include <numbers>
+// #include "arclengthSplining.hpp"
 
 StanleyController stan = StanleyController();
 PurePursuit purePursuit = PurePursuit();
 Autonomous auton = Autonomous();
+
+PurePursuitController purePursuit = PurePursuitController();
+PathFollower pathFollower = PathFollower(purePursuit);
 
 std::vector<ALS_Path> paths;
 
@@ -73,31 +79,18 @@ void autonomous() {
 	printf("[MAIN] Delaying 2000ms...\n");
 	pros::delay(2000);
 
-	// if (paths.size() <= PathName::SECOND_PATH) {
-	// 	printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
-	// 	return;
-	// }
+	if (paths.size() <= PathName::SECOND_PATH) {
+		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
+		return;
+	}
 
-	// printf("[MAIN] Setting SECOND_PATH...\n");
-	// stan.setPath(paths[PathName::SECOND_PATH]);
-	// printf("[MAIN] SECOND_PATH set. Tracking...\n");
-	// while (not stan.step()) {
-	// 	pros::delay(20);
-	// }
-	// printf("[MAIN] SECOND_PATH tracking complete.\n");
-
-	// 	if (paths.size() <= PathName::THIRD_PATH) {
-	// 	printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
-	// 	return;
-	// }
-
-	// printf("[MAIN] Setting THIRD_PATH...\n");
-	// stan.setPath(paths[PathName::THIRD_PATH]);
-	// printf("[MAIN] THIRD_PATH set. Tracking...\n");
-	// while (not stan.step()) {
-	// 	pros::delay(20);
-	// }
-	// printf("[MAIN] THIRD_PATH tracking complete.\n");
+	printf("[MAIN] Setting SECOND_PATH...\n");
+	pathFollower.setPath(paths[PathName::SECOND_PATH]);
+	printf("[MAIN] SECOND_PATH set. Tracking...\n");
+	while (not pathFollower.step()) {
+		pros::delay(20);
+	}
+	printf("[MAIN] SECOND_PATH tracking complete.\n");
 
 }
 

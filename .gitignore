@@ -10,7 +10,7 @@
 *.userosscache
 *.sln.docstates
 *.env
-
+tests/*.cpp
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
@@ -52,6 +52,9 @@ bld/
 # Uncomment if you have tasks that rely on *.refresh files to move binaries
 # (https://github.com/github/gitignore/pull/3736)
 #!**/[Bb]in/*.refresh
+
+# build directory
+.d/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
