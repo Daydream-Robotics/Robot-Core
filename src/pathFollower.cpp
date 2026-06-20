@@ -16,14 +16,10 @@ void PathFollower::setPath(ALS_Path& path, Flags flag) {
     m_controller.reset();
 }
 
-
-
-
 bool PathFollower::step() {
     if (m_isFinished || !m_path || !m_path->isValid() || m_path->getSamples().empty()) {
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
-        pros::lcd::print(0, "Done1");
         return true;
     }
 
@@ -45,7 +41,6 @@ bool PathFollower::step() {
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
         m_isFinished = true;
-        pros::lcd::print(0, "Done2");
         return true;
     }
     // pros::lcd::print(0, "run");
