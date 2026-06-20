@@ -6,13 +6,8 @@ class PathFollower {
     public:
         PathFollower(MotionController& controller);
         ~PathFollower() = default;
-
-        enum Flags {
-            FORWARDS,
-            REVERSE
-        };
         
-        void setPath(ALS_Path& path, Flags flag = FORWARDS);
+        void setPath(ALS_Path& path, PathFlag flag = PathFlag::FORWARDS);
         bool step();
 
 
@@ -24,5 +19,5 @@ class PathFollower {
         double m_distanceFromEnd = 999.0;
         bool m_isFinished = false;
 
-        Flags flag = FORWARDS;
+        PathFlag flag = PathFlag::FORWARDS;
 };

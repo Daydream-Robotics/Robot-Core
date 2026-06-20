@@ -5,7 +5,7 @@
 PathFollower::PathFollower(MotionController& controller)
      : m_controller(controller) {}
 
-void PathFollower::setPath(ALS_Path& path, Flags flag) {
+void PathFollower::setPath(ALS_Path& path, PathFlag flag) {
     this->flag = flag;
     m_path = &path;
     m_currentSampleIdx = 0;

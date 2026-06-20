@@ -29,7 +29,7 @@ public:
 
     void reset() override {}
     //public compute: sends parameters plus robot telematry to private compute, gets voltages
-    WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx, PathFollower::Flags flag) override;
+    WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx, PathFlag flag) override;
 
     //motor model identification
     static void identifyMotorModel();
@@ -69,11 +69,11 @@ private:
     Params m_params; //timing and gear ratio
 
     //private compute: sends full state + reference to microcontroller, gets voltages
-    WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx, PathFollower::Flags flag, double omega_L, double omega_R, double V_battery, double I_total);
+    WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx, PathFlag flag, double omega_L, double omega_R, double V_battery, double I_total);
     //find closest point on spline for given arc length
     InterpSample sampleAtArcLength(const std::vector<Sample>& samples, double sQuery);
     //pack current state + build reference trajectory into update packet
-    MPCUpdatePacket buildUpdatePacket(const Pose& currentPose, const std::vector<Sample>& samples, std::size_t idx, PathFollower::Flags flag, double omega_L, double omega_R, double V_battery, double I_total);
+    MPCUpdatePacket buildUpdatePacket(const Pose& currentPose, const std::vector<Sample>& samples, std::size_t idx, PathFlag flag, double omega_L, double omega_R, double V_battery, double I_total);
 
     //get motor model
     static double estimateA(const std::vector<double>& time, const std::vector<double>& omega, double omega_ss);
