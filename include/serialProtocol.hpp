@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cctype>
 #include <cstdio>
+#include <chrono>
 
 #define __vexbrain__
 
@@ -274,80 +275,83 @@ bool SerialProtocol::sendBinary(uint16_t type, const T& packet) {
 // Receives a fixed-size binary struct from serial and returns nullptr if full packet isn't recieved
 template <typename T>
 std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
-    //ensure type can be safley uses as raw bytes
     static_assert(std::is_trivially_copyable_v<T>,
                   "Binary packet must be trivially copyable");
     
-    // Packet header (with sync, type, size)
-    BinaryHeader header;
+    const int timeout_ms = 2000;
+    const auto deadline = std::chrono::steady_clock::now() 
+                        + std::chrono::milliseconds(timeout_ms);
 
+    BinaryHeader header;
     uint8_t byte;
     int sync_found = 0;
     int attempts   = 0;
     const int max_attempts = 10000;
-    //scan one byte at a time for sync bytes 0x55 0xaa
-    //reads byte by byte until sync is found or timeout occurs
+
+    // Scan for sync bytes 0x55 0xAA
     while (sync_found < 2 && attempts < max_attempts) {
-        //serial timeout or read failure
-        if (!readBytes(&byte, 1, 1000)) {
+        if (std::chrono::steady_clock::now() > deadline) {
             return std::nullopt;
         }
-        //when looking for first sync byte finds first sync byte
+        if (!readBytes(&byte, 1, 100)) {
+            return std::nullopt;
+        }
         if (sync_found == 0 && byte == 0x55) {
             sync_found = 1;
-        }
-        //when looking for second sync byte finds second sync byte
-        else if (sync_found == 1 && byte == 0xAA) {
+        } else if (sync_found == 1 && byte == 0xAA) {
             sync_found = 2;
-        }
-        //restart sync detection if sequence breaks
-        else {
+        } else {
             sync_found = (byte == 0x55) ? 1 : 0;
         }
         attempts++;
     }
-    //failed to find sync within reasonable limit
+
     if (attempts >= max_attempts) {
         return std::nullopt;
     }
 
     // Read type + size
-    if (!readBytes(((uint8_t*)&header) + 2, sizeof(BinaryHeader) - 2, 100)) {
+    if (!readBytes(reinterpret_cast<uint8_t*>(&header) + 2, 
+                   sizeof(BinaryHeader) - 2, 100)) {
         return std::nullopt;
     }
-    //validate packet type
+
+    // Validate packet type
     if (header.type != expectedType) {
-        //skip/discard payload + crc
         skipBytes(header.size + 1);
         return std::nullopt;
     }
-    //validate payload size
+
+    // Validate payload size
     if (header.size != sizeof(T)) {
-        //skip/discard payload + crc
         skipBytes(header.size + 1);
         return std::nullopt;
     }
-    //prevent buffer overflow or invalid sizes
+
+    // Prevent buffer overflow
     if (header.size > (size_t)buffer_size || header.size == 0) {
         skipBytes(header.size + 1);
         return std::nullopt;
     }
 
-    //object to hold data 
+    // Read payload
     T result;
-    //read struct data into result buffer
-    if (!readBytes(&result, sizeof(T), 1000)) {
+    if (!readBytes(&result, sizeof(T), 100)) {
         return std::nullopt;
     }
-    //read sent CRC and compare with computed crc
+
+    // Read and verify CRC
     uint8_t recv_crc;
     if (!readBytes(&recv_crc, 1, 100)) {
         return std::nullopt;
     }
-    uint8_t computed_crc = crc8(reinterpret_cast<const uint8_t*>(&result), sizeof(T));
+
+    uint8_t computed_crc = crc8(reinterpret_cast<const uint8_t*>(&result), 
+                                sizeof(T));
     if (computed_crc != recv_crc) {
         return std::nullopt;
     }
+
     return result;
 }
 

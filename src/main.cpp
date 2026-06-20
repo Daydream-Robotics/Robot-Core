@@ -1,37 +1,33 @@
 #include "main.h"
-#include "subsystems.hpp"
-#include "constants.h"
-#include "autonomous.hpp"
-// #include "slam.h"
-#include "objectHandler.h"
-#include <numbers>
-#include "arclengthSplining.hpp"
-#include "paths.hpp"
 #include "sd_card_logging.hpp"
-#include "purePursuit.hpp"
-
+#include "subsystems.hpp"
+#include "autonomous.hpp"
+#include "paths.hpp"
+#include "pathFollower.hpp"
+#include "mpcSerial.hpp"
 
 Autonomous auton = Autonomous();
+
+// Declare pointers globally so they are visible to both initialize and autonomous
+MPCSerial* mpc_serial_controller = nullptr;
+PathFollower* pathFollower = nullptr;
 
 std::vector<ALS_Path> paths;
 
 void initialize() {
-	// Initialize subsystems
-	pros::lcd::initialize();
-	pros::lcd::print(0, "Reg: Initialize");
+    SerialProtocol::setUpVexSerial();
+    pros::lcd::initialize();
+    pros::lcd::print(0, "MPC Serial Initialization");
 
-	// logger setup
-	Logger::getInstance().init("/usd/log.txt");
+    Logger::getInstance().init("/usd/log.txt");
 	LOG("Program Start");
-	
-	// imu setup
-	imu.reset();
-	while (imu.is_calibrating()) {
-		pros::delay(20);
-	}
+    
+    imu.reset();
+    while (imu.is_calibrating()) {
+        pros::delay(20);
+    }
 
-	// path setup
-	printf("[MAIN] Loading paths...\n");
+    printf("[MAIN] Loading paths...\n");
 	paths = Path::buildAllPathsFromJerryIO("/usd/path.jerryio.txt");
 	printf("[MAIN] Paths loaded: %zu\n", paths.size());
 	if (paths.size() != PathName::COUNT) {
@@ -43,7 +39,13 @@ void initialize() {
 		pros::lcd::print(1, "Trajectories Loaded");
 	}
 
-	// object handler setup
+
+    constexpr double GEAR_RATIO = 450.0 / 600.0;
+    MPCSerial::Params mpc_serial_params(0.02, GEAR_RATIO);
+    mpc_serial_controller = new MPCSerial(mpc_serial_params);
+    pathFollower = new PathFollower(*mpc_serial_controller);
+
+    // object handler setup
 	// pros::Task frame_task(UpdateFrame_task_fn, (void*)"PROS_Task_Param", TASK_PRIORITY_DEFAULT, TASK_STACK_DEPTH_DEFAULT, "Vision Frame Update");
 	printf("[MAIN] Initialize complete\n");
 }
@@ -51,9 +53,9 @@ void initialize() {
 void disabled() {}
 
 void competition_initialize() {}
-//all after path actions are commented out for path testing purposes
+
 void autonomous() {
-	printf("[MAIN] Starting autonomous()\n");
+    printf("[MAIN] Starting autonomous()\n");
 	
 	if (paths.size() <= PathName::FIRST_PATH) {
 		printf("[MAIN-ERROR] FIRST_PATH index out of bounds! Array size is %zu\n", paths.size());
@@ -61,99 +63,83 @@ void autonomous() {
 	}
 
 	printf("[MAIN] Setting FIRST_PATH...\n");
-	// purePursuit.setPath(paths[PathName::FIRST_PATH]);
+	pathFollower->setPath(paths[PathName::FIRST_PATH]);
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
-	// while (not purePursuit.step()) {
+	while (not pathFollower->step()) {
 		pros::delay(20);
-	// }
+	}
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
 
 	printf("[MAIN] Delaying 2000ms...\n");
 	pros::delay(2000);
 
-	// if (paths.size() <= PathName::SECOND_PATH) {
+	if (paths.size() <= PathName::SECOND_PATH) {
 		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
 		return;
-	// }
+	}
 
 	printf("[MAIN] Setting SECOND_PATH...\n");
-	// purePursuit.setPath(paths[PathName::SECOND_PATH]);
+	pathFollower->setPath(paths[PathName::SECOND_PATH]);
 	printf("[MAIN] SECOND_PATH set. Tracking...\n");
-	// while (not purePursuit.step()) {
+	while (not pathFollower->step()) {
 		pros::delay(20);
-	// }
+	}
 	printf("[MAIN] SECOND_PATH tracking complete.\n");
-
+    
 }
 
 void opcontrol() {
-	leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
-	rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
+    leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
+    rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
+    descorer.set_value(true);
+    intake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 
-	descorer.set_value(true);
-
-	intake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
-
-	lever.move(-HIGH_VOLTAGE);
-	pros::delay(100);
+    lever.move(-HIGH_VOLTAGE);
+    pros::delay(100);
     lever.move(STOP);
-	lever.set_zero_position(lever.get_position());
+    lever.set_zero_position(lever.get_position());
 
-	// bool raised = false;
-	// bool lowered = true;
-	// bool leverToggle = false;
-
-	
-    bool lifterUp =  true;
-
+    bool lifterUp = true;
     uint32_t leverMoveStart = pros::millis();
     bool leverMovingDown = false;
     uint32_t timeToMoveLeverDown = 500;
 
-	while(true){
+    while (true) {
+        drive(DriveType::SPLIT_ARCADE);
 
-		drive(DriveType::SPLIT_ARCADE);
+        if (controller.get_digital(DIGITAL_R1)) {
+            intake.move(HIGH_VOLTAGE);
+        } else if (controller.get_digital(DIGITAL_L2)) {
+            intake.move(-HIGH_VOLTAGE);
+        } else {
+            intake.move(STOP);
+        }
 
-		// NEW INTAKE
-		if (controller.get_digital(DIGITAL_R1)) { // intake
-			intake.move(HIGH_VOLTAGE);
-		} else if (controller.get_digital(DIGITAL_L2)) { // outtake
-			intake.move(-HIGH_VOLTAGE);
-		} else {
-			intake.move(STOP);
-		}
-
-		// Matchloader
-		if (controller.get_digital(DIGITAL_Y)) {
-			matchloader.set_value(true); //r
-		} else {
-			matchloader.set_value(false); //r
-		}
+        if (controller.get_digital(DIGITAL_Y)) {
+            matchloader.set_value(true);
+        } else {
+            matchloader.set_value(false);
+        }
         
-        // Raise Lifter
         if (controller.get_digital_new_press(DIGITAL_RIGHT)) {
-            // scoringLifter.toggle();
             lifterUp = !lifterUp;
         }
 
-		// Descore Wing
         if (controller.get_digital(DIGITAL_L1)) {
             descorer.set_value(false);
         } else {
             descorer.set_value(lifterUp);
         }
 
-		// Lever Hold
-		if (controller.get_digital_new_press(DIGITAL_R2)) {
+        if (controller.get_digital_new_press(DIGITAL_R2)) {
             leverMovingDown = false;
-			lever.move(MAX_VOLTAGE);
-			ballBlocker.set_value(true);
-		} else if(controller.get_digital_new_release(DIGITAL_R2)){
+            lever.move(MAX_VOLTAGE);
+            ballBlocker.set_value(true);
+        } else if (controller.get_digital_new_release(DIGITAL_R2)) {
             leverMovingDown = true;
             leverMoveStart = pros::millis();
-			// lever.move_absolute(5, 100);
-			ballBlocker.set_value(false);
-		}
+            ballBlocker.set_value(false);
+        }
 
         if (leverMovingDown) {
             if (pros::millis() - leverMoveStart > timeToMoveLeverDown) {
@@ -165,143 +151,102 @@ void opcontrol() {
         }
 
         scoringLifter.set_value(lifterUp);
-
-		// Delay added to prevent crashing
-		pros::delay(20);
-	}
+        pros::delay(20);
+    }
 }
 
 void drive(DriveType type) {
-	if (!controller.get_digital(DIGITAL_UP) && !controller.get_digital(DIGITAL_DOWN)) {
-		switch (type) {
-			case DriveType::TANK: {
-				// Get joystick values
-				int leftY = controller.get_analog(ANALOG_LEFT_Y);
-				int rightY = controller.get_analog(ANALOG_RIGHT_Y);
+    if (!controller.get_digital(DIGITAL_UP) && !controller.get_digital(DIGITAL_DOWN)) {
+        switch (type) {
+            case DriveType::TANK: {
+                int leftY = controller.get_analog(ANALOG_LEFT_Y);
+                int rightY = controller.get_analog(ANALOG_RIGHT_Y);
 
-				// Dead zone for both motors
-				if(abs(leftY) > DEADZONE) {
-					leftMotors.move_voltage(leftY * 12000 / 127);
-				} else {
-					leftMotors.move_voltage(0);
-				}
+                if (abs(leftY) > DEADZONE) {
+                    leftMotors.move_voltage(leftY * 12000 / 127);
+                } else {
+                    leftMotors.move_voltage(0);
+                }
 
-				if(abs(rightY) > DEADZONE) {
-					rightMotors.move_voltage(rightY * 12000 / 127);
-				} else { 
-					rightMotors.move_voltage(0);
-				}
-				break;
-			}
-			case DriveType::SPLIT_ARCADE: {
-                int left_adjusted, right_adjusted;
+                if (abs(rightY) > DEADZONE) {
+                    rightMotors.move_voltage(rightY * 12000 / 127);
+                } else { 
+                    rightMotors.move_voltage(0);
+                }
+                break;
+            }
+            case DriveType::SPLIT_ARCADE: {
+                int power = controller.get_analog(ANALOG_LEFT_Y);
+                int turn = controller.get_analog(ANALOG_RIGHT_X);
 
-				// Get joystick values
-				int power = controller.get_analog(ANALOG_LEFT_Y);
-				int turn = controller.get_analog(ANALOG_RIGHT_X);
+                int left = power + turn;
+                int right = power - turn;
 
-                // pros::lcd::print(0, "Power: %d", power);
-                // pros::lcd::print(1, "Turn: %d", turn);
+                int left_adjusted = left * 12000 / 127;
+                int right_adjusted = right * 12000 / 127;
 
-				int left = power + turn;
-				int right = power - turn;
+                if (abs(left) > DEADZONE) {
+                    leftMotors.move_voltage(left_adjusted);
+                } else {
+                    leftMotors.move_voltage(0);
+                }
 
-				// int left_adjusted = left * 600 / 127;
-				// int right_adjusted = right * 600 / 127;
-                left_adjusted = left * 12000 / 127;
-                right_adjusted = right * 12000 / 127;
-
-				// Dead zone for both motors
-				if(abs(left) > DEADZONE) {
-					leftMotors.move_voltage(left_adjusted);
-				} else {
-					leftMotors.move_voltage(0);
-				}
-
-				if(abs(right) > DEADZONE) {
-					rightMotors.move_voltage(right_adjusted);
-				} else { 
-					rightMotors.move_voltage(0);
-				}
-
-                // pros::lcd::print(0, "Left: %d", left_adjusted);
-                // pros::lcd::print(1, "Right: %d", right_adjusted);
-
-				break;
-			}
-		}
-	} else {
-		if (controller.get_digital(DIGITAL_UP)) { // slow move forward
-			leftMotors.move_voltage(LOW_VOLTAGE * 12000 / 127);
-			rightMotors.move_voltage(LOW_VOLTAGE * 12000 / 127);
-		} else if (controller.get_digital(DIGITAL_DOWN)){ // slow move backward
-			leftMotors.move_voltage(-LOW_VOLTAGE * 12000 / 127);
-			rightMotors.move_voltage(-LOW_VOLTAGE * 12000 / 127);
-		}
-	}
+                if (abs(right) > DEADZONE) {
+                    rightMotors.move_voltage(right_adjusted);
+                } else { 
+                    rightMotors.move_voltage(0);
+                }
+                break;
+            }
+        }
+    } else {
+        if (controller.get_digital(DIGITAL_UP)) {
+            leftMotors.move_voltage(LOW_VOLTAGE * 12000 / 127);
+            rightMotors.move_voltage(LOW_VOLTAGE * 12000 / 127);
+        } else if (controller.get_digital(DIGITAL_DOWN)) {
+            leftMotors.move_voltage(-LOW_VOLTAGE * 12000 / 127);
+            rightMotors.move_voltage(-LOW_VOLTAGE * 12000 / 127);
+        }
+    }
 }
 
-
-
-// score
 void score() {
-	// lever up
     intake.move(MAX_VOLTAGE);
-	pros::delay(500);
+    pros::delay(500);
 
     lever.move(125);
     pros::delay(500);
     intake.move(-MAX_VOLTAGE);
     pros::delay(500);
 
-	// lever down
-	lever.move(-MAX_VOLTAGE);
-	pros::delay(600);
-	lever.move(STOP);
+    lever.move(-MAX_VOLTAGE);
+    pros::delay(600);
+    lever.move(STOP);
 
     intake.move(STOP);
     pros::delay(100);
 }
 
-
 void matchload(int numRam) {
     intake.move(MAX_VOLTAGE);
     pros::delay(300);
 
-	for (int i = 0; i < numRam; i++) {
-		leftMotors.move_velocity(-70);
-		rightMotors.move_velocity(-70);
-		pros::delay(400);
-		leftMotors.move_velocity(0);
-		rightMotors.move_velocity(0);
-		pros::delay(300);
-		leftMotors.move_velocity(70);
-		rightMotors.move_velocity(70);
-		pros::delay(350); //400
-		leftMotors.move_velocity(0);
-		rightMotors.move_velocity(0);
-		pros::delay(500);
-	}
+    for (int i = 0; i < numRam; i++) {
+        leftMotors.move_velocity(-70);
+        rightMotors.move_velocity(-70);
+        pros::delay(400);
+        leftMotors.move_velocity(0);
+        rightMotors.move_velocity(0);
+        pros::delay(300);
+        leftMotors.move_velocity(70);
+        rightMotors.move_velocity(70);
+        pros::delay(350);
+        leftMotors.move_velocity(0);
+        rightMotors.move_velocity(0);
+        pros::delay(500);
+    }
     intake.move(STOP);
 }
-
-// void fullMatchload() {
-// 	intake.move(MAX_VOLTAGE);
-//     pros::delay(300);
-//     leftMotors.move_velocity(-70);
-//     rightMotors.move_velocity(-70);
-//     pros::delay(250);
-// 	leftMotors.move_velocity(0);
-// 	rightMotors.move_velocity(0);
-// 	pros::delay(250);
-//     leftMotors.move_velocity(70);
-//     rightMotors.move_velocity(70);
-//     pros::delay(250);
-//     leftMotors.move_velocity(0);
-//     rightMotors.move_velocity(0);
-// 	pros::delay(400);
-//     intake.move(STOP);
-// }
 
 void wallBall() {
     int turnSpeed = 40;

@@ -1,5 +1,4 @@
 # Robot-Core
-
 Core backend code for Daydream Robotics' VEX U robots.
 
 Robot-Core contains the shared robot systems that run on the V5 Brain, including autonomous logic, odometry, PID control, path following, subsystem control, helper utilities, and path files. This repository is intended to serve as the common backend foundation for both robots.
