@@ -9,7 +9,6 @@
 
 enum PathName {
     FIRST_PATH,
-    SECOND_PATH,
     COUNT
 };
 

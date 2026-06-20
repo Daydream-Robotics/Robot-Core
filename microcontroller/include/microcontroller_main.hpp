@@ -1,6 +1,0 @@
-#ifndef _MICROCONTROLLER_MAIN_HPP_
-#define _MICROCONTROLLER_MAIN_HPP_
-
-
-
-#endif
