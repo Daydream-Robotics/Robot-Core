@@ -25,3 +25,82 @@ This is the penalty weight of change in control input.
 
 ### p_theta
 - Start with p_theta = 100.0 If the robot tracks straight lines perfectly but cuts corners on sharp turns, increase by 50
+
+
+
+How to do main properly:
+at top:
+```
+MPCSerial* mpc_serial_controller = nullptr;
+PathFollower* pathFollower = nullptr;
+```
+in ```initialize()```:
+```
+SerialProtocol::setUpVexSerial();
+    pros::lcd::initialize();
+    pros::lcd::print(0, "MPC Serial Initialization");
+
+    Logger::getInstance().init("/usd/log.txt");
+	LOG("Program Start");
+    
+    imu.reset();
+    while (imu.is_calibrating()) {
+        pros::delay(20);
+    }
+
+    printf("[MAIN] Loading paths...\n");
+	paths = Path::buildAllPathsFromJerryIO("/usd/path.jerryio.txt");
+	printf("[MAIN] Paths loaded: %zu\n", paths.size());
+	if (paths.size() != PathName::COUNT) {
+		printf("[MAIN] ERROR: Path count mismatch\n");
+		pros::lcd::print(1, "ERROR: Path count mismatch");
+		pros::lcd::print(2, "Expected: %d, Actual: %d", PathName::COUNT, paths.size());
+	} else {
+		printf("[MAIN] Trajectories Loaded successfully\n");
+		pros::lcd::print(1, "Trajectories Loaded");
+	}
+
+
+    constexpr double GEAR_RATIO = 450.0 / 600.0;
+    MPCSerial::Params mpc_serial_params(0.02, GEAR_RATIO);
+    mpc_serial_controller = new MPCSerial(mpc_serial_params);
+    pathFollower = new PathFollower(*mpc_serial_controller);
+
+    // object handler setup
+	// pros::Task frame_task(UpdateFrame_task_fn, (void*)"PROS_Task_Param", TASK_PRIORITY_DEFAULT, TASK_STACK_DEPTH_DEFAULT, "Vision Frame Update");
+	printf("[MAIN] Initialize complete\n");
+```
+
+in ```auton()``:
+```
+ printf("[MAIN] Starting autonomous()\n");
+	
+	if (paths.size() <= PathName::FIRST_PATH) {
+		printf("[MAIN-ERROR] FIRST_PATH index out of bounds! Array size is %zu\n", paths.size());
+		return;
+	}
+
+	printf("[MAIN] Setting FIRST_PATH...\n");
+	pathFollower->setPath(paths[PathName::FIRST_PATH]);
+	printf("[MAIN] FIRST_PATH set. Tracking...\n");
+	while (not pathFollower->step()) {
+		pros::delay(20);
+	}
+	printf("[MAIN] FIRST_PATH tracking complete.\n");
+
+	printf("[MAIN] Delaying 2000ms...\n");
+	pros::delay(2000);
+
+	if (paths.size() <= PathName::SECOND_PATH) {
+		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
+		return;
+	}
+
+	printf("[MAIN] Setting SECOND_PATH...\n");
+	pathFollower->setPath(paths[PathName::SECOND_PATH]);
+	printf("[MAIN] SECOND_PATH set. Tracking...\n");
+	while (not pathFollower->step()) {
+		pros::delay(20);
+	}
+	printf("[MAIN] SECOND_PATH tracking complete.\n");
+```
