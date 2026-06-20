@@ -79,7 +79,7 @@ MPCSerial::InterpSample MPCSerial::sampleAtArcLength(const std::vector<Sample>& 
 }
 
 //pack current state + build reference trajectory into update packet
-MPCSerial::MPCUpdatePacket MPCSerial::buildUpdatePacket(const Pose& currentPose, const std::vector<Sample>& samples, std::size_t idx, double omega_L, double omega_R, double V_battery, double I_total) {
+MPCSerial::MPCUpdatePacket MPCSerial::buildUpdatePacket(const Pose& currentPose, const std::vector<Sample>& samples, std::size_t idx, PathFollower::Flags flag, double omega_L, double omega_R, double V_battery, double I_total) {
     MPCUpdatePacket p{};
 
     p.pose_x = static_cast<float>(currentPose.x);
@@ -108,17 +108,22 @@ MPCSerial::MPCUpdatePacket MPCSerial::buildUpdatePacket(const Pose& currentPose,
         // sample at new arc length for reference
         InterpSample ref = sampleAtArcLength(samples, s);
 
+        double refTheta = ref.theta;
+        if (flag == PathFollower::REVERSE) {
+            refTheta = wrapAngle(refTheta + M_PI);
+        }
+
         // pack into flat array: x, y, theta per stage
         std::size_t base = i * 3;
         p.z_desired[base + 0] = static_cast<float>(ref.x);
         p.z_desired[base + 1] = static_cast<float>(ref.y);
-        p.z_desired[base + 2] = static_cast<float>(ref.theta);
+        p.z_desired[base + 2] = static_cast<float>(refTheta);
     }
     return p;
 }
 
 //public compute: read sensors, call private compute
-WheelVelocities MPCSerial::compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestIdx) {
+WheelVelocities MPCSerial::compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestIdx, PathFollower::Flags flag) {
 
     //convert motor RPM to rad/s at wheels
     double raw_omega_L = leftMotors.get_actual_velocity(0) * 2.0 * M_PI / 60.0;
@@ -130,14 +135,14 @@ WheelVelocities MPCSerial::compute(const Pose& currentPose, const ALS_Path& path
     double V_battery = pros::battery::get_voltage() / 1000.0;
     double I_total = pros::battery::get_current() / 1000.0; 
 
-    return compute(currentPose, path, closestIdx, wheel_omega_L, wheel_omega_R, V_battery, I_total);
+    return compute(currentPose, path, closestIdx, flag, wheel_omega_L, wheel_omega_R, V_battery, I_total);
 }
 
 // private compute: send to microcontroller, receive optimal voltages
 //builds packet, sends via serial, blocks for response from microcontroller
-WheelVelocities MPCSerial::compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestIdx, double omega_L, double omega_R, double V_battery, double I_total) {
+WheelVelocities MPCSerial::compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestIdx, PathFollower::Flags flag, double omega_L, double omega_R, double V_battery, double I_total) {
     //pack current state + F-stage reference trajectory
-    MPCUpdatePacket req = buildUpdatePacket(currentPose, path.getSamples(), closestIdx, omega_L, omega_R, V_battery, I_total);
+    MPCUpdatePacket req = buildUpdatePacket(currentPose, path.getSamples(), closestIdx, flag, omega_L, omega_R, V_battery, I_total);
     fflush(stdout);
     std::fflush(stdout);
 

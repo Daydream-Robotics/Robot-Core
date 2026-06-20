@@ -7,8 +7,14 @@ class PathFollower {
         PathFollower(MotionController& controller);
         ~PathFollower() = default;
 
-        void setPath(ALS_Path& path);
+        enum Flags {
+            FORWARDS,
+            REVERSE
+        };
+        
+        void setPath(ALS_Path& path, Flags flag = FORWARDS);
         bool step();
+
 
     private:
         MotionController& m_controller;
@@ -17,4 +23,6 @@ class PathFollower {
         std::size_t m_currentSampleIdx = 0;
         double m_distanceFromEnd = 999.0;
         bool m_isFinished = false;
+
+        Flags flag = FORWARDS;
 };
