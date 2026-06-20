@@ -1,7 +1,6 @@
 #pragma once
 #include "arclengthSplining.hpp"
 #include "motionController.hpp"
-#include "pathFlags.hpp"
 
 class PathFollower {
     public:

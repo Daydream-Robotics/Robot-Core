@@ -1,7 +1,6 @@
 #pragma once
 #include "arclengthSplining.hpp"
 #include "odometry.hpp"
-#include "pathFlags.hpp"
 
 
 enum class ControlMode {
@@ -9,6 +8,10 @@ enum class ControlMode {
     INPUT_VOLTAGE
 };
 
+enum class PathFlag {
+    FORWARDS,
+    REVERSE
+};
 
 struct WheelVelocities {
     double left;

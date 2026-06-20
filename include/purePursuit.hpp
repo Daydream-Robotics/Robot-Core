@@ -5,7 +5,6 @@
 #include "helpers.hpp"
 #include "arclengthSplining.hpp"
 #include "motionController.hpp"
-#include "pathFlags.hpp"
 
 constexpr double MAX_LOOKAHEAD_DIST = 25.0;
 constexpr double MIN_LOOKAHEAD_DIST = 15.0;
