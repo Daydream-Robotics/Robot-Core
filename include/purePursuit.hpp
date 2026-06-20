@@ -46,7 +46,7 @@ class PurePursuitController : public MotionController {
         PurePursuitController();
         virtual ~PurePursuitController() = default;
 
-        WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) override;
+        WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx, PathFlag flag) override;
 
         void reset() override;
 

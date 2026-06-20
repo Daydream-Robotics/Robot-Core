@@ -592,9 +592,10 @@
       }
     },
     "upload_options": {
-      "slot": 8,
+      "slot": 1,
       "icon": "X",
-      "description": "My PROS Project"
+      "description": "My PROS Project",
+      "after": "run"
     },
     "use_early_access": false
   }

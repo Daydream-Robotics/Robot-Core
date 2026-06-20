@@ -16,7 +16,7 @@ void PurePursuitController::reset() {
 }
 
 
-WheelVelocities PurePursuitController::compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) {
+WheelVelocities PurePursuitController::compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx, PathFlag flag) {
 
     Sample currentSample = als_path.getSamples()[closestSampleIdx];
 

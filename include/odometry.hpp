@@ -1,5 +1,6 @@
 #pragma once
-#include "pros/rtos.hpp"
+
+#include "main.h"
 
 struct OdomConfig {
     double parallelWheelDiameter;
