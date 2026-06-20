@@ -1,7 +1,7 @@
 #pragma once
 #include "arclengthSplining.hpp"
 #include "odometry.hpp"
-#include "pathFollower.hpp"
+#include "pathFlags.hpp"
 
 
 enum class ControlMode {
@@ -20,7 +20,7 @@ struct WheelVelocities {
 class MotionController {
     public:
         virtual ~MotionController() = default;
-        virtual WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx, PathFollower::Flags flag) = 0;
+        virtual WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx, PathFlag flag) = 0;
         
         /**
          * @brief resets tracking variables to inital values

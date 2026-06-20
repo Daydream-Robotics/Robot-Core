@@ -5,6 +5,7 @@
 #include "helpers.hpp"
 #include "arclengthSplining.hpp"
 #include "motionController.hpp"
+#include "pathFlags.hpp"
 
 constexpr double MAX_LOOKAHEAD_DIST = 25.0;
 constexpr double MIN_LOOKAHEAD_DIST = 15.0;
@@ -46,7 +47,7 @@ class PurePursuitController : public MotionController {
         PurePursuitController();
         virtual ~PurePursuitController() = default;
 
-        WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) override;
+        WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx, PathFlag flag) override;
 
         void reset() override;
 
