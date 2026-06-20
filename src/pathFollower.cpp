@@ -5,7 +5,8 @@
 PathFollower::PathFollower(MotionController& controller)
      : m_controller(controller) {}
 
-void PathFollower::setPath(ALS_Path& path) {
+void PathFollower::setPath(ALS_Path& path, Flags flag) {
+    this->flag = flag;
     m_path = &path;
     m_currentSampleIdx = 0;
     m_isFinished = false;
@@ -42,11 +43,22 @@ bool PathFollower::step() {
         m_isFinished = true;
         return true;
     }
-
-    WheelVelocities wheelVelocities = m_controller.compute(currentPose, *m_path, m_currentSampleIdx);
+    // pros::lcd::print(0, "run");
+    WheelVelocities wheelVelocities = m_controller.compute(currentPose, *m_path, m_currentSampleIdx, flag);
     
-    leftMotors.move_velocity(wheelVelocities.left);
-    rightMotors.move_velocity(wheelVelocities.right);
+    switch(wheelVelocities.input){
+        case ControlMode::INPUT_VELOCITY:
+            leftMotors.move_velocity(wheelVelocities.left);
+            rightMotors.move_velocity(wheelVelocities.right);
+            break;
+        case ControlMode::INPUT_VOLTAGE:
+            leftMotors.move_voltage(wheelVelocities.left);
+            rightMotors.move_voltage(wheelVelocities.right);
+            break;
+        default:
+            break;
+    }
+    
 
     return false;
 }
