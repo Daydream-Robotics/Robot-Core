@@ -10,7 +10,7 @@
 *.userosscache
 *.sln.docstates
 *.env
-
+tests/*.cpp
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
@@ -430,3 +430,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# c++ vscode commands file
+compile_commands.json
