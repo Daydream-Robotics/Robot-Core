@@ -25,6 +25,12 @@ WheelVelocities PurePursuitController::compute(const Pose& currentPose, const AL
     
     Position targetPoint;
 
+    // create virtual pose
+    Pose virtualPose = currentPose;
+    if (flag == PathFlag::REVERSE) {
+        virtualPose.theta = angleDiffRad(currentPose.theta + M_PI, 0);
+    }
+
     // if dist to end is less than lookahead, use ghost point to prevent aggressive braking
     m_distFromEnd = als_path.getTotalLength() - currentSample.s;
     if (m_distFromEnd < m_lookAheadDist) {
@@ -45,7 +51,7 @@ WheelVelocities PurePursuitController::compute(const Pose& currentPose, const AL
     }
 
     // translate coordinates to robot frame
-    Position robotFrameTargetPt = convertPtToRobotFrame(targetPoint, currentPose);
+    Position robotFrameTargetPt = convertPtToRobotFrame(targetPoint, virtualPose);
 
     // get the curvature to the target point
     double steeringCurvature = calculateCurvature(robotFrameTargetPt);
@@ -57,10 +63,15 @@ WheelVelocities PurePursuitController::compute(const Pose& currentPose, const AL
     // Direction is selected externally for the whole path.
     // int base_vel = static_cast<int>(getBaseVelocity(pathMaxCurvature, m_speedAdjustmentConst) * velocityDirection);
     int base_vel = static_cast<int>(getBaseVelocity(pathMaxCurvature));
+
+    if (flag == PathFlag::REVERSE) {
+        base_vel = -base_vel;
+    }
     
     // !IMPORTANT! If reverse tracking steers the wrong way, flip the sign of curvature
-    double left_target = base_vel - (steeringCurvature * base_vel * TURN_RATE);
-    double right_target = base_vel + (steeringCurvature * base_vel * TURN_RATE);
+    double turn_vel = steeringCurvature * std::abs(base_vel) * TURN_RATE;
+    double left_target = base_vel - turn_vel;
+    double right_target = base_vel + turn_vel;
 
     // Maintain the turn ratio if the requested velocity exceeds the motor's physical limit
     double max_req = std::max(std::abs(left_target), std::abs(right_target));
@@ -77,7 +88,7 @@ WheelVelocities PurePursuitController::compute(const Pose& currentPose, const AL
         // pros::lcd::print(1, "Cur: %lf", steeringCurvature);
         // pros::lcd::print(2, "VEL: %d", base_vel);
 
-        double distFromLine = std::hypot(currentSample.x - currentPose.x, currentSample.y - currentPose.y);
+        double distFromLine = std::hypot(currentSample.x - virtualPose.x, currentSample.y - virtualPose.y);
         m_totalDistOff += std::abs(distFromLine);
         // printf("[PP] Pos:(%.2f, %.2f) H:%.2f | Vel:%.2f | LookAhead:%.2f | Dir:%.0f | TgtGlobal:(%.2f, %.2f) TgtLocal:(%.2f, %.2f) | Curv:%.4f | Vels: B:%d L:%d R:%d | OffAtStep: %.4f | AvgDistOff: %.4f\n",
         //        cur_x, cur_y, cur_heading_deg, current_vel, m_lookAheadDist, velocityDirection, targetPoint.x, targetPoint.y,
