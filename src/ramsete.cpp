@@ -26,14 +26,15 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
     // set up virtual pose (this is used to make the robot consider it's back as forward when moving in reverse)
     Pose virtualPose = currentPose;
     if (flag == PathFlag::REVERSE) {
+        // rotate robot orientation 180 degrees to consider the back as forward
         virtualPose.theta = angleDiffRad(currentPose.theta + M_PI, 0.0);
     }
 
-    // get global error
+    // calculate global displacement errors
     double dx = target.x - currentPose.x;
     double dy = target.y - currentPose.y;
 
-    // get local errors
+    // project global errors to local coordinate frame
     double e_x = (std::cos(virtualPose.theta) * dx) + (std::sin(virtualPose.theta) * dy);
     double e_y = (-std::sin(virtualPose.theta) * dx) + (std::cos(virtualPose.theta) * dy);
     double e_theta = angleDiffRad(target.heading, virtualPose.theta);
@@ -41,7 +42,8 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
     // calculate target angular velocity
     double targetAngularVel = target.v * target.curvature;
 
-    // get gain
+    // calculate gain
+    // k = 2 * zeta * sqrt(w_d^2 + b * v_d^2)
     double k = 2.0 * m_zeta * std::sqrt(std::pow(targetAngularVel,2) + (m_b * std::pow(target.v,2)) );
 
     // calculate linear and angular velocity to command
@@ -57,6 +59,7 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
     double leftInchesPerSec = commandLinearVel - (commmandAngularVel * m_trackWidthInches / 2.0);
     double rightInchesPerSec = commandLinearVel + (commmandAngularVel * m_trackWidthInches / 2.0);
 
+    // convert linear wheel speeds from inch/ser to motor rpm
     // TODO: Add gear ratio math
     double inchToRpmConversion = 60.0 / (M_PI * DRIVE_WHEEL_DIAMETER_INCHES);
 
@@ -70,6 +73,6 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
 
 
 double RamseteController::sinc(double x) {
-    if (std::abs(x) < 1e-9) return 1;
+    if (std::abs(x) < 1e-9) return 1; // Mathematical limit of sin(x)/x as x approaches 0
     return std::sin(x) / x;
 }
