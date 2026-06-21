@@ -23,10 +23,10 @@ RamseteController::RamseteController(double b, double zeta, double trackWidthInc
 WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& targetIdx, PathFlag flag) {
     Sample target = als_path.getSamples()[targetIdx];
 
-    double currentTheta = currentPose.theta;
-
+    // set up virtual pose (this is used to make the robot consider it's back as forward when moving in reverse)
+    Pose virtualPose = currentPose;
     if (flag == PathFlag::REVERSE) {
-        currentTheta = angleDiffRad(currentTheta + M_PI, 0.0);
+        virtualPose.theta = angleDiffRad(currentPose.theta + M_PI, 0.0);
     }
 
     // get global error
@@ -34,9 +34,9 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
     double dy = target.y - currentPose.y;
 
     // get local errors
-    double e_x = (std::cos(currentTheta) * dx) + (std::sin(currentTheta) * dy);
-    double e_y = (-std::sin(currentTheta) * dx) + (std::cos(currentTheta) * dy);
-    double e_theta = angleDiffRad(target.heading, currentTheta);
+    double e_x = (std::cos(virtualPose.theta) * dx) + (std::sin(virtualPose.theta) * dy);
+    double e_y = (-std::sin(virtualPose.theta) * dx) + (std::cos(virtualPose.theta) * dy);
+    double e_theta = angleDiffRad(target.heading, virtualPose.theta);
 
     // calculate target angular velocity
     double targetAngularVel = target.v * target.curvature;
