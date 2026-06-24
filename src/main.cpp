@@ -6,12 +6,15 @@
 #include "paths.hpp"
 #include "pathFollower.hpp"
 #include "purePursuit.hpp"
+#include "stanley.hpp"
+
 
 // #include "slam.h"
 // #include "objectHandler.h"
 // #include <numbers>
 // #include "arclengthSplining.hpp"
 
+StanleyController stan = StanleyController();
 Autonomous auton = Autonomous();
 
 PurePursuitController purePursuit = PurePursuitController();
@@ -40,7 +43,7 @@ void initialize() {
 	printf("[MAIN] Paths loaded: %zu\n", paths.size());
 	if (paths.size() != PathName::COUNT) {
 		printf("[MAIN] ERROR: Path count mismatch\n");
-		pros::lcd::print(1, "ERROR: Path count mismatch");
+		pros::lcd::print(1, "EsRROR: Path count mismatch");
 		pros::lcd::print(2, "Expected: %d, Actual: %d", PathName::COUNT, paths.size());
 	} else {
 		printf("[MAIN] Trajectories Loaded successfully\n");
@@ -65,9 +68,9 @@ void autonomous() {
 	}
 
 	printf("[MAIN] Setting FIRST_PATH...\n");
-	pathFollower.setPath(paths[PathName::FIRST_PATH]);
+	stan.setPath(paths[PathName::FIRST_PATH]);
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
-	while (not pathFollower.step()) {
+	while (not stan.step()) {
 		pros::delay(20);
 	}
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
@@ -136,9 +139,23 @@ void opcontrol() {
         
         // Raise Lifter
         if (controller.get_digital_new_press(DIGITAL_RIGHT)) {
-            // scoringLifter.toggle();
-            lifterUp = !lifterUp;
-        }
+            if (paths.size() <= PathName::FIRST_PATH) {
+				printf("[MAIN-ERROR] FIRST_PATH index out of bounds! Array size is %zu\n", paths.size());
+				return;
+			}
+
+			printf("[MAIN] Setting FIRST_PATH...\n");
+			stan.setPath(paths[PathName::FIRST_PATH]);
+			printf("[MAIN] FIRST_PATH set. Tracking...\n");
+			while (not stan.step(-1)) {
+				pros::delay(20);
+			}
+
+			printf("[MAIN] FIRST_PATH tracking complete.\n");
+
+			printf("[MAIN] Delaying 2000ms...\n");
+			pros::delay(2000);
+		}
 
 		// Descore Wing
         if (controller.get_digital(DIGITAL_L1)) {

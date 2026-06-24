@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "W_AWP",
+    "project_name": "Stanley Controller",
     "target": "v5",
     "templates": {
       "kernel": {
@@ -592,9 +592,9 @@
       }
     },
     "upload_options": {
-      "slot": 8,
-      "icon": "X",
-      "description": "My PROS Project"
+      "slot": 7,
+      "icon": "alien",
+      "description": "Stanley Controller Feature Testing"
     },
     "use_early_access": false
   }

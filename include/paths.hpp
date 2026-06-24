@@ -14,6 +14,7 @@
 enum PathName {
     FIRST_PATH,
     SECOND_PATH,
+    THIRD_PATH,
     COUNT
 };
 

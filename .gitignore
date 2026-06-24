@@ -430,6 +430,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
-
-# c++ vscode commands file
+/.d
+/.vscode
 compile_commands.json
