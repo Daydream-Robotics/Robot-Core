@@ -29,11 +29,15 @@ public:
         }
     }
 
+    bool sdAvailable() const { 
+        return pros::usd::is_installed(); 
+    }
+
     // prevent copies
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
 
-private:
+protected:
     Logger() = default;
     ~Logger() { close(); }
     FILE* m_file = nullptr;
