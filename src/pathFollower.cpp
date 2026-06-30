@@ -5,7 +5,11 @@
 PathFollower::PathFollower(MotionController& controller)
      : m_controller(controller) {}
 
-void PathFollower::setPath(ALS_Path& path, PathFlag flag) {
+void PathFollower::setPath(ALS_Path& path, PathFlag flag, bool logging, const char* baseName) {
+    this->logging = logging;
+    if (logging) {
+        path_log.emplace(LoggerType::PATH, baseName);
+    }
     this->flag = flag;
     m_path = &path;
     m_currentSampleIdx = 0;
@@ -34,7 +38,7 @@ bool PathFollower::step() {
         return true;
     }
 
-    Sample targetSample = m_path->getSamples()[m_currentSampleIdx];
+    Sample targetSample = m_path->getSamples()[m_currentSampleIdx];    
     m_distanceFromEnd = m_path->getTotalLength() - targetSample.s;
 
     if (m_distanceFromEnd < END_TOLERANCE) {
@@ -43,7 +47,6 @@ bool PathFollower::step() {
         m_isFinished = true;
         return true;
     }
-    // pros::lcd::print(0, "run");
     WheelVelocities wheelVelocities = m_controller.compute(currentPose, *m_path, m_currentSampleIdx, flag);
     
     switch(wheelVelocities.input){
@@ -58,7 +61,9 @@ bool PathFollower::step() {
         default:
             break;
     }
-    
+    if (logging && path_log) {
+        path_log->log(Waypoint{targetSample.x, targetSample.y, targetSample.v}, Waypoint{currentPose.x, currentPose.y, 0.0}, pros::millis()/1000);
+    }
 
     return false;
 }

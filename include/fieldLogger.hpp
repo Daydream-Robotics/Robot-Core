@@ -124,23 +124,23 @@ class FieldLogger: public Logger {
         int flush_counter;
 
 
-        void logPath(const Waypoint& target, const Waypoint& current, double t) {
+        void logPath(const Waypoint& target, const Waypoint& current, double time) {
             if(log_type != LoggerType::PATH ) {
                 return;
             }
 
             if (target_pos_file) {
-                fprintf(target_pos_file, "%.4f %.4f %.4f\n", t, target.x, target.y);
+                fprintf(target_pos_file, "%.4f %.4f %.4f\n", time, target.x, target.y);
             }
             if (actual_pos_file) {
-                fprintf(actual_pos_file, "%.4f %.4f %.4f\n", t, current.x, current.y);
+                fprintf(actual_pos_file, "%.4f %.4f %.4f\n", time, current.x, current.y);
             }
             
             double dx = target.x - current.x;
             double dy = target.y - current.y;
             double error = std::hypot(dx, dy);
             if (error_pos_file) {
-                fprintf(error_pos_file, "%.4f %.4f\n", t, error);
+                fprintf(error_pos_file, "%.4f %.4f\n", time, error);
             }
             
             if (++flush_counter >= 10) {
@@ -149,11 +149,11 @@ class FieldLogger: public Logger {
             }
         }
 
-        void logValue(double value, double t) {
+        void logValue(double value, double time) {
             if((log_type != LoggerType::VALUE) || !value_file) {
                 return;
             }
-            fprintf(value_file, "%.4f %.4f\n", t, value);
+            fprintf(value_file, "%.4f %.4f\n", time, value);
             
             if (++flush_counter >= 10) {
                 flush();
