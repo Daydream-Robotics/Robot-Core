@@ -24,6 +24,8 @@ bool PathFollower::step() {
     if (m_isFinished || !m_path || !m_path->isValid() || m_path->getSamples().empty()) {
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
+        path_log->flush();
+        path_log->close();
         return true;
     }
 

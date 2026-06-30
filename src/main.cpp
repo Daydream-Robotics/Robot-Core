@@ -64,6 +64,8 @@ void autonomous() {
 		printf("[MAIN-ERROR] FIRST_PATH index out of bounds! Array size is %zu\n", paths.size());
 		return;
 	}
+
+
 	FieldLogger sin_log(LoggerType::VALUE, "test","sine");
 	printf("[MAIN] Setting FIRST_PATH...\n");
 	pathFollower.setPath(paths[PathName::FIRST_PATH], PathFlag::FORWARDS, true, "test");
@@ -72,24 +74,25 @@ void autonomous() {
 		sin_log.log(sin(pros::millis()/1000), pros::millis()/1000);
 		pros::delay(20);
 	}
-	pros::lcd::print(0, "DOne");
+	sin_log.flush();
+	sin_log.close();
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
 
 	printf("[MAIN] Delaying 2000ms...\n");
 	pros::delay(2000);
 
-	// if (paths.size() <= PathName::SECOND_PATH) {
-	// 	printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
-	// 	return;
-	// }
+	if (paths.size() <= PathName::SECOND_PATH) {
+		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
+		return;
+	}
 
-	// printf("[MAIN] Setting SECOND_PATH...\n");
-	// pathFollower.setPath(paths[PathName::SECOND_PATH]);
-	// printf("[MAIN] SECOND_PATH set. Tracking...\n");
-	// while (not pathFollower.step()) {
-	// 	pros::delay(20);
-	// }
-	// printf("[MAIN] SECOND_PATH tracking complete.\n");
+	printf("[MAIN] Setting SECOND_PATH...\n");
+	pathFollower.setPath(paths[PathName::SECOND_PATH], PathFlag::REVERSE, true, "test_back");
+	printf("[MAIN] SECOND_PATH set. Tracking...\n");
+	while (not pathFollower.step()) {
+		pros::delay(20);
+	}
+	printf("[MAIN] SECOND_PATH tracking complete.\n");
 
 }
 
