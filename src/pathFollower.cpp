@@ -47,7 +47,7 @@ bool PathFollower::step() {
         return true;
     }
 
-    Sample targetSample = m_path->getSamples()[m_currentSampleIdx];
+    Sample targetSample = m_path->getSamples()[m_currentSampleIdx];    
     m_distanceFromEnd = m_path->getTotalLength() - targetSample.s;
 
     if (m_distanceFromEnd < END_TOLERANCE) {
@@ -58,7 +58,7 @@ bool PathFollower::step() {
         m_isFinished = true;
         return true;
     }
-    wheelVelocities = m_controller.compute(currentPose, *m_path, m_currentSampleIdx, flag);
+    WheelVelocities wheelVelocities = m_controller.compute(currentPose, *m_path, m_currentSampleIdx, flag);
     
     switch(wheelVelocities.input){
         case ControlMode::INPUT_VELOCITY:

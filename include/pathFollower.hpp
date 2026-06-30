@@ -2,6 +2,7 @@
 #include "arclengthSplining.hpp"
 #include "motionController.hpp"
 #include "fieldLogger.hpp"
+#include "fieldLogger.hpp"
 
 class PathFollower {
     public:
@@ -18,12 +19,7 @@ class PathFollower {
         double m_distanceFromEnd = 999.0;
         bool m_isFinished = false;
 
-        PathFlag flag = PathFlag::FORWARDS;
-        Pose currentPose = {0,0,0};
+        PathFlag flag = PathFlag::FORWARDS;     /**< Direction config parameter */
         std::optional<FieldLogger> path_log;
-        
         bool logging;
 };
-extern double omega_L;
-extern double omega_R;
-extern WheelVelocities wheelVelocities;

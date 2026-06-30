@@ -72,6 +72,7 @@ void autonomous() {
         velocity_log.log(leftMotors.get_actual_velocity(0), pros::millis()/1000.0);
 		pros::delay(20);
 	}
+	pros::lcd::print(0, "DOne");
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
     pros::lcd::print(5, "done");
 
@@ -80,10 +81,10 @@ void autonomous() {
 	printf("[MAIN] Delaying 2000ms...\n");
 	pros::delay(2000);
 
-	if (paths.size() <= PathName::SECOND_PATH) {
-		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
-		return;
-	}
+	// if (paths.size() <= PathName::SECOND_PATH) {
+	// 	printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
+	// 	return;
+	// }
 
 	printf("[MAIN] Setting SECOND_PATH...\n");
 	pathFollower->setPath(paths[PathName::SECOND_PATH], PathFlag::REVERSE, true, "test_reverse");
