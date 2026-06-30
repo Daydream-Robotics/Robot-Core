@@ -9,9 +9,13 @@ class PathFollowingTracking {
         void update(const Pose& pose, const Sample& nearest);
         void reset();
 
+        double getMaxCTE() const { return maxCTE; }
+        double getAvgCTE() const { return avgCTE; }
         double getRMSCTE() const;
-        double getFinalCTE()    const { return finalCTE; }
-        void recordPositionError(const Pose& pose, const Sample& targetSample);
+        double getFinalCTE() const { return finalCTE; }
+        int    getSignChanges() const { return signChanges; }
+        double getPosErrorAtPoint() const { return posErrorAtPoint; }
+
     private:    
         int n = 0;
         /*--------------Distance----------------*/
@@ -47,9 +51,10 @@ class HeadingAccuracyTracking {
         void update(const Pose& pose, const Sample& nearest, double timestamp_s);
         void reset();
 
-        double getMaxError()    const { return maxError; }
-        double getFinalError()  const { return lastError; }
-        double getRMSError()    const;
+        double getMaxError() const { return maxError; }
+        double getFinalError() const { return lastError; }
+        double getRMSError() const;
+        int    getOscillations() const { return oscillations; }
 
     private:
         
@@ -88,6 +93,8 @@ class VelocityTracking {
         void update(const Pose& pose, const Sample& nearest, double parallelVel);
         void reset();
 
+        double getAvgVelocity() const { return avgVel; }
+        double getMaxVelocity() const { return maxVel; }
     private:
         int n = 0;
 
@@ -105,6 +112,12 @@ class EndpointPerformanceTracking {
         void updateSettling(const Pose& pose, const Sample& goal, double timestamp_s);
         void reset();
 
+        double getFinalPositionError() const { return finalPosError; }
+        double getFinalHeadingError()  const { return finalHeadError; }
+        double getTimeToSettle() const {return timeToSettle; }
+        double getCorrectionCount() const { return correctionCount; }
+        double getdistOvershoot() const {return distOvershoot; }
+        double getHeadingOvershoot() const { return headingOvershoot; }
         
     private:
 
@@ -146,6 +159,10 @@ class TimingTracking {
         void finish(double timestamp_s);
         void reset();
 
+        double getTotalTime() const { return totalTime; }
+        double getTimeAboveThreshold() const { return timeAboveThreshold; }
+        double getStartTime() const { return startTime; }
+
     private:
     /*--------------Runtime--------------*/
         double startTime = 0.0;
@@ -169,6 +186,11 @@ class SmoothnessTracking {
         void update(double parallelVel, double poseTheta_rad, double timestamp_s);
         void reset();
 
+        double getAvgJerk()  const { return avgJerk; }
+        double getPeakJerk() const { return peakJerk; }
+        double getPeakSteeringJerk() const { return peakSteeringJerk; }
+        double getAvgSteeringJerk() const { return avgSteeringJerk; }
+
     private:
         int n = 0;
         double lastVel      = 0.0;
@@ -176,6 +198,8 @@ class SmoothnessTracking {
         double lastTime     = -1.0;
         bool initialized    = false;
         bool hasAccel       = false;
+
+
 
     //Average jerk
         double avgJerk = 0.0;
