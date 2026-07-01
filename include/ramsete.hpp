@@ -1,22 +1,57 @@
 #pragma once
 #include "constants.h"
 #include "odometry.hpp"
+#include "motionController.hpp"
 
+/**
+ * @struct RamseteConfig
+ * @brief Tuning constants and chassis measurements for the ramesete controller
+ */
 struct RamseteConfig {
+    /**
+     * @brief Proportional tracking spring constant
+     * @note Higher values causes the robot to converge to the path more agressively but lower damping stability and can cause oscilations.
+     */
     double b;
-    double zeta;
-    double trackWidthInches;
-};
 
-struct WheelVelocities {
-    double left;
-    double right;
-}
+    /**
+     * @brief Daming ratio
+     * @note Range: (0 < zeta < 1)
+     * @note Higher values will supress path convergence smoothing out oscilations.
+     */
+    double zeta;
+
+    double trackWidthInches; /**< track distance between left and right weheels in inches */
+    double lookaheadInches = 0.0; /**< arc-lenght offset ahead of closest point used for tracking. */
+};
 
 /**
  * @class Ramsete Controller
+ * @brief real-time non-linear feedback controller
  */
-class RamseteController {
+class RamseteController : public MotionController {
+    private:
+        double m_b;                 /**< Proportional paremeter b */
+        double m_zeta;              /**< Damping parameter zeta */
+        double m_trackWidthInches;  /**< drivetrain width in inches */
+        double m_lookaheadInches;    /**< arc-length offset ahead of closest point used as a tracking target */
+
+        /**
+         * @brief computes sin(x)/x with divide by zero catch
+         * @param x angle in radians
+         * @note Includes catch to prevent divide by zero
+         * @returns vlaue of sin(x)/x or 1.0 if x is near zero
+         */
+        double sinc(double x);
+
+        /**
+         * @brief Finds the sample approximately lookaheadInches ahead of closestIdx
+         * @param als_path splined path
+         * @param closestIdx index of closest sample to the robot
+         * @returns Sample near s(closestIdx) + m_lookaheadInches, clamped to the end of the path
+         */
+        Sample getLookaheadSample(const ALS_Path& als_path, std::size_t closestIdx);
+
     public:
         /**
          * @brief Constructs Ramsete controller instance
@@ -25,17 +60,21 @@ class RamseteController {
         RamseteController(RamseteConfig config);
 
         /**
-         * @brief Computes the commanded wheel velocities
+         * @brief Constructs Ramsete controller instance
+         * @param b Proportional paremeter
+         * @param zeta Damping parameter
+         * @param trackWidthInches drivetrain width in inches
          */
-        WheelVelocities compute(Pose currentPose, Pose targetPose, double targetLinearVel, double targetAngularVel);
-
-    private:
-        double m_b;
-        double m_zeta;
-        double m_trackWidthInches;
+        RamseteController(double b, double zeta, double trackWidthInches, double lookaheadInches = 0.0);
+        virtual ~RamseteController() = default;
 
         /**
-         * @brief computes sin(x)/x with divide by zero catch
+         * @brief Computes the commanded wheel velocities
+         * @param currentPose latest pose of the robot
+         * @param als_path splined path with target samples
+         * @param targetIdx lookup index of the closest sample to the robot
+         * @param flag sets direction of tracking
+         * @returns left and right wheel velocities 
          */
-        double sinc(double x);
+        WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& targetIdx, PathFlag flag) override;
 };

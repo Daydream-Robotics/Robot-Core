@@ -6,6 +6,7 @@
 #include "paths.hpp"
 #include "pathFollower.hpp"
 #include "purePursuit.hpp"
+#include "ramsete.hpp"
 
 // #include "slam.h"
 // #include "objectHandler.h"
@@ -14,8 +15,9 @@
 
 Autonomous auton = Autonomous();
 
+RamseteController ramsete = RamseteController(0.0013, 0.7, 10.1875, 4);
 PurePursuitController purePursuit = PurePursuitController();
-PathFollower pathFollower = PathFollower(purePursuit);
+PathFollower pathFollower = PathFollower(ramsete);
 
 std::vector<ALS_Path> paths;
 
@@ -81,7 +83,7 @@ void autonomous() {
 	}
 
 	printf("[MAIN] Setting SECOND_PATH...\n");
-	pathFollower.setPath(paths[PathName::SECOND_PATH]);
+	pathFollower.setPath(paths[PathName::SECOND_PATH], PathFlag::REVERSE);
 	printf("[MAIN] SECOND_PATH set. Tracking...\n");
 	while (not pathFollower.step()) {
 		pros::delay(20);
