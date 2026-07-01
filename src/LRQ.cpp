@@ -1,9 +1,10 @@
 #include "LRQ.hpp"
-#include  "helpers.hpp"
+#include "helpers.hpp"
 #include <algorithm>
 #include <cmath>
 #include <array>
 #include <numbers>
+#include <vector>
 
 //* ----------- HELPER FUNCTIONS ---------------------------------------------------------------------
 
@@ -230,19 +231,6 @@ namespace {
         return result;
     }
 
-    // Multiply a 3x3 matrix by a scalar
-    Matrix3 scale(const Matrix3& matrix, double scalar) {
-        Matrix3 result = zero3();
-
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 3; col++) {
-                result[row][col] = matrix[row][col] * scalar;
-            }
-        }
-
-        return result;
-    }
-
     // Compute the maximum absolute difference between two 3x3 matrices
     double maxAbsDifference(const Matrix3& lhs, const Matrix3& rhs) {
         double result = 0.0;
@@ -379,7 +367,7 @@ namespace {
         Matrix3 a = identity3();
 
         a[0][1] = targetAngularVel * dt;
-        a[0][2] = -targetAngularVel * dt;
+        a[1][0] = -targetAngularVel * dt;
         a[1][2] = targetLinearVel * dt;
 
         return a;
@@ -426,9 +414,77 @@ namespace {
 
         return WheelVelocities{leftRpm, rightRpm, ControlMode::INPUT_VELOCITY};
     }
+
+    Vector3 calculateError(const Pose& currentPose, const Sample& reference) {
+        const double dx = currentPose.x - reference.x;
+        const double dy = currentPose.y - reference.y;
+
+        const double cosHeading = std::cos(reference.heading);
+        const double sinHeading = std::sin(reference.heading);
+
+        const double errorX = cosHeading * dx + sinHeading * dy;
+        const double errorY = -sinHeading * dx + cosHeading * dy;
+        const double errorTheta = normalizeAngle(currentPose.theta - reference.heading);
+
+        return {errorX, errorY, errorTheta};
+    }
+
+
 }
 
+
+//* --------------------------- LQR CONTROLLER IMPLEMENTATION ---------------------------------------------------------------------
 LQRController::LQRController(LQRConfig config)
     : m_config(config) {}
 
+// Reset the controller state (nothing to reset at the moment, everything exists at compute)
 void LQRController::reset() {}
+
+// Compute the commanded wheel velocities based on the current pose, path, and closest sample index
+WheelVelocities LQRController::compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx, PathFlag flag) {
+    const std::vector<Sample>& samples = als_path.getSamples();
+
+    // Check for valid path and sample index
+    if (!als_path.isValid() || samples.empty() || closestSampleIdx >= samples.size()) {
+        return WheelVelocities{0.0, 0.0, ControlMode::INPUT_VELOCITY};
+    }
+
+    // Get the reference sample at the closest index
+    const Sample& reference = samples[closestSampleIdx];
+
+    double targetLinearVelocity = reference.v;
+    double targetAngularVelocity = reference.omega;
+
+    if (flag == PathFlag::REVERSE) {
+        targetLinearVelocity = -targetLinearVelocity;
+        targetAngularVelocity = -targetAngularVelocity;
+    }
+
+    // Build the discrete-time system matrices and LQR gain
+    const Matrix3 a = buildDiscreteA(targetLinearVelocity, targetAngularVelocity, m_config.dt);
+    const Matrix3x2 b = buildDiscreteB(m_config.dt);
+    const Matrix3 q = buildQ(m_config);
+    const Matrix2 r = buildR(m_config);
+
+    // Solve the Discrete-time Algebraic Riccati Equation (DARE) to get matrix P
+    Matrix3 p = zero3();
+    if (!solveDare(a, b, q, r, p)) {
+        return chassisSpeedsToWheelVelocities(targetLinearVelocity, targetAngularVelocity, m_config.trackWidthInches);
+    }
+
+    // Compute the LQR gain matrix K
+    Matrix2x3 k = {{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}};
+    if (!computeGain(a, b, r, p, k)) {
+        return chassisSpeedsToWheelVelocities(targetLinearVelocity, targetAngularVelocity, m_config.trackWidthInches);
+    }
+
+    // Calculate the error between the current pose and the reference sample
+    const Vector3 error = calculateError(currentPose, reference);
+    const Vector2 correction = multiply(k, error);
+
+    // Apply the correction to the target velocities
+    const double correctedLinearVelocity = targetLinearVelocity - correction[0];
+    const double correctedAngularVelocity = targetAngularVelocity - correction[1];
+
+    return chassisSpeedsToWheelVelocities(correctedLinearVelocity, correctedAngularVelocity, m_config.trackWidthInches);
+}
