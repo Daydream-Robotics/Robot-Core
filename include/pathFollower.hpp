@@ -38,4 +38,6 @@ class PathFollower {
         bool m_isFinished = false;              /**< Boolean true if end of path reached */
 
         PathFlag flag = PathFlag::FORWARDS;     /**< Direction config parameter */
+
+        std::size_t MAX_VIEWABLE_INDEX_AHEAD = 50;
 };
