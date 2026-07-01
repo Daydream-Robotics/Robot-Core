@@ -5,7 +5,7 @@
 #include "sd_card_logging.hpp" 
 
 // ----------------------------------------
-//             MAIN INTERFACE
+//             MAIN WRAPPER
 // ----------------------------------------
 
 Waypoint ALS_Path::returnLookaheadPoint(const Position& curPosition, double lookaheadDistance) {

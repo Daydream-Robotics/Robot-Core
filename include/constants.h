@@ -1,12 +1,4 @@
-/**
- * \file constants.h
- *
- * Contains constants used throughout the robot.
- */
-
-#ifndef CONSTANTS_H
-#define CONSTANTS_H
- #include <stdio.h>
+#pragma once
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
@@ -41,6 +33,7 @@ constexpr double PERPINDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behin
 /* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
 
 constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 2.0;
+constexpr double DRIVE_TRACK_WIDTH_INCHES = 10.1875;
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
@@ -79,6 +72,3 @@ enum class DriveType {
     SPLIT_ARCADE,
     TANK
 };
-
-
-#endif
