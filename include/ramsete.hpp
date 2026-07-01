@@ -21,8 +21,8 @@ struct RamseteConfig {
      */
     double zeta;
 
-    /** track distance between left and right weheels in inches */
-    double trackWidthInches; 
+    double trackWidthInches; /**< track distance between left and right weheels in inches */
+    double lookaheadInches = 0.0; /**< arc-lenght offset ahead of closest point used for tracking. */
 };
 
 /**
@@ -34,6 +34,7 @@ class RamseteController : public MotionController {
         double m_b;                 /**< Proportional paremeter b */
         double m_zeta;              /**< Damping parameter zeta */
         double m_trackWidthInches;  /**< drivetrain width in inches */
+        double m_lookaheadInches;    /**< arc-length offset ahead of closest point used as a tracking target */
 
         /**
          * @brief computes sin(x)/x with divide by zero catch
@@ -42,6 +43,14 @@ class RamseteController : public MotionController {
          * @returns vlaue of sin(x)/x or 1.0 if x is near zero
          */
         double sinc(double x);
+
+        /**
+         * @brief Finds the sample approximately lookaheadInches ahead of closestIdx
+         * @param als_path splined path
+         * @param closestIdx index of closest sample to the robot
+         * @returns Sample near s(closestIdx) + m_lookaheadInches, clamped to the end of the path
+         */
+        Sample getLookaheadSample(const ALS_Path& als_path, std::size_t closestIdx);
 
     public:
         /**
@@ -56,8 +65,7 @@ class RamseteController : public MotionController {
          * @param zeta Damping parameter
          * @param trackWidthInches drivetrain width in inches
          */
-        RamseteController(double b, double zeta, double trackWidthInches);
-        
+        RamseteController(double b, double zeta, double trackWidthInches, double lookaheadInches = 0.0);
         virtual ~RamseteController() = default;
 
         /**

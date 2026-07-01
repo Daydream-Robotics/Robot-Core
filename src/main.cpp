@@ -15,7 +15,7 @@
 
 Autonomous auton = Autonomous();
 
-RamseteController ramsete = RamseteController(2, 0.7, 12);
+RamseteController ramsete = RamseteController(0.0013, 0.7, 10.1875, 4);
 PurePursuitController purePursuit = PurePursuitController();
 PathFollower pathFollower = PathFollower(ramsete);
 
