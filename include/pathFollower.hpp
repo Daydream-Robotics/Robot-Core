@@ -12,8 +12,8 @@ class PathFollower {
         bool step();
 
     private:
-        MotionController& m_controller;
-        ALS_Path* m_path = nullptr;
+        MotionController& m_controller;         /**< Reference to motion controller */
+        ALS_Path* m_path = nullptr;             /**< Pointer to current path being tracked */
 
         std::size_t m_currentSampleIdx = 0;
         double m_distanceFromEnd = 999.0;
