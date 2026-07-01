@@ -74,6 +74,9 @@ void autonomous() {
 	}
 	sin_log.flush();
 	sin_log.close();
+	cos_log.flush();
+	cos_log.close();
+	pros::lcd::print(0, "done Loaded");
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
     pros::lcd::print(5, "done");
 
@@ -81,7 +84,6 @@ void autonomous() {
  
 	printf("[MAIN] Delaying 2000ms...\n");
 	pros::delay(2000);
-
 	if (paths.size() <= PathName::SECOND_PATH) {
 		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
 		return;
