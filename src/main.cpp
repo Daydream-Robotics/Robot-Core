@@ -76,7 +76,6 @@ void autonomous() {
 	sin_log.close();
 	cos_log.flush();
 	cos_log.close();
-	pros::lcd::print(0, "done Loaded");
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
     pros::lcd::print(5, "done");
 
