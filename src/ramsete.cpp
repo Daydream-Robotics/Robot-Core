@@ -2,6 +2,7 @@
 #include <cmath>
 #include "helpers.hpp"
 #include "constants.h"
+#include "sd_card_logging.hpp"
 
 // Notes:
 // Check that all headings are in radians (also add these to comments)
@@ -96,14 +97,22 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
         wasScaled = true;
     }
 
-    printf("[RAMSETE] idx=%zu flag=%d | pose(x=%.2f y=%.2f th=%.3f) target(x=%.2f y=%.2f th=%.3f v=%.2f k=%.3f s=%.2f) | e_x=%.3f e_y=%.3f e_th=%.3f | k_gain=%.3f | vCmd=%.2f(pre=%.2f) wCmd=%.3f | L=%.1f(pre=%.1f) R=%.1f(pre=%.1f) scaled=%d\n",
-    targetIdx, static_cast<int>(flag),
-    currentPose.x, currentPose.y, currentPose.theta,
-    target.x, target.y, target.heading, target.v, target.curvature, target.s,
-    e_x, e_y, e_theta,
-    k,
-    commandLinearVel, commandLinearVel_preClamp, commmandAngularVel,
-    speeds.left, left_preClamp, speeds.right, right_preClamp, wasScaled ? 1 : 0);
+    // !DEBUG
+    static int debugTick = 0;
+    if (++debugTick % 5 == 0) {
+        char logBuf[256];
+        snprintf(logBuf, sizeof(logBuf),
+            "[RAMSETE] idx=%zu flag=%d | pose(%.2f,%.2f,%.3f) target(%.2f,%.2f,%.3f v=%.2f k=%.3f s=%.2f) | e=(%.3f,%.3f,%.3f) | k_gain=%.3f | vCmd=%.2f(pre=%.2f) wCmd=%.3f | L=%.1f(pre=%.1f) R=%.1f(pre=%.1f) scaled=%d",
+            targetIdx, static_cast<int>(flag),
+            currentPose.x, currentPose.y, currentPose.theta,
+            target.x, target.y, target.heading, target.v, target.curvature, target.s,
+            e_x, e_y, e_theta,
+            k,
+            commandLinearVel, commandLinearVel_preClamp, commmandAngularVel,
+            speeds.left, left_preClamp, speeds.right, right_preClamp, wasScaled ? 1 : 0);
+        printf("%s\n", logBuf);
+        LOG(logBuf);
+    }
 
     return speeds;
 }
