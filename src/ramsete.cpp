@@ -97,7 +97,7 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
         wasScaled = true;
     }
 
-    // !DEBUG
+    // !START OF DEBUG
     static int debugTick = 0;
     if (++debugTick % 5 == 0) {
         char logBuf[256];
@@ -113,6 +113,7 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
         printf("%s\n", logBuf);
         LOG(logBuf);
     }
+    // !END OF DEBUG
 
     return speeds;
 }
