@@ -67,26 +67,31 @@ void autonomous() {
 
 
 	FieldLogger sin_log(LoggerType::VALUE, "test","sine");
+	FieldLogger cos_log(LoggerType::VALUE, "test","cosine");
 	printf("[MAIN] Setting FIRST_PATH...\n");
 	pathFollower.setPath(paths[PathName::FIRST_PATH], PathFlag::FORWARDS, true, "test");
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
 	while (not pathFollower.step()) {
 		sin_log.log(sin(pros::millis()/1000), pros::millis()/1000);
+		cos_log.log(cos(pros::millis()/1000), pros::millis()/1000);
 		pros::delay(20);
 	}
 	sin_log.flush();
 	sin_log.close();
+	cos_log.flush();
+	cos_log.close();
+	pros::lcd::print(0, "done Loaded");
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
 
 	printf("[MAIN] Delaying 2000ms...\n");
 	pros::delay(2000);
-
 	if (paths.size() <= PathName::SECOND_PATH) {
 		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
 		return;
 	}
 
 	printf("[MAIN] Setting SECOND_PATH...\n");
+	
 	pathFollower.setPath(paths[PathName::SECOND_PATH], PathFlag::REVERSE, true, "test_back");
 	printf("[MAIN] SECOND_PATH set. Tracking...\n");
 	while (not pathFollower.step()) {

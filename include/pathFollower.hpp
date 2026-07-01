@@ -31,6 +31,7 @@ class PathFollower {
 
 
     private:
+        Pose currentPose = {-48, -48, 0};
         MotionController& m_controller;         /**< Reference to motion controller */
         ALS_Path* m_path = nullptr;             /**< Pointer to current path being tracked */
 
