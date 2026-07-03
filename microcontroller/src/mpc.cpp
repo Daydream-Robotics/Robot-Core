@@ -339,7 +339,7 @@ void MPCController<V, F>::buildConstraintDelta(
     m_b_delta.template bottomRows<m_inputs*V>().setConstant(m_params.delta_u_max);
     //adjust first block for actual previous control
     m_b_delta.template segment<m_inputs>(0) += u_prev; //lower bound
-    m_b_delta.template segment<m_inputs>(m_inputs * V) -= u_prev; //upper bound
+    m_b_delta.template segment<m_inputs>(m_inputs * V) += u_prev; //upper bound
 }
 
 //battery voltage constraint: available voltage drops with current: V_avail = V_batt - I·R_int
@@ -356,6 +356,8 @@ template<std::size_t V, std::size_t F>
 void MPCController<V, F>::buildConstraintPosition() {
     m_b_z_xy.topRows(2 * F) = m_z_xy_max+ m_O_xy*m_x_hat;    
     m_b_z_xy.bottomRows(2 * F) = m_z_xy_max - m_O_xy*m_x_hat;
+    m_G_z_xy.topRows(2*F)    = -m_M_xy;
+    m_G_z_xy.bottomRows(2*F) =  m_M_xy;
 }
 
 // motor speed constraint
@@ -364,6 +366,8 @@ void MPCController<V, F>::buildConstraintOmega() {
     //initialize b_z,omega
     m_b_z_omega.topRows(2 * F) = m_z_omega_max+ m_O_omega*m_x_hat;    
     m_b_z_omega.bottomRows(2 * F) = m_z_omega_max - m_O_omega*m_x_hat;
+    m_G_z_omega.topRows(2*F)    = -m_M_omega;
+    m_G_z_omega.bottomRows(2*F) =  m_M_omega;
 }
 
 //Eigen sparse to OSQP CSC (OSQP needs compressed sparse column format)
@@ -599,14 +603,7 @@ void MPCController<V, F>::MPCControl(SerialProtocol& serial, MPCController& mpc)
     MPCControlPacket response{0.0f, 0.0f};
     //run MPC optimization with exception safety
     try {
-        WheelVelocities out = mpc.compute(
-            pose,
-            z_desired,
-            packet.omega_L,
-            packet.omega_R,
-            packet.V_battery,
-            packet.I_total
-        );
+        WheelVelocities out = mpc.compute(pose, z_desired, packet.omega_L, packet.omega_R, packet.V_battery, packet.I_total);
     //pack optimal voltages on success
     response.V_left = static_cast<float>(out.left);
     response.V_right = static_cast<float>(out.right);

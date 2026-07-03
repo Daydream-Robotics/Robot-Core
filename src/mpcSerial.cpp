@@ -227,7 +227,7 @@ void MPCSerial::runSingleIdentificationTest(int voltage, double& out_a, double& 
     double omega_ss = omega.back();
     out_a = estimateA(time, omega, omega_ss);
     //normalize voltage to [0,1] range
-    out_b = estimateB(out_a, omega_ss, voltage / 12000.0);
+    out_b = estimateB(out_a, omega_ss, voltage / 1000.0);
 
     printf("\n");
     printf("Voltage: %d mV\n", voltage);
