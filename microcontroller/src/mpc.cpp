@@ -481,6 +481,8 @@ void MPCController<V,F>::solveQP() {
     }
 
     //run optimizer
+
+    OSQPInt solve_flag = osqp_solve(solver);
     if (solve_flag != 0 || solver->info->status_val != OSQP_SOLVED) {
         osqp_cleanup(solver);
         throw std::runtime_error("OSQP solve failed");
@@ -609,7 +611,7 @@ void MPCController<V, F>::MPCControl(SerialProtocol& serial, MPCController& mpc)
     response.V_left = static_cast<float>(out.left);
     response.V_right = static_cast<float>(out.right);
     }
-    catch{
+    catch (const std::exception& e){
         //MPC failed: log error and send zero volts
         std::cerr << "MPC ERROR: " << e.what() << ", sending zero volts\n";
     }
