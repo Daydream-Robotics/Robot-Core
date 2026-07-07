@@ -32,7 +32,7 @@ public:
     WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx, PathFlag flag) override;
 
     //motor model identification
-    static void identifyMotorModel();
+    static void identifyMotorModel(double gear_ratio);
 
 private:
     //binary packet def for the microcontroller the data it needs to compute input volatges
@@ -78,7 +78,7 @@ private:
     //get motor model
     static double estimateA(const std::vector<double>& time, const std::vector<double>& omega, double omega_ss);
     static double estimateB(double a, double omega_ss, double voltage);
-    static void runSingleIdentificationTest(int voltage, double& out_a, double& out_b);
+    static void runSingleIdentificationTest(int voltage, double& out_a, double& out_b, double gear_ratio);
 };
 
 #endif

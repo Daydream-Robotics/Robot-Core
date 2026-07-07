@@ -11,11 +11,10 @@
 #include <Eigen/Sparse>
 #include <cstddef>
 
-// V: prediction horizon; F: control horizon compile-time)
+
 template<std::size_t V, std::size_t F>
 class MPCController : public MotionController {
     public:
-        //physical and cost parameters for the QP
         struct Params {
             double r; //wheel radius (in)
             double L; //track width (in)
@@ -35,7 +34,7 @@ class MPCController : public MotionController {
             double delta_u_min; //max negative change in voltage between steps
             double x_field_max; //max allowed x position on field
             double y_field_max; //max allowed y position on field
-            double omega_motor_max; //max allowed rad/s
+            double omega_motor_max; //max allowed rpm
             double V_left_applied; //starting Voltage left
             double V_right_applied; //starting Voltage right
 
@@ -63,29 +62,23 @@ class MPCController : public MotionController {
                 double voltageRight
             );
         };
-
-
-        //sizes used in QP formulation
-        static constexpr std::size_t n_states = 5; //x, y, theta, omega_L, omega_R
-        static constexpr std::size_t m_inputs = 2; //V_L, V_R
-        static constexpr std::size_t r_states = 3; //x, y, theta
+        static constexpr std::size_t n_states = 5;
+        static constexpr std::size_t m_inputs = 2;
+        static constexpr std::size_t r_states = 3;
+        static constexpr std::size_t num_constr = 5;
 
         explicit MPCController(const Params& params);
         ~MPCController() override = default;
         void reset() override;
-
-        //function to recieve update packet: compute voltages: send control packet
         static void MPCControl(SerialProtocol& serial, MPCController& mpc);
 
-        //! Unused override that doesn't work (no planned use either)
         WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) 
             override ;
-        //outputs wheel voltages using MPC, taking in info from MPCUpdatePacket
+        
         WheelVelocities compute(const Pose& currentPose, Eigen::Matrix<double, r_states*F, 1> z_desired, double omega_L, double omega_R, double V_battery, double I_total);
 
-
         private:
-            // Current state estimate
+
             struct State {
                 // x-position of bot (inches)
                 double x;
@@ -93,34 +86,35 @@ class MPCController : public MotionController {
                 double y;
                 // Heading of bot (rads)
                 double theta;
-                //left wheels angular velocity (rad/s)
                 double omega_L;
-                //right wheels angular velocity (rad/s)
                 double omega_R;
             };
-
-
-            //binary packet def for the microcontroller the data it needs to compute input volatges
             #pragma pack(push, 1)
             struct MPCUpdatePacket {
-                float pose_x; //[in]
-                float pose_y; //[in]
-                float pose_theta; //[rad]
-                float omega_L; //[rad/s]
-                float omega_R; //[rad/s]
-                float V_battery; //[V]
-                float I_total; //[A] (get from battery)
+                float pose_x;
+                float pose_y;
+                float pose_theta;
+                float omega_L;
+                float omega_R;
+                float V_battery;
+                float I_total;
                 float z_desired[F*3];
             };
             #pragma pack(pop)
-            //binary packet def to send input voltages
             #pragma pack(push, 1)
             struct MPCControlPacket {
-                float V_left; //[V]
-                float V_right; //[V]
+                float V_left;
+                float V_right;
             };
             #pragma pack(pop)
-            //CSC (Compressed Sparse Column) matrix storage for OSQP
+
+            struct InterpSample {
+                double x       = 0.0;
+                double y       = 0.0;
+                double theta = 0.0;
+                double v       = 0.0;
+            };
+
             struct CscStorage {
                 std::vector<OSQPFloat> values;
                 std::vector<OSQPInt>   row_idx;
@@ -128,8 +122,6 @@ class MPCController : public MotionController {
                 OSQPCscMatrix mat;
             };
 
-
-            //internal matrices and vectors used to build the QP (names are self explanitory when refrencing paper)
             Params m_params;
             State x_hat;
 
@@ -143,6 +135,7 @@ class MPCController : public MotionController {
             double m_u_right;
 
             double u_prev = 0;
+
 
             Eigen::Matrix<double, n_states, n_states> m_Ac;
             Eigen::Matrix<double, n_states, n_states> m_A;
@@ -198,25 +191,24 @@ class MPCController : public MotionController {
 
             Eigen::Matrix<double, m_inputs, 1> m_u_prev;
 
-            //helper methods
+
             void linearize(const Pose& x_hat, double omega_L, double omega_R);
             void discretize();
             void buildPredictionMatrices();
-
-            //assemble all into constraints m_G and m_b
+            // Assemble all into m_G and m_b
             void assembleConstraints(double V_batt, double I_total, const Eigen::Matrix<double, m_inputs, 1> u_prev);
-            //helper methods to build each constraint type
+            // Helper methods to build each constraint type
             void buildConstraintDelta(const Eigen::Matrix<double, m_inputs, 1> u_prev); 
             void buildConstraintU();        
             void buildConstraintBattery(double V_battery, double I_total);  
             void buildConstraintPosition(); 
             void buildConstraintOmega();
-            
-            //helper functions to get data ready to solve the QP
+            InterpSample sampleAtArcLength(const std::vector<Sample>& samples, double sQuery);
+            // Eigen::Matrix<double,r_states*F, 1> buildZDesired(const ALS_Path& als_path, std::size_t closestSampleIdx);
+            void buildZDesiredFromPacket(const MPCUpdatePacket& packet);
             CscStorage eigenToCSC(Eigen::SparseMatrix<double>& m);
             void assembleQP();
             void solveQP();
-
             static auto unpackZDesired(const float* z_raw);
             
 };

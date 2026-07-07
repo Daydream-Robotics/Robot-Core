@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <iostream>
 #include "mpc.hpp"
 #define EIGEN_STACK_ALLOCATION_LIMIT 1048576 
@@ -202,23 +203,24 @@ void MPCController<V, F>::linearize(const Pose& x_hat, double omega_L, double om
     0,0,0,0, -m_params.a;
 }
 
-//discretize via matrix exponential
+//discretize
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::discretize() {
-    //declares a matrix to hold exp version of continuous A&B matrices
+    // ZOH discretization via matrix exponential
     Eigen::Matrix<double, n_states + m_inputs, n_states + m_inputs> m_exp;
     m_exp.setZero();
-    //puts A^C_K and B^c in exp matrix
     m_exp.template block<n_states, n_states>(0, 0) = m_Ac;
     m_exp.template block<n_states, m_inputs>(0, n_states) = m_Bc;
-    //multiplies exp matrix by sample period
     m_exp *= m_params.h;
-    // exponentiates matrix
-    auto Md = m_exp.exp();
-    // extract A_k
+    Eigen::Matrix<double, n_states + m_inputs, n_states + m_inputs> Md = m_exp.exp();
     m_A = Md.template block<n_states, n_states>(0, 0);
-    // extract B_k
     m_B = Md.template block<n_states, m_inputs>(0, n_states);
+
+
+
+
+
+
 }
 
 //build O and M prediction matrices
@@ -517,7 +519,17 @@ WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, Eigen::Mat
 
     //linearize system
     linearize(currentPose, omega_L, omega_R);
-
+    std::cerr << "Ac row 0 (xdot): " << m_Ac.row(0) << "\n";
+std::cerr << "Ac row 1 (ydot): " << m_Ac.row(1) << "\n";
+std::cerr << "B row 3 (omegaL): " << m_Bc.row(3) << "\n";
+std::cerr << "B row 4 (omegaR): " << m_Bc.row(4) << "\n";
+std::cerr << "M first block:\n" << m_M.topRows(r_states) << "\n";
+              << m_A.col(3).transpose() << "\n"
+              << m_A.col(4).transpose() << "\n";
+    std::cerr << "A*B:\n" << (m_A * m_B) << "\n";
+    std::cerr << "C*A*B:\n" << (m_C * m_A * m_B) << "\n";
+    std::cerr << "M second block (C*A*B expected):\n"
+              << m_M.block(r_states, 0, r_states, m_inputs*V) << "\n";
     //discretize
     discretize();
 
@@ -619,3 +631,4 @@ void MPCController<V, F>::MPCControl(SerialProtocol& serial, MPCController& mpc)
 
 //explicit instantiation for V=F=15
 template class MPCController<15, 15>;
+

@@ -90,6 +90,7 @@ void autonomous() {
 }
 
 void opcontrol() {
+	MPCSerial::identifyMotorModel(450.0/600.0);                                                      
     leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     descorer.set_value(true);

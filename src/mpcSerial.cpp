@@ -201,7 +201,7 @@ double MPCSerial::estimateB(double a, double omega_ss, double voltage) {
 }
 
 //single step response test: applies constant voltage, records omega(t), fits a and b
-void MPCSerial::runSingleIdentificationTest(int voltage, double& out_a, double& out_b) {
+void MPCSerial::runSingleIdentificationTest(int voltage, double& out_a, double& out_b, double gear_ratio) {
     std::vector<double> time;
     std::vector<double> omega;
 
@@ -224,7 +224,7 @@ void MPCSerial::runSingleIdentificationTest(int voltage, double& out_a, double& 
     //stop motor
     leftMotors.move_voltage(0);
     //fit model
-    double omega_ss = omega.back();
+    double omega_ss = omega.back() * gear_ratio;
     out_a = estimateA(time, omega, omega_ss);
     //normalize voltage to [0,1] range
     out_b = estimateB(out_a, omega_ss, voltage / 1000.0);
@@ -237,7 +237,7 @@ void MPCSerial::runSingleIdentificationTest(int voltage, double& out_a, double& 
 }
 
 //full motor identification: runs multiple voltage steps, averages fitted parameters
-void MPCSerial::identifyMotorModel() {
+void MPCSerial::identifyMotorModel(double gear_ratio) {
     double sum_a = 0.0;
     double sum_b = 0.0;
     int count = 0;
@@ -245,7 +245,7 @@ void MPCSerial::identifyMotorModel() {
     //helper: run test and accumulate
     auto identify = [&](int voltage) {
         double a = 0.0, b = 0.0;
-        runSingleIdentificationTest(voltage, a, b);
+        runSingleIdentificationTest(voltage, a, b, gear_ratio);
         sum_a += a;
         sum_b += b;
         count++;
