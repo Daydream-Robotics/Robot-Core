@@ -1,5 +1,6 @@
 #include "metrics.hpp"
 #include "helpers.hpp"
+#include "sd_card_logging.hpp"
 #include <cmath>
 #include <cstdio>
 
@@ -285,4 +286,21 @@ void MetricsSystem::finishRun(const Pose& finalPose, const Sample& goalSample,
                                double timestamp_s) {
     timing.finish(timestamp_s);
     endpoint.record(finalPose, goalSample);
+}
+
+void MetricsSystem::printSummary() const {
+
+   char summary [1000];
+
+    snprintf(summary, sizeof(summary),
+            "===== Run Metrics =====\n[Path]     MaxCTE=%.2f  AvgCTE=%.2f  RMSCTE=%.2f  SignFlips=%d\n[Heading]  MaxErr=%.2f  FinalErr=%.2f  RMS=%.2f  Oscillations=%d\n[Velocity] Avg=%.2f  Max=%.2f\n[Jerk]     Avg=%.2f  Peak=%.2f  SteerPeak=%.2f\n[Timing]   Total=%.2fs  AboveThreshold=%.2fs\n[Endpoint] PosErr=%.2f  HeadErr=%.2f  Overshoot=%.2f  HeadOvershoot=%.2f\n=======================\n", 
+            path.getMaxCTE(), path.getAvgCTE(), path.getRMSCTE(), path.getSignChanges(),
+            heading.getMaxError(), heading.getFinalError(), heading.getRMSError(), heading.getOscillations(), 
+            velocity.getAvgVelocity(), velocity.getMaxVelocity(),
+            smoothness.getAvgJerk(), smoothness.getPeakJerk(), smoothness.getPeakSteeringJerk(),
+            timing.getTotalTime(), timing.getTimeAboveThreshold(),
+            endpoint.getFinalPositionError(), endpoint.getFinalHeadingError(), endpoint.getDistOvershoot(), endpoint.getHeadingOvershoot());
+
+    printf("%s\n", summary);
+    LOG(summary);
 }

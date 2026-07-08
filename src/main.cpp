@@ -75,18 +75,6 @@ void autonomous() {
 	printf("[MAIN] Delaying 2000ms...\n");
 	pros::delay(2000);
 
-	if (paths.size() <= PathName::SECOND_PATH) {
-		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
-		return;
-	}
-
-	printf("[MAIN] Setting SECOND_PATH...\n");
-	pathFollower.setPath(paths[PathName::SECOND_PATH]);
-	printf("[MAIN] SECOND_PATH set. Tracking...\n");
-	while (not pathFollower.step()) {
-		pros::delay(20);
-	}
-	printf("[MAIN] SECOND_PATH tracking complete.\n");
 
 }
 
@@ -174,6 +162,7 @@ void opcontrol() {
 		pros::delay(20);
 	}
 }
+
 
 void drive(DriveType type) {
 	if (!controller.get_digital(DIGITAL_UP) && !controller.get_digital(DIGITAL_DOWN)) {

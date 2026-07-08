@@ -1,6 +1,7 @@
 #pragma once
 #include "arclengthSplining.hpp"
 #include "motionController.hpp"
+#include "metrics.hpp"
 
 /**
  * @class PathFollower
@@ -38,4 +39,6 @@ class PathFollower {
         bool m_isFinished = false;              /**< Boolean true if end of path reached */
 
         PathFlag flag = PathFlag::FORWARDS;     /**< Direction config parameter */
-};
+
+        MetricsSystem metrics;
+};      

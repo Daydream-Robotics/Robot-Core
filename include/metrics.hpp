@@ -15,6 +15,7 @@ class PathFollowingTracking {
         double getFinalCTE() const { return finalCTE; }
         int    getSignChanges() const { return signChanges; }
         double getPosErrorAtPoint() const { return posErrorAtPoint; }
+        void recordPositionError(const Pose& pose, const Sample& target);
 
     private:    
         int n = 0;
@@ -116,7 +117,7 @@ class EndpointPerformanceTracking {
         double getFinalHeadingError()  const { return finalHeadError; }
         double getTimeToSettle() const {return timeToSettle; }
         double getCorrectionCount() const { return correctionCount; }
-        double getdistOvershoot() const {return distOvershoot; }
+        double getDistOvershoot() const {return distOvershoot; }
         double getHeadingOvershoot() const { return headingOvershoot; }
         
     private:
@@ -225,6 +226,9 @@ class MetricsSystem {
         void startRun(double timestamp_s);
 
         void finishRun(const Pose& finalPose, const Sample& goalSample, double timestamp_s);
+
+        void printSummary() const;
+
 
         PathFollowingTracking path;
         HeadingAccuracyTracking heading;
