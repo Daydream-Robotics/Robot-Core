@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "W_AWP",
+    "project_name": "LQR",
     "target": "v5",
     "templates": {
       "kernel": {
@@ -592,8 +592,8 @@
       }
     },
     "upload_options": {
-      "slot": 8,
-      "icon": "X",
+      "slot": 1,
+      "icon": "planet",
       "description": "My PROS Project"
     },
     "use_early_access": false

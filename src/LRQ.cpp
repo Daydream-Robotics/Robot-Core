@@ -429,7 +429,9 @@ namespace {
         return {errorX, errorY, errorTheta};
     }
 
-
+    double motorRpmToInchesPerSecond(double rpm) {
+        return rpm * (std::numbers::pi * DRIVE_WHEEL_DIAMETER_INCHES) / 60.0;
+    }
 }
 
 
@@ -452,8 +454,8 @@ WheelVelocities LQRController::compute(const Pose& currentPose, const ALS_Path& 
     // Get the reference sample at the closest index
     const Sample& reference = samples[closestSampleIdx];
 
-    double targetLinearVelocity = reference.v;
-    double targetAngularVelocity = reference.omega;
+    double targetLinearVelocity = motorRpmToInchesPerSecond(reference.v);
+    double targetAngularVelocity = targetLinearVelocity * reference.curvature;
 
     if (flag == PathFlag::REVERSE) {
         targetLinearVelocity = -targetLinearVelocity;

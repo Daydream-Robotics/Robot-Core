@@ -4,12 +4,12 @@
 #include "motionController.hpp"
 
 struct LQRConfig {
-    double qX = 1.0; // State error penalty for longitudinal position
-    double qY = 6.0; // State error penalty for lateral position
-    double qTheta = 2.0; // State error penalty for heading
-    double rV = 1.0; // Control effort penalty for linear velocity
-    double rOmega = 1.0; // Control effort penalty for angular velocity
-    double dt = 0.01; // Time step in seconds
+    double qX = 0.1; // State error penalty for longitudinal position
+    double qY = 3.0; // State error penalty for lateral position
+    double qTheta = 1.0; // State error penalty for heading
+    double rV = 2.0; // Control effort penalty for linear velocity
+    double rOmega = 12.0; // Control effort penalty for angular velocity
+    double dt = 0.02; // Time step in seconds
     double trackWidthInches = DRIVE_TRACK_WIDTH_INCHES; // Track width of the robot in inches
 };
 

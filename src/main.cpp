@@ -5,7 +5,7 @@
 #include "autonomous.hpp"
 #include "paths.hpp"
 #include "pathFollower.hpp"
-#include "purePursuit.hpp"
+#include "LRQ.hpp"
 
 // #include "slam.h"
 // #include "objectHandler.h"
@@ -14,8 +14,9 @@
 
 Autonomous auton = Autonomous();
 
-PurePursuitController purePursuit = PurePursuitController();
-PathFollower pathFollower = PathFollower(purePursuit);
+
+LQRController lqr = LQRController(LQRConfig{});
+PathFollower pathFollower = PathFollower(lqr);
 
 std::vector<ALS_Path> paths;
 
