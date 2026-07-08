@@ -46,6 +46,8 @@ bool PathFollower::step() {
     if (m_distanceFromEnd < END_TOLERANCE) {
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
+        path_log->flush();
+        path_log->close();
         m_isFinished = true;
         return true;
     }
