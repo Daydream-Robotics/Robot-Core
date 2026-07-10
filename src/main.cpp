@@ -6,6 +6,7 @@
 #include "paths.hpp"
 #include "pathFollower.hpp"
 #include "mpcSerial.hpp"
+#include "fieldLogger.hpp"
 
 Autonomous auton = Autonomous();
 
@@ -62,35 +63,39 @@ void autonomous() {
 		printf("[MAIN-ERROR] FIRST_PATH index out of bounds! Array size is %zu\n", paths.size());
 		return;
 	}
-
+    FieldLogger velocity_log(LoggerType::VALUE, "test","sine");
 	printf("[MAIN] Setting FIRST_PATH...\n");
-	pathFollower->setPath(paths[PathName::FIRST_PATH]);
+	pathFollower->setPath(paths[PathName::FIRST_PATH], PathFlag::FORWARDS, true, "test");
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
 	while (not pathFollower->step()) {
+        velocity_log.log(leftMotors.get_actual_velocity(0), pros::millis()/1000);
 		pros::delay(20);
 	}
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
+    pros::lcd::print(5, "done");
 
-	printf("[MAIN] Delaying 2000ms...\n");
-	pros::delay(2000);
+   
+ 
+	// printf("[MAIN] Delaying 2000ms...\n");
+	// pros::delay(2000);
 
-	if (paths.size() <= PathName::SECOND_PATH) {
-		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
-		return;
-	}
+	// if (paths.size() <= PathName::SECOND_PATH) {
+	// 	printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
+	// 	return;
+	// }
 
-	printf("[MAIN] Setting SECOND_PATH...\n");
-	pathFollower->setPath(paths[PathName::SECOND_PATH]);
-	printf("[MAIN] SECOND_PATH set. Tracking...\n");
-	while (not pathFollower->step()) {
-		pros::delay(20);
-	}
-	printf("[MAIN] SECOND_PATH tracking complete.\n");
+	// printf("[MAIN] Setting SECOND_PATH...\n");
+	// pathFollower->setPath(paths[PathName::THIRD_PATH]);
+	// printf("[MAIN] SECOND_PATH set. Tracking...\n");
+	// while (not pathFollower->step()) {
+	// 	pros::delay(20);
+	// }
+	// printf("[MAIN] SECOND_PATH tracking complete.\n");
     
 }
 
 void opcontrol() {
-	MPCSerial::identifyMotorModel(450.0/600.0);                                                      
+	// MPCSerial::identifyMotorModel(450.0/600.0);                                                      
     leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     descorer.set_value(true);

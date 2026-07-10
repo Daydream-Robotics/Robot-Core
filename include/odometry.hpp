@@ -7,6 +7,8 @@ struct OdomConfig {
     double perpendicularWheelDiameter;
     double parallelTrackingWheelOffset;
     double perpendicularTrackingWheelOffset;
+    bool useMotorEncoders = false;
+    double driveWheelDiameter = 0.0;
 };
 
 struct WheelLengths {
@@ -101,10 +103,15 @@ public:
      * @brief Returns struct of distances travelled by Odometry Wheels
      */
     WheelLengths getOdomWheelTravel(void);
+
+    /**
+     * @brief Returns struct of distances travelled by the drive motors when using internal encoders
+     */
+    WheelLengths getDriveEncoderTravel(void);
     
     /**
-     * @brief gets the current velocity of the parallel tracking wheel
-     * @returns velocity of parallel tracking wheel in inches per second
+     * @brief gets the current velocity of the parallel tracking wheel or drive motors
+     * @returns velocity in inches per second
      */
     double getParallelVel();
     
@@ -127,6 +134,8 @@ private:
     double m_prevTheta = 0;
     double m_prevParallel = 0;
     double m_prevPerpendicular = 0;
+    double m_prevLeft = 0;
+    double m_prevRight = 0;
     bool m_initialized = false;
 };
 

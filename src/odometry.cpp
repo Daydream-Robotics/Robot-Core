@@ -4,6 +4,21 @@
 #include "helpers.hpp"
 #include <cmath>
 #include <numbers>
+#include <vector>
+
+static double averageMotorGroupPosition(const pros::MotorGroup& group) {
+    std::vector<double> positions = group.get_position_all();
+    if (positions.empty()) {
+        return 0.0;
+    }
+
+    double sum = 0.0;
+    for (double pos : positions) {
+        sum += pos;
+    }
+
+    return sum / static_cast<double>(positions.size());
+}
 
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
@@ -21,24 +36,40 @@ void Odometry::updatePose(void) {
 	
 	if (!m_initialized) {
 		m_prevTheta = theta_rad;
-		
-		// get initial position of tracking wheels
-		m_prevParallel = parallelTrackingWheel.get_position();
-		m_prevPerpendicular = perpendicularTrackingWheel.get_position();
+
+		if (m_config.useMotorEncoders) {
+			m_prevLeft = averageMotorGroupPosition(leftMotors);
+			m_prevRight = averageMotorGroupPosition(rightMotors);
+		} else {
+			m_prevParallel = parallelTrackingWheel.get_position();
+			m_prevPerpendicular = perpendicularTrackingWheel.get_position();
+		}
 		
 		m_initialized = true;
 		return;
 	}
 
-	// Calculate distance travelled by each tracking wheel
-	WheelLengths arcs = getOdomWheelTravel();
+	// Calculate distance travelled by either drive encoders or tracking wheels
+	WheelLengths arcs;
+	if (m_config.useMotorEncoders) {
+		arcs = getDriveEncoderTravel();
+	} else {
+		arcs = getOdomWheelTravel();
+	}
 	
 	// Determine change in heading 
 	double del_theta = normalizeAngle(theta_rad - m_prevTheta);
 
 	// Determine change in local x and in local y
-	double dx_local = arcs.parallel - (del_theta * m_config.parallelTrackingWheelOffset);
-	double dy_local = arcs.perpendicular - (del_theta * m_config.perpendicularTrackingWheelOffset);
+	double dx_local;
+	double dy_local;
+	if (m_config.useMotorEncoders) {
+		dx_local = arcs.parallel;
+		dy_local = 0.0;
+	} else {
+		dx_local = arcs.parallel - (del_theta * m_config.parallelTrackingWheelOffset);
+		dy_local = arcs.perpendicular - (del_theta * m_config.perpendicularTrackingWheelOffset);
+	}
 
 	double theta_mid = m_prevTheta + del_theta / 2.0;
     theta_mid = normalizeAngle(theta_mid);
@@ -156,7 +187,44 @@ WheelLengths Odometry::getOdomWheelTravel(void) {
 	return {delParallel, delPerpendicular};
 }
 
+WheelLengths Odometry::getDriveEncoderTravel(void) {
+	if (!m_initialized) {
+		return {0, 0};
+	}
+
+    double currLeft = averageMotorGroupPosition(leftMotors);
+    double currRight = averageMotorGroupPosition(rightMotors);
+
+    double dLeft = currLeft - m_prevLeft;
+    double dRight = currRight - m_prevRight;
+
+    double leftInches = (dLeft / 360.0) * m_config.driveWheelDiameter * std::numbers::pi;
+    double rightInches = (dRight / 360.0) * m_config.driveWheelDiameter * std::numbers::pi;
+
+    m_prevLeft = currLeft;
+    m_prevRight = currRight;
+
+    double forwardInches = (leftInches + rightInches) / 2.0;
+    return {forwardInches, 0.0};
+}
+
 double Odometry::getParallelVel() {
+	if (m_config.useMotorEncoders) {
+		auto leftVels = leftMotors.get_actual_velocity_all();
+		auto rightVels = rightMotors.get_actual_velocity_all();
+
+		double leftSum = 0.0;
+		for (double v : leftVels) leftSum += v;
+		double rightSum = 0.0;
+		for (double v : rightVels) rightSum += v;
+
+		double leftAvg = leftVels.empty() ? 0.0 : leftSum / static_cast<double>(leftVels.size());
+		double rightAvg = rightVels.empty() ? 0.0 : rightSum / static_cast<double>(rightVels.size());
+
+		double avgRpm = (leftAvg + rightAvg) / 2.0;
+		return (avgRpm / 60.0) * m_config.driveWheelDiameter * std::numbers::pi;
+	}
+
 	double deg_s = parallelTrackingWheel.get_velocity();
 	return (deg_s / 360.0) * m_config.parallelWheelDiameter * std::numbers::pi;
 }
@@ -173,5 +241,7 @@ Odometry odom({
 	PARALLEL_TRACKING_WHEEL_DIAMETER,
 	PERPENDICULAR_TRACKING_WHEEL_DIAMETER,
 	PARALLEL_TRACKING_WHEEL_OFFSET,
-	PERPINDICULAR_TRACKING_WHEEL_OFFSET	
+	PERPINDICULAR_TRACKING_WHEEL_OFFSET,
+	true,
+	DRIVE_WHEEL_DIAMETER_INCHES
 });

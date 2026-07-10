@@ -1,6 +1,7 @@
 #pragma once
 #include "arclengthSplining.hpp"
 #include "motionController.hpp"
+#include "fieldLogger.hpp"
 
 /**
  * @class PathFollower
@@ -28,7 +29,6 @@ class PathFollower {
          */
         bool step();
 
-
     private:
         MotionController& m_controller;         /**< Reference to motion controller */
         ALS_Path* m_path = nullptr;             /**< Pointer to current path being tracked */
@@ -43,3 +43,6 @@ class PathFollower {
 
         PathFlag flag = PathFlag::FORWARDS;     /**< Direction config parameter */
 };
+extern double omega_L;
+extern double omega_R;
+extern WheelVelocities wheelVelocities;

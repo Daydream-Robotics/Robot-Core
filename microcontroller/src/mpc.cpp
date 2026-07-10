@@ -5,6 +5,7 @@
 #include <unsupported/Eigen/MatrixFunctions>
 #include <cmath>
 #include <algorithm>
+#include <fstream>
 
 template<std::size_t V, std::size_t F>
 MPCController<V, F>::Params::Params(
@@ -195,12 +196,17 @@ void MPCController<V, F>::linearize(const Pose& x_hat, double omega_L, double om
     double cos_theta = cos(x_hat.theta);
     double sin_theta = sin(x_hat.theta);
     //initailize A^c_k
+    constexpr double OMEGA_SUM_MIN = 20.0;   // e.g. 2 × 15 rad/s
+    double omega_sum = omega_L + omega_R;
+    if (std::abs(omega_sum) < OMEGA_SUM_MIN) {
+        omega_sum = (omega_sum >= 0.0) ? OMEGA_SUM_MIN : -OMEGA_SUM_MIN;
+    }
     m_Ac << 
-    0, 0, -R_TWO*(omega_L+omega_R)*sin_theta, R_TWO*cos_theta, R_TWO*cos_theta,
-    0,0,   R_TWO*(omega_L+omega_R)*cos_theta, R_TWO*sin_theta, R_TWO*sin_theta,
-    0,0,0, -R_L, R_L,
-    0,0,0, -m_params.a, 0,
-    0,0,0,0, -m_params.a;
+    0, 0, -R_TWO*omega_sum*sin_theta, R_TWO*cos_theta,  R_TWO*cos_theta,
+    0, 0,  R_TWO*omega_sum*cos_theta, R_TWO*sin_theta,  R_TWO*sin_theta,
+    0, 0,  0,                         -R_L,              R_L,
+    0, 0,  0,                         -m_params.a,       0,
+    0, 0,  0,                          0,                -m_params.a;
 }
 
 //discretize
@@ -421,13 +427,17 @@ template<std::size_t V, std::size_t F>
 void MPCController<V, F>::assembleQP() {
     // tracking error: s = z_desired - free response
     m_s.noalias() = m_z_desired - m_O * m_x_hat;
-
+    for (std::size_t i = 0; i < F; i++) {
+        double& theta_err = m_s(i * r_states + 2);
+        while (theta_err > M_PI) theta_err -= 2.0 * M_PI;
+        while (theta_err < -M_PI) theta_err += 2.0 * M_PI;
+    }
     //P = M^T*W_4*M (Hessian)
     Eigen::Matrix<double, r_states*F, m_inputs*V> m_W_four_M;
     m_W_four_M.noalias() = m_W_four * m_M;
     m_P.noalias() = m_M.transpose() * m_W_four_M + m_W_three;
     //regularization for stability
-    m_P.diagonal().array() += 1e-2;
+    m_P.diagonal().array() += 2;
 
     //q = -M^T*W_4*s (linear term)
     Eigen::Matrix<double, r_states*F, 1> m_W_four_s;
@@ -471,11 +481,11 @@ void MPCController<V,F>::solveQP() {
     //set settings
     OSQPSettings settings;
     osqp_set_default_settings(&settings);
-    settings.warm_starting = 0; //cold start each time
+    settings.warm_starting = 1; //cold start each time
     settings.max_iter = 10000;  //set max iterations
     settings.polishing = 1; //refine solution
-    settings.eps_abs = 1e-4; //set absolute tolerance
-    settings.eps_rel = 1e-4; //set relative tolerance
+    settings.eps_abs = 1e-3; //set absolute tolerance
+    settings.eps_rel = 1e-3; //set relative tolerance
     settings.verbose = 0; //make it silent
 
     //create solver instance
@@ -483,6 +493,13 @@ void MPCController<V,F>::solveQP() {
     OSQPInt setup_flag = osqp_setup(&solver, &P_csc.mat, q.data(), &A_csc.mat,
                                     l.data(), u.data(), N_CONSTR, N_VARS, &settings);
     if (setup_flag != 0) {
+        int status = solver->info->status_val;
+        osqp_cleanup(solver);
+
+    // reset u_prev to zero so next solve isn't anchored to a bad value
+    m_u_prev.setZero();
+    m_u_left = 0.0;
+    m_u_right = 0.0;	
         throw std::runtime_error("OSQP setup failed");
     }
 
@@ -490,7 +507,17 @@ void MPCController<V,F>::solveQP() {
 
     OSQPInt solve_flag = osqp_solve(solver);
     if (solve_flag != 0 || solver->info->status_val != OSQP_SOLVED) {
-        osqp_cleanup(solver);
+        int status = solver->info ? solver->info->status_val : -999;
+    std::cerr << "OSQP status: " << status << " (";
+    switch(status) {
+        case -3: std::cerr << "PRIMAL_INFEASIBLE"; break;
+        case -4: std::cerr << "DUAL_INFEASIBLE"; break;
+        case -2: std::cerr << "MAX_ITER_REACHED"; break;
+        case 2:  std::cerr << "SOLVED_INACCURATE"; break;
+        default: std::cerr << "OTHER"; break;
+    }
+    std::cerr << ") iter=" << (solver->info ? solver->info->iter : -1) << "\n"; 
+       osqp_cleanup(solver);
         throw std::runtime_error("OSQP solve failed");
     }
 
@@ -519,17 +546,6 @@ WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, Eigen::Mat
 
     //linearize system
     linearize(currentPose, omega_L, omega_R);
-    std::cerr << "Ac row 0 (xdot): " << m_Ac.row(0) << "\n";
-std::cerr << "Ac row 1 (ydot): " << m_Ac.row(1) << "\n";
-std::cerr << "B row 3 (omegaL): " << m_Bc.row(3) << "\n";
-std::cerr << "B row 4 (omegaR): " << m_Bc.row(4) << "\n";
-std::cerr << "M first block:\n" << m_M.topRows(r_states) << "\n";
-              << m_A.col(3).transpose() << "\n"
-              << m_A.col(4).transpose() << "\n";
-    std::cerr << "A*B:\n" << (m_A * m_B) << "\n";
-    std::cerr << "C*A*B:\n" << (m_C * m_A * m_B) << "\n";
-    std::cerr << "M second block (C*A*B expected):\n"
-              << m_M.block(r_states, 0, r_states, m_inputs*V) << "\n";
     //discretize
     discretize();
 
@@ -592,8 +608,7 @@ auto MPCController<V, F>::unpackZDesired(const float* z_raw) {
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::MPCControl(SerialProtocol& serial, MPCController& mpc) {
     //wait for state packet from vex brain
-    std::optional<MPCUpdatePacket> packet_opt = serial.receive<MPCUpdatePacket>(SerialProtocol::PacketType::MPC_UPDATE);
-    
+std::optional<MPCUpdatePacket> packet_opt = serial.receive<MPCUpdatePacket>(SerialProtocol::PacketType::MPC_UPDATE);
     //timeout or bad packet
     if(!packet_opt.has_value()) {
         return;

@@ -14,24 +14,24 @@ int main() {
     // create MPC with parameters
    typename MPCController<V::value, F::value>::Params params(
         1.625, //wheel radius (in)
-        10.63, //track width (in)
-        10.4151, //motor time-constant
-        730.8520, //motor gain constant
+        10.5, //track width (in)
+        30.0308, //motor time-constant
+        138.9554, //motor gain constant
         0.02, //sampling period (s)
-        2.0, //output weight for x
-        15.0, //output weight for y
-        100.0, //output weight for theta
-        0.01, //input penalty
-        0.1, //multiplier for first Q_i
+        132.0, //output weight for x
+        132.0, //output weight for y
+        10.0, //output weight for theta
+        0.5, //input penalty
+        5.0, //multiplier for first Q_i
         5.0, //multiplier for last Q_i
-        10.0, //multiplier for last P_i
+        50.0, //multiplier for last P_i
         12.0, //voltage max
         0.083, //internal resistance of battery
-        4.0, //max positive change in voltage between steps
-        -4.0, //max negative change in voltage between steps
-        70.2, //max allowed x position on field
-        70.2, //max allowed y position on field
-        47.13, //max allowed rad/s
+        24.0, //max positive change in voltage between steps
+        -24.0, //max negative change in voltage between steps
+        140, //max allowed x position on field
+        140, //max allowed y position on field
+        100, //max allowed rad/s
         0.0, //starting Voltage left
         0.0 //starting Voltage right
     );
@@ -61,7 +61,17 @@ int main() {
     std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
     std::cerr << "Ready\n";
+	std::thread wakeupTask([&serial]() {
+    while (true) {
+        serial.sendWakeup(std::string(1, '\0'));
 
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(500)
+        );
+    }
+});
+
+wakeupTask.detach();
     //50 Hz control loop
     while (true) {
         //recieve update packet: compute voltages: send control packet
@@ -69,3 +79,4 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 }
+

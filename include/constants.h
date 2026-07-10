@@ -16,8 +16,8 @@ constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 10;
 #define LEFT_DRIVE_WHEEL_PORTS {-11, -12, -13}
 #define RIGHT_DRIVE_WHEEL_PORTS {18, 19, 20}
 
-constexpr int INITIAL_INTAKE_PORT = 22;
-constexpr int INITIAL_INTAKE_PORT2 = -22;
+constexpr int INITIAL_INTAKE_PORT = 14;
+constexpr int INITIAL_INTAKE_PORT2 = -17;
 constexpr int LEVER_ONE_PORT = -22;
 constexpr int LEVER_TWO_PORT = 22;
 
@@ -40,7 +40,7 @@ constexpr double PERPINDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behin
 
 /* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
 
-constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 2.0;
+constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 3.25;
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
