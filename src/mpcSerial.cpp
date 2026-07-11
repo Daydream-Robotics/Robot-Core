@@ -81,46 +81,11 @@ MPCSerial::InterpSample MPCSerial::sampleAtArcLength(const std::vector<Sample>& 
     return result;
 }
 
-void computeVelocityProfile(std::vector<Sample>& samples) {
-    if (samples.size() < 2) return;
 
-    const double r = DRIVE_WHEEL_DIAMETER_INCHES / 2.0;
-    const double L = 10.5;
-    const double omega_wheel_max = 0.9 * (138.9554 / 30.0308) * 12.0;  
-    const double v_straight_max  = omega_wheel_max * r;
-    const double A_MAX = 60.0;  
-
-    const std::size_t N = samples.size();
-
-    for (std::size_t i = 0; i + 1 < N; i++) {
-        double ds = samples[i + 1].s - samples[i].s;
-        if (ds < 1e-9) { 
-            samples[i].v = v_straight_max; continue; 
-        }
-        double kappa = std::abs(wrapAngle(samples[i + 1].heading - samples[i].heading)) / ds;
-        samples[i].v = v_straight_max / (1.0 + kappa * L / 2.0);
-    }
-    samples[N - 1].v = 0.0; 
-
-    for (std::size_t i = N - 1; i-- > 0; ) {
-        double ds = samples[i + 1].s - samples[i].s;
-        samples[i].v = std::min(samples[i].v,
-            std::sqrt(samples[i + 1].v * samples[i + 1].v + 2.0 * A_MAX * ds));
-    }
-    for (std::size_t i = 1; i < N; i++) {
-        double ds = samples[i].s - samples[i - 1].s;
-        samples[i].v = std::min(samples[i].v,
-            std::sqrt(samples[i - 1].v * samples[i - 1].v + 2.0 * A_MAX * ds));
-    }
-}
 
 //pack current state + build reference trajectory into update packet
 // pack current state + build reference trajectory into update packet
-MPCSerial::MPCUpdatePacket MPCSerial::buildUpdatePacket(
-    const Pose& currentPose, const std::vector<Sample>& samples, 
-    std::size_t idx, PathFlag flag, double omega_L, double omega_R, 
-    double V_battery, double I_total) 
-{
+MPCSerial::MPCUpdatePacket MPCSerial::buildUpdatePacket( const Pose& currentPose, const std::vector<Sample>& samples, std::size_t idx, PathFlag flag, double omega_L, double omega_R, double V_battery, double I_total) {
     MPCUpdatePacket p{};
 
     p.pose_x = static_cast<float>(currentPose.x);
@@ -131,29 +96,38 @@ MPCSerial::MPCUpdatePacket MPCSerial::buildUpdatePacket(
     p.V_battery = static_cast<float>(V_battery);
     p.I_total = static_cast<float>(I_total);
 
-    // fixed spatial step between horizon stages
-    // 1.0 inch per stage × F=15 stages = 15 inch preview
-    // matches robot's expected travel per horizon at ~50 in/s
-    constexpr double DS = 1.0;   // inches per horizon stage
-    
+    const double h = m_params.h;
+    const double r = DRIVE_WHEEL_DIAMETER_INCHES / 2.0;
+    constexpr double TRACK_WIDTH = 10.5;
+    constexpr double A_MAX = 60.0;   
+    constexpr double V_REF_MIN = 3.0;
+    const double V_STRAIGHT_MAX = 0.9 * (138.9554 / 30.0308) * 12.0 * r;
+
+    // seed from robot's actual speed
+    double v = std::max(std::abs(0.5 * (omega_L + omega_R) * r), V_REF_MIN);
     double s = samples[idx].s;
-    for (std::size_t i = 0; i < F; i++) {
-        s += DS;
-        if (s > samples.back().s) {
-            s = samples.back().s;
-        }
 
+    for (std::size_t i = 0; i <= F; i++) {           
         InterpSample ref = sampleAtArcLength(samples, s);
-
         double refTheta = ref.theta;
         if (flag == PathFlag::REVERSE) {
             refTheta = wrapAngle(refTheta + M_PI);
         }
-
         std::size_t base = i * 3;
         p.z_desired[base + 0] = static_cast<float>(ref.x);
         p.z_desired[base + 1] = static_cast<float>(ref.y);
         p.z_desired[base + 2] = static_cast<float>(refTheta);
+
+        InterpSample ahead = sampleAtArcLength(samples, std::min(s + 1.0, samples.back().s));
+        double ds_local = std::max(1e-3, ahead.s - ref.s);
+        double kappa = std::abs(wrapAngle(ahead.theta - ref.theta)) / ds_local;
+        double v_cap = V_STRAIGHT_MAX / (1.0 + kappa * TRACK_WIDTH / 2.0);
+
+        v = std::max(std::min(v_cap, v + A_MAX * h), V_REF_MIN);
+        s += v * h;
+        if (s > samples.back().s) {
+            s = samples.back().s;
+        }
     }
     return p;
 }

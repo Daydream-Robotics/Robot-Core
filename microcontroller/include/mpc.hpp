@@ -68,14 +68,14 @@ class MPCController : public MotionController {
         static constexpr std::size_t num_constr = 5;
 
         explicit MPCController(const Params& params);
-        ~MPCController() override = default;
+        ~MPCController() override;
         void reset() override;
         static void MPCControl(SerialProtocol& serial, MPCController& mpc);
 
         WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) 
             override ;
         
-        WheelVelocities compute(const Pose& currentPose, Eigen::Matrix<double, r_states*F, 1> z_desired, double omega_L, double omega_R, double V_battery, double I_total);
+        WheelVelocities compute(const Pose& currentPose, Eigen::Matrix<double, r_states * (F + 1), 1>& z_desired, double omega_L, double omega_R, double V_battery, double I_total);
 
         private:
 
@@ -98,7 +98,7 @@ class MPCController : public MotionController {
                 float omega_R;
                 float V_battery;
                 float I_total;
-                float z_desired[F*3];
+                float z_desired[(F + 1) * 3];
             };
             #pragma pack(pop)
             #pragma pack(push, 1)
@@ -135,6 +135,16 @@ class MPCController : public MotionController {
             double m_u_right;
 
             double u_prev = 0;
+
+            std::array<Eigen::Matrix<double, n_states, n_states>, F> m_A_k;
+            std::array<Eigen::Matrix<double, n_states, m_inputs>, F> m_B_k;
+            std::array<Eigen::Matrix<double, n_states, 1>, F> m_d_k;   
+            Eigen::Matrix<double, r_states*(F+1), 1> m_z_ref;                  
+            Eigen::Matrix<double, n_states, F+1> m_x_ref;
+            Eigen::Matrix<double, m_inputs, F> m_u_ref;                  
+            Eigen::Matrix<double, r_states*F, 1> m_D_z;                    
+            Eigen::Matrix<double, 2*F, 1> m_D_xy;
+            Eigen::Matrix<double, 2*F, 1> m_D_omega;
 
 
             Eigen::Matrix<double, n_states, n_states> m_Ac;
@@ -183,13 +193,19 @@ class MPCController : public MotionController {
             Eigen::Matrix<double, 2*F, 1> m_z_xy_max;
             Eigen::Matrix<double, 2*F, 1> m_z_omega_max;
 
-            Eigen::Matrix<double, r_states*F, 1> m_z_desired;
+            Eigen::Matrix<double, r_states * (F + 1), 1> m_z_desired;
             Eigen::Matrix<double, r_states*F, 1> m_s;
 
             Eigen::Matrix<double, m_inputs*V, m_inputs*V> m_P;
             Eigen::Matrix<double, m_inputs*V, 1> m_q;
 
             Eigen::Matrix<double, m_inputs, 1> m_u_prev;
+
+
+            OSQPSolver* m_solver = nullptr;
+            CscStorage  m_P_csc;
+            CscStorage  m_A_full_csc;
+            std::vector<OSQPFloat> m_q_v, m_l_v, m_u_v;
 
 
             void linearize(const Pose& x_hat, double omega_L, double omega_R);
@@ -210,6 +226,11 @@ class MPCController : public MotionController {
             void assembleQP();
             void solveQP();
             static auto unpackZDesired(const float* z_raw);
+            void buildReferenceStates();
+            void buildStageModels();
+            static void initCscDense(CscStorage& out, int rows, int cols, bool upperOnly);
+            template<typename Derived>
+            static void fillCscDense(CscStorage& out, const Eigen::MatrixBase<Derived>& M, bool upperOnly);
             
 };
 #endif

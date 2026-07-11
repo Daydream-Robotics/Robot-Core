@@ -96,7 +96,7 @@ bool PathFollower::step() {
     // pros::lcd::print(0, "x %f", currentPose.x);
     // pros::lcd::print(1, "y %f", currentPose.y);
     if (logging && path_log) {
-        path_log->log(Waypoint{targetSample.x, targetSample.y, targetSample.v}, Waypoint{currentPose.x, currentPose.y, 0.0}, pros::millis()/1000);
+        path_log->log(Waypoint{targetSample.x, targetSample.y, targetSample.v}, Waypoint{currentPose.x, currentPose.y, 0.0}, pros::millis()/1000.0);
     }
     
 

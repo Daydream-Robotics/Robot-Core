@@ -68,7 +68,7 @@ void autonomous() {
 	pathFollower->setPath(paths[PathName::FIRST_PATH], PathFlag::FORWARDS, true, "test");
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
 	while (not pathFollower->step()) {
-        velocity_log.log(leftMotors.get_actual_velocity(0), pros::millis()/1000);
+        velocity_log.log(leftMotors.get_actual_velocity(0), pros::millis()/1000.0);
 		pros::delay(20);
 	}
 	printf("[MAIN] FIRST_PATH tracking complete.\n");

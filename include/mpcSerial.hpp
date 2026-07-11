@@ -45,7 +45,7 @@ private:
         float omega_R; //[rad/s]
         float V_battery; //[V]
         float I_total; //[A] (get from battery)
-        float z_desired[F*3];
+        float z_desired[(F + 1) * 3];
     };
     #pragma pack(pop)
     //binary packet def to send input voltages
