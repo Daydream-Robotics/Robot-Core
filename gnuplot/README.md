@@ -2,11 +2,11 @@
 ```
 //path logging
 FieldLogger path_log(LoggerType::PATH, "test_path");
-path_log.log(target_pose, current_pose, pros::millis()/1000);
+path_log.log(target_pose, current_pose, pros::millis()/1000.0);
 
 //value logging
 FieldLogger heading_log(LoggerType::VALUE, "test_path","velocity");
-heading_log.log(heading, pros::millis()/1000);
+heading_log.log(heading, pros::millis()/1000.0);
 
 //explicit flush
 path_log.flush();

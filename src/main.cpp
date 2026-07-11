@@ -72,8 +72,8 @@ void autonomous() {
 	pathFollower.setPath(paths[PathName::FIRST_PATH], PathFlag::FORWARDS, true, "test");
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
 	while (not pathFollower.step()) {
-		sin_log.log(sin(pros::millis()/1000), pros::millis()/1000);
-		cos_log.log(cos(pros::millis()/1000), pros::millis()/1000);
+		sin_log.log(sin(pros::millis()/1000.0), pros::millis()/1000.0);
+		cos_log.log(cos(pros::millis()/1000.0), pros::millis()/1000.0);
 		pros::delay(20);
 	}
 	sin_log.flush();

@@ -66,7 +66,7 @@ bool PathFollower::step() {
             break;
     }
     if (logging && path_log) {
-        path_log->log(Waypoint{targetSample.x, targetSample.y, targetSample.v}, Waypoint{currentPose.x, currentPose.y, 0.0}, pros::millis()/1000);
+        path_log->log(Waypoint{targetSample.x, targetSample.y, targetSample.v}, Waypoint{currentPose.x, currentPose.y, 0.0}, pros::millis()/1000.0);
     }
 
     return false;
