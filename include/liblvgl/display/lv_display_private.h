@@ -52,7 +52,7 @@ struct _lv_display_t {
     int32_t physical_ver_res;
 
     /** Horizontal offset from the full / physical display. Set to 0 for fullscreen mode.*/
-    int32_t offset_x;
+    int32_t offsetXoffset_x;
 
     /** Vertical offset from the full / physical display. Set to 0 for fullscreen mode.*/
     int32_t offset_y;
