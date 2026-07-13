@@ -66,8 +66,10 @@ bool PathFollower::step() {
             break;
     }
     if (logging && path_log) {
-        path_log->log(Waypoint{targetSample.x, targetSample.y, targetSample.v}, Waypoint{currentPose.x, currentPose.y, 0.0}, pros::millis()/1000.0);
-    }
+        std::size_t log_idx = m_path->findClosestSampleIndex({currentPose.x, currentPose.y}, m_currentSampleIdx);
+        Waypoint closest = FieldLogger::closestPointOnPath(m_path->getSamples(), log_idx,{currentPose.x, currentPose.y});
+        path_log->log(closest, Waypoint{currentPose.x, currentPose.y, 0.0}, pros::millis() / 1000.0);
+     }
 
     return false;
 }

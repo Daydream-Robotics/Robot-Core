@@ -138,6 +138,45 @@ class FieldLogger: public Logger {
             }
         }
 
+        // finds the closest point on the path to a given position by projecting onto the path segments adjacent to the closest sampled point
+        static Waypoint closestPointOnPath(const std::vector<Sample>& samples, std::size_t idx, const Position& p) {
+            // projects the curr pos on a line segment and interpolates the velocity at that point
+            auto project_on_segment = [&](const Sample& a, const Sample& b) {
+                // segment direction vector
+                double ex = b.x - a.x, ey = b.y - a.y;
+                // squared segment len
+                double len_squared = ex * ex + ey * ey;
+                // projection parameter (clamped so it stays on the segment)
+                double t = (len_squared < 1e-12) ? 0.0 : std::clamp(((p.x - a.x) * ex + (p.y - a.y) * ey) / len_squared, 0.0, 1.0);
+                //return projected point w/ interpolated velocity.
+                return Waypoint{a.x + t * ex, a.y + t * ey, a.v + t * (b.v - a.v)};
+            };
+
+            //initialize with the closest sampled waypoint.
+            Waypoint best{samples[idx].x, samples[idx].y, samples[idx].v};
+            double best_distance = std::hypot(p.x - best.x, p.y - best.y);
+
+            // check the segment after the closest sample.
+            if (idx + 1 < samples.size()) {
+                Waypoint w = project_on_segment(samples[idx], samples[idx + 1]);
+                double d = std::hypot(p.x - w.x, p.y - w.y);
+                if (d < best_distance) { 
+                    best_distance = d; best = w; 
+                }
+            }
+
+            //check the segment before the closest sample.
+            if (idx > 0) {
+                Waypoint w = project_on_segment(samples[idx - 1], samples[idx]);
+                double d = std::hypot(p.x - w.x, p.y - w.y);
+                if (d < best_distance) {
+                    best = w;
+                }
+            }
+            return best;
+        }
+
+
         //prevent copying because file handles can't be duplicated
         FieldLogger(const FieldLogger&) = delete;
         FieldLogger& operator=(const FieldLogger&) = delete;
