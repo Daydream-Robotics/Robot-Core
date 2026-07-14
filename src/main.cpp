@@ -76,26 +76,59 @@ void autonomous() {
 
    
  
-	// printf("[MAIN] Delaying 2000ms...\n");
-	// pros::delay(2000);
+	printf("[MAIN] Delaying 2000ms...\n");
+	pros::delay(2000);
 
-	// if (paths.size() <= PathName::SECOND_PATH) {
-	// 	printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
-	// 	return;
-	// }
+	if (paths.size() <= PathName::SECOND_PATH) {
+		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
+		return;
+	}
 
-	// printf("[MAIN] Setting SECOND_PATH...\n");
-	// pathFollower->setPath(paths[PathName::THIRD_PATH]);
-	// printf("[MAIN] SECOND_PATH set. Tracking...\n");
-	// while (not pathFollower->step()) {
-	// 	pros::delay(20);
-	// }
-	// printf("[MAIN] SECOND_PATH tracking complete.\n");
+	printf("[MAIN] Setting SECOND_PATH...\n");
+	pathFollower->setPath(paths[PathName::SECOND_PATH], PathFlag::REVERSE, true, "test_reverse");
+	printf("[MAIN] SECOND_PATH set. Tracking...\n");
+	while (not pathFollower->step()) {
+		pros::delay(20);
+	}
+	printf("[MAIN] SECOND_PATH tracking complete.\n");
+    pros::lcd::print(5, "done2");
+    printf("[MAIN] Delaying 2000ms...\n");
+	pros::delay(2000);
+
+	if (paths.size() <= PathName::THIRD_PATH) {
+		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
+		return;
+	}
+
+	printf("[MAIN] Setting SECOND_PATH...\n");
+	pathFollower->setPath(paths[PathName::THIRD_PATH], PathFlag::FORWARDS, true, "test_two");
+	printf("[MAIN] SECOND_PATH set. Tracking...\n");
+	while (not pathFollower->step()) {
+		pros::delay(20);
+	}
+	printf("[MAIN] SECOND_PATH tracking complete.\n");
+    pros::lcd::print(5, "done3");
+    printf("[MAIN] Delaying 2000ms...\n");
+	pros::delay(2000);
+
+	if (paths.size() <= PathName::FOURTH_PATH) {
+		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
+		return;
+	}
+
+	printf("[MAIN] Setting SECOND_PATH...\n");
+	pathFollower->setPath(paths[PathName::FOURTH_PATH], PathFlag::REVERSE, true, "test_two_reverse");
+	printf("[MAIN] SECOND_PATH set. Tracking...\n");
+	while (not pathFollower->step()) {
+		pros::delay(20);
+	}
+	printf("[MAIN] SECOND_PATH tracking complete.\n");
+    pros::lcd::print(5, "done4");
     
 }
 
 void opcontrol() {
-	// MPCSerial::identifyMotorModel(450.0/600.0);                                                      
+	MPCSerial::identifyMotorModel(450.0/600.0);                                                      
     leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     descorer.set_value(true);

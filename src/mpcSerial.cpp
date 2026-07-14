@@ -84,49 +84,107 @@ MPCSerial::InterpSample MPCSerial::sampleAtArcLength(const std::vector<Sample>& 
 
 
 //pack current state + build reference trajectory into update packet
-// pack current state + build reference trajectory into update packet
-MPCSerial::MPCUpdatePacket MPCSerial::buildUpdatePacket( const Pose& currentPose, const std::vector<Sample>& samples, std::size_t idx, PathFlag flag, double omega_L, double omega_R, double V_battery, double I_total) {
+MPCSerial::MPCUpdatePacket MPCSerial::buildUpdatePacket(
+    const Pose& currentPose, const std::vector<Sample>& samples,
+    std::size_t idx, PathFlag flag, double omega_L, double omega_R,
+    double V_battery, double I_total)
+{
     MPCUpdatePacket p{};
-
-    p.pose_x = static_cast<float>(currentPose.x);
-    p.pose_y = static_cast<float>(currentPose.y);
+    p.pose_x     = static_cast<float>(currentPose.x);
+    p.pose_y     = static_cast<float>(currentPose.y);
     p.pose_theta = static_cast<float>(currentPose.theta);
-    p.omega_L = static_cast<float>(omega_L);
-    p.omega_R = static_cast<float>(omega_R);
-    p.V_battery = static_cast<float>(V_battery);
-    p.I_total = static_cast<float>(I_total);
+    p.omega_L    = static_cast<float>(omega_L);
+    p.omega_R    = static_cast<float>(omega_R);
+    p.V_battery  = static_cast<float>(V_battery);
+    p.I_total    = static_cast<float>(I_total);
+
 
     const double h = m_params.h;
     const double r = DRIVE_WHEEL_DIAMETER_INCHES / 2.0;
     constexpr double TRACK_WIDTH = 10.5;
-    constexpr double A_MAX = 60.0;   
-    constexpr double V_REF_MIN = 3.0;
-    const double V_STRAIGHT_MAX = 0.9 * (138.9554 / 30.0308) * 12.0 * r;
+    constexpr double A_MAX       = 60.0;   
+    constexpr double V_REF_MIN   = 3.0;    
+    const double V_STRAIGHT_MAX  = 0.9 * (138.9554 / 30.0308) * 12.0 * r;
+    // max feasible heading rate (point-turn limit), derated
+    const double W_REF_MAX = 0.9 * (2.0 * r * (0.9 * (138.9554 / 30.0308) * 12.0)) / TRACK_WIDTH;
 
-    // seed from robot's actual speed
-    double v = std::max(std::abs(0.5 * (omega_L + omega_R) * r), V_REF_MIN);
+
+    auto capAt = [&](double sq) -> double {
+        InterpSample a = sampleAtArcLength(samples, sq);
+        InterpSample b = sampleAtArcLength(samples,
+            std::min(sq + 3.0, samples.back().s));
+        double ds = std::max(1e-3, b.s - a.s);
+        double kappa = std::abs(wrapAngle(b.theta - a.theta)) / ds;
+        return V_STRAIGHT_MAX / (1.0 + kappa * TRACK_WIDTH / 2.0);
+    };
+
+
+    auto brakingCapAt = [&](double sq, double v_now) -> double {
+        double cap = capAt(sq);
+        double brakeDist = (v_now * v_now) / (2.0 * A_MAX) + 2.0;
+        for (double d = 2.0; d <= brakeDist; d += 2.0) {
+            double s_ahead = sq + d;
+            if (s_ahead >= samples.back().s) break;
+            double c = capAt(s_ahead);
+            cap = std::min(cap, std::sqrt(c * c + 2.0 * A_MAX * d));
+        }
+
+        double dEnd = std::max(0.0, samples.back().s - sq);
+        cap = std::min(cap, std::sqrt(2.0 * A_MAX * dEnd));
+        return cap;
+    };
+
+
+    double v_meas = std::abs(0.5 * (omega_L + omega_R) * r);
+    double v;
+    if (m_v_ref < 0.0) {
+
+        v = std::max(v_meas, V_REF_MIN);
+    } else {
+
+        v = std::clamp(m_v_ref, v_meas - 25.0, v_meas + 25.0);
+        v = std::max(v, V_REF_MIN);
+    }
+
     double s = samples[idx].s;
+    double prevTheta = 0.0;
+    bool havePrev = false;
 
-    for (std::size_t i = 0; i <= F; i++) {           
+
+    for (std::size_t i = 0; i <= F; i++) {
         InterpSample ref = sampleAtArcLength(samples, s);
         double refTheta = ref.theta;
         if (flag == PathFlag::REVERSE) {
             refTheta = wrapAngle(refTheta + M_PI);
         }
+
+        if (!havePrev) {
+            refTheta = currentPose.theta + wrapAngle(refTheta - currentPose.theta);
+        } else {
+            double dth = wrapAngle(refTheta - prevTheta);
+            double dth_max = W_REF_MAX * h;
+            dth = std::clamp(dth, -dth_max, dth_max);
+            refTheta = prevTheta + dth;          
+        }
+        prevTheta = refTheta;
+        havePrev = true;
+
         std::size_t base = i * 3;
         p.z_desired[base + 0] = static_cast<float>(ref.x);
         p.z_desired[base + 1] = static_cast<float>(ref.y);
         p.z_desired[base + 2] = static_cast<float>(refTheta);
 
-        InterpSample ahead = sampleAtArcLength(samples, std::min(s + 1.0, samples.back().s));
-        double ds_local = std::max(1e-3, ahead.s - ref.s);
-        double kappa = std::abs(wrapAngle(ahead.theta - ref.theta)) / ds_local;
-        double v_cap = V_STRAIGHT_MAX / (1.0 + kappa * TRACK_WIDTH / 2.0);
-
-        v = std::max(std::min(v_cap, v + A_MAX * h), V_REF_MIN);
+        double v_floor = (samples.back().s - s < 6.0) ? 1.0 : V_REF_MIN;
+        double v_cap = brakingCapAt(s, v);
+        double v_target = std::min(v_cap, v + A_MAX * h);
+        v = std::max({v_target, v - A_MAX * h, v_floor});
         s += v * h;
         if (s > samples.back().s) {
             s = samples.back().s;
+        }
+
+        if (i == 0) {
+            m_v_ref = v;
         }
     }
     return p;

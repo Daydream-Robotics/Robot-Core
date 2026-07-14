@@ -27,7 +27,10 @@ public:
     explicit MPCSerial(const Params& params);
     ~MPCSerial() override = default;
 
-    void reset() override {}
+    void reset() {
+        m_v_ref = -1.0; 
+    }
+
     //public compute: sends parameters plus robot telematry to private compute, gets voltages
     WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx, PathFlag flag) override;
 
@@ -67,7 +70,7 @@ private:
 
     SerialProtocol serial; //serial link to microcontroller
     Params m_params; //timing and gear ratio
-
+    double m_v_ref = -1.0;
     //private compute: sends full state + reference to microcontroller, gets voltages
     WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx, PathFlag flag, double omega_L, double omega_R, double V_battery, double I_total);
     //find closest point on spline for given arc length

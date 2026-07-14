@@ -138,9 +138,38 @@ class FieldLogger: public Logger {
             }
         }
 
+        static Waypoint closestPointOnPath(const std::vector<Sample>& samples, std::size_t idx, const Position& p) {
+            auto project = [&](const Sample& a, const Sample& b) {
+                double ex = b.x - a.x, ey = b.y - a.y;
+                double len2 = ex * ex + ey * ey;
+                double t = (len2 < 1e-12)
+                    ? 0.0
+                    : std::clamp(((p.x - a.x) * ex + (p.y - a.y) * ey) / len2, 0.0, 1.0);
+                return Waypoint{a.x + t * ex, a.y + t * ey, a.v + t * (b.v - a.v)};
+            };
+
+            Waypoint best{samples[idx].x, samples[idx].y, samples[idx].v};
+            double bestD = std::hypot(p.x - best.x, p.y - best.y);
+
+            if (idx + 1 < samples.size()) {
+                Waypoint w = project(samples[idx], samples[idx + 1]);
+                double d = std::hypot(p.x - w.x, p.y - w.y);
+                if (d < bestD) { bestD = d; best = w; }
+            }
+            if (idx > 0) {
+                Waypoint w = project(samples[idx - 1], samples[idx]);
+                double d = std::hypot(p.x - w.x, p.y - w.y);
+                if (d < bestD) best = w;
+            }
+            return best;
+        }
+
         //prevent copying because file handles can't be duplicated
         FieldLogger(const FieldLogger&) = delete;
         FieldLogger& operator=(const FieldLogger&) = delete;
+
+
+        
 
     private:
         //file handles for PATH mode
@@ -204,5 +233,6 @@ class FieldLogger: public Logger {
                 flush_counter = 0;
             }
         }
+
 };
 
