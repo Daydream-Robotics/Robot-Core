@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "W_AWP",
+    "project_name": "MotionControl",
     "target": "v5",
     "templates": {
       "kernel": {
