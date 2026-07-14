@@ -454,7 +454,7 @@ WheelVelocities LQRController::compute(const Pose& currentPose, const ALS_Path& 
     // Get the reference sample at the closest index
     const Sample& reference = samples[closestSampleIdx];
 
-    double targetLinearVelocity = 12 * motorRpmToInchesPerSecond(reference.v);
+    double targetLinearVelocity = motorRpmToInchesPerSecond(reference.v);
     double targetAngularVelocity = targetLinearVelocity * reference.curvature;
 
     if (flag == PathFlag::REVERSE) {
