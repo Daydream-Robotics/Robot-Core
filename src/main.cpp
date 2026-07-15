@@ -1,17 +1,22 @@
 #include "main.h"
-#include "subsystems.hpp"
-#include "constants.h"
-#include "autonomous.hpp"
-// #include "slam.h"
-#include "objectHandler.h"
-#include <numbers>
-#include "arclengthSplining.hpp"
-#include "paths.hpp"
 #include "sd_card_logging.hpp"
+// #include "constants.h"
+#include "subsystems.hpp"
+#include "autonomous.hpp"
+#include "paths.hpp"
+#include "pathFollower.hpp"
 #include "purePursuit.hpp"
 
-PurePursuit purePursuit = PurePursuit();
+
+// #include "slam.h"
+// #include "objectHandler.h"
+// #include <numbers>
+// #include "arclengthSplining.hpp"
+
 Autonomous auton = Autonomous();
+
+PurePursuitController purePursuit = PurePursuitController();
+PathFollower pathFollower = PathFollower(purePursuit);
 
 std::vector<ALS_Path> paths;
 
@@ -60,26 +65,35 @@ void autonomous() {
 		return;
 	}
 
+
+	FieldLogger sin_log(LoggerType::VALUE, "test","sine");
+	FieldLogger cos_log(LoggerType::VALUE, "test","cosine");
 	printf("[MAIN] Setting FIRST_PATH...\n");
-	purePursuit.setPath(paths[PathName::FIRST_PATH]);
+	pathFollower.setPath(paths[PathName::FIRST_PATH], PathFlag::FORWARDS, true, "test");
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
-	while (not purePursuit.step()) {
+	while (not pathFollower.step()) {
+		sin_log.log(sin(pros::millis()/1000.0), pros::millis()/1000.0);
+		cos_log.log(cos(pros::millis()/1000.0), pros::millis()/1000.0);
 		pros::delay(20);
 	}
+	sin_log.flush();
+	sin_log.close();
+	cos_log.flush();
+	cos_log.close();
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
 
 	printf("[MAIN] Delaying 2000ms...\n");
 	pros::delay(2000);
-
 	if (paths.size() <= PathName::SECOND_PATH) {
 		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
 		return;
 	}
 
 	printf("[MAIN] Setting SECOND_PATH...\n");
-	purePursuit.setPath(paths[PathName::SECOND_PATH]);
+	
+	pathFollower.setPath(paths[PathName::SECOND_PATH], PathFlag::REVERSE, true, "test_back");
 	printf("[MAIN] SECOND_PATH set. Tracking...\n");
-	while (not purePursuit.step()) {
+	while (not pathFollower.step()) {
 		pros::delay(20);
 	}
 	printf("[MAIN] SECOND_PATH tracking complete.\n");
