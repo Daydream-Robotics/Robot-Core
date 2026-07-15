@@ -43,7 +43,7 @@ class RamseteController : public MotionController {
          * @returns vlaue of sin(x)/x or 1.0 if x is near zero
          */
         double sinc(double x);
-
+        
         /**
          * @brief Finds the sample approximately lookaheadInches ahead of closestIdx
          * @param als_path splined path
@@ -51,14 +51,14 @@ class RamseteController : public MotionController {
          * @returns Sample near s(closestIdx) + m_lookaheadInches, clamped to the end of the path
          */
         Sample getLookaheadSample(const ALS_Path& als_path, std::size_t closestIdx);
-
-    public:
+        
+        public:
         /**
          * @brief Constructs Ramsete controller instance
          * @param config The config for the ramsete controller
          */
         RamseteController(RamseteConfig config);
-
+        
         /**
          * @brief Constructs Ramsete controller instance
          * @param b Proportional paremeter
@@ -67,7 +67,16 @@ class RamseteController : public MotionController {
          */
         RamseteController(double b, double zeta, double trackWidthInches, double lookaheadInches = 0.0);
         virtual ~RamseteController() = default;
-
+        
+        /**
+         * @brief Applies curvature-based speed limiting to a path's sample table, in place.
+         * @note Call once after buildFromPoints(), typically during initialize()
+         * @param path Path to modify
+         * @param maxLatAccelInPerS2 Max allowed lateral acceleration through curves
+         * @param maxDecelInPerS2 Max achievable deceleration, used to smooth speed backward into corners
+         */
+        void applyCurvatureSpeedLimit(ALS_Path& path, double maxLatAccelInPerS2, double maxDecelInPerS2);
+        
         /**
          * @brief Computes the commanded wheel velocities
          * @param currentPose latest pose of the robot

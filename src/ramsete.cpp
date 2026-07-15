@@ -33,6 +33,40 @@ Sample RamseteController::getLookaheadSample(const ALS_Path& als_path, std::size
     return samples[idx];
 }
 
+void RamseteController::applyCurvatureSpeedLimit(ALS_Path& path, double maxLatAccelInPerS2, double maxDecelInPerS2) {
+    if (!path.isValid()) {
+        printf("[RAMSETE] applyCurvatureSpeedLimit: path invalid, skipping\n");
+        return;
+    }
+
+    std::vector<Sample>& samples = path.getMutableSamples();
+    if (samples.empty()) return;
+
+    // Forward pass: cap v by curvature at each sample
+    for (auto& s : samples) {
+        double absCurv = std::abs(s.curvature);
+        if (absCurv > 1e-6) {
+            double vCurvLimit = std::sqrt(maxLatAccelInPerS2 / absCurv);
+            s.v = std::min(s.v, vCurvLimit);
+        }
+    }
+
+    // Backward pass: ensure there's room to decelerate into each capped sample
+    for (std::size_t i = samples.size() - 1; i-- > 0; ) {
+        double ds = samples[i + 1].s - samples[i].s;
+        double vMaxFromNext = std::sqrt(samples[i + 1].v * samples[i + 1].v
+                                         + 2.0 * maxDecelInPerS2 * ds);
+        samples[i].v = std::min(samples[i].v, vMaxFromNext);
+    }
+
+    // Recompute omega since v changed
+    for (auto& s : samples) {
+        s.omega = s.v * s.curvature;
+    }
+
+    printf("[RAMSETE] applyCurvatureSpeedLimit applied to %zu samples\n", samples.size());
+}
+
 WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& targetIdx, PathFlag flag) {
     // Sample target = als_path.getSamples()[targetIdx];
     Sample target = getLookaheadSample(als_path, targetIdx);
@@ -43,6 +77,8 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
         // rotate robot orientation 180 degrees to consider the back as forward
         virtualPose.theta = angleDiffRad(currentPose.theta + M_PI, 0.0);
     }
+    // temp
+    // virtualPose.theta = -currentPose.theta;
 
     // calculate global displacement errors
     double dx = target.x - currentPose.x;
@@ -65,7 +101,7 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
     double commmandAngularVel = targetAngularVel + (k * e_theta) + (m_b * target.v * sinc(e_theta) * e_y);
 
     double maxLinearSpeedInchesPerSecond = (450.0 / 60.0) * (M_PI * DRIVE_WHEEL_DIAMETER_INCHES);
-    double commandLinearVel = std::clamp(commandLinearVel_preClamp, -maxLinearSpeedInchesPerSecond, maxLinearSpeedInchesPerSecond);
+    double commandLinearVel = std::clamp(commandLinearVel_preClamp, 0.0, maxLinearSpeedInchesPerSecond);
 
     // reverse linear velocity in case of reverse
     if (flag == PathFlag::REVERSE) {

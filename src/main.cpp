@@ -7,6 +7,7 @@
 #include "pathFollower.hpp"
 #include "purePursuit.hpp"
 #include "ramsete.hpp"
+#include "odometry.hpp"
 
 // #include "slam.h"
 // #include "objectHandler.h"
@@ -15,7 +16,7 @@
 
 Autonomous auton = Autonomous();
 
-RamseteController ramsete = RamseteController(0.0013, 0.7, 10.1875, 4);
+RamseteController ramsete = RamseteController(0.007, 0.7, 10.1875, 4); // 0.003 - 0.01
 PurePursuitController purePursuit = PurePursuitController();
 PathFollower pathFollower = PathFollower(ramsete);
 
@@ -40,6 +41,11 @@ void initialize() {
 	printf("[MAIN] Loading paths...\n");
 	paths = Path::buildAllPathsFromJerryIO("/usd/path.jerryio.txt");
 	printf("[MAIN] Paths loaded: %zu\n", paths.size());
+
+	for (auto& p : paths) {
+		RamseteController::applyCurvatureSpeedLimit(p, 40.0, 60.0); // tune these two
+	}
+
 	if (paths.size() != PathName::COUNT) {
 		printf("[MAIN] ERROR: Path count mismatch\n");
 		pros::lcd::print(1, "ERROR: Path count mismatch");
@@ -59,6 +65,11 @@ void disabled() {}
 void competition_initialize() {}
 //all after path actions are commented out for path testing purposes
 void autonomous() {
+	// while (true){
+	// 	odom.updatePose();
+	// 	pros::delay(20);
+	// }
+
 	printf("[MAIN] Starting autonomous()\n");
 	
 	if (paths.size() <= PathName::FIRST_PATH) {
