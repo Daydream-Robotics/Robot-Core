@@ -1,6 +1,6 @@
 #pragma once
-#include "arclengthSplining.hpp"
-#include "odometry.hpp"
+#include "daydream/motion/pathing/arclengthSplining.hpp"
+#include "daydream/motion/odometry.hpp"
 
 /**
  * @brief Configuration modes for drivetrain motor inputs

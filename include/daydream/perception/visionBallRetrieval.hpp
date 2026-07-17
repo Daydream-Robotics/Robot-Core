@@ -1,7 +1,7 @@
 #ifndef SLAM_H
 #define SLAM_H
 
-#include "objectHandler.h"
+#include "daydream/perception/objectHandler.h"
 
 constexpr char TEAM = '\0';
 // constexpr int FRAME_WIDTH = 256;

@@ -1,6 +1,6 @@
-#include "pathFollower.hpp"
-#include "subsystems.hpp"
-#include "constants.h"
+#include "daydream/motion/pathFollower.hpp"
+#include "daydream/config/subsystems.hpp"
+#include "daydream/config/constants.h"
 
 PathFollower::PathFollower(MotionController& controller)
      : m_controller(controller) {}

@@ -1,10 +1,10 @@
 #pragma once
 
 #include <vector>
-#include "odometry.hpp"
-#include "helpers.hpp"
-#include "arclengthSplining.hpp"
-#include "motionController.hpp"
+#include "daydream/motion/odometry.hpp"
+#include "daydream/utils/helpers.hpp"
+#include "daydream/motion/pathing/arclengthSplining.hpp"
+#include "daydream/motion/control/motionController.hpp"
 
 constexpr double MAX_LOOKAHEAD_DIST = 25.0;     /**< Maximum lookahead distance (inches) */
 constexpr double MIN_LOOKAHEAD_DIST = 15.0;     /**< Minimum lookahead distance (inches) */

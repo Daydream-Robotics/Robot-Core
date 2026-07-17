@@ -1,6 +1,6 @@
 #pragma once
 
-#include "odometry.hpp" // Needed for the Position struct
+#include "daydream/motion/odometry.hpp" // Needed for the Position struct
 
 // Normalize angle between [-180, 180] 
 double normalizeAngle(double a);
