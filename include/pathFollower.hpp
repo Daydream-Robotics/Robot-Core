@@ -1,6 +1,7 @@
 #pragma once
 #include "arclengthSplining.hpp"
 #include "motionController.hpp"
+#include "fieldLogger.hpp"
 
 /**
  * @class PathFollower
@@ -20,7 +21,7 @@ class PathFollower {
          * @param path Splined path containing information along the path
          * @param flag Direction of travel
          */
-        void setPath(ALS_Path& path, PathFlag flag = PathFlag::FORWARDS);
+        void setPath(ALS_Path& path, PathFlag flag = PathFlag::FORWARDS, bool logging = false, const char* baseName = "noname");
         
         /**
          * @brief Executes a single clock step of the tracking controller
@@ -38,4 +39,6 @@ class PathFollower {
         bool m_isFinished = false;              /**< Boolean true if end of path reached */
 
         PathFlag flag = PathFlag::FORWARDS;     /**< Direction config parameter */
+        std::optional<FieldLogger> path_log;
+        bool logging;
 };
