@@ -10,18 +10,18 @@
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
-constexpr int PARALLEL_TRACKING_WHEEL_PORT = 6;
+constexpr int PARALLEL_TRACKING_WHEEL_PORT = 8;
 constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 10;
 
-#define LEFT_DRIVE_WHEEL_PORTS {-14, -12, -13}
-#define RIGHT_DRIVE_WHEEL_PORTS {17, 18, 19}
+#define LEFT_DRIVE_WHEEL_PORTS {-2, -3, -5, 11, 13}
+#define RIGHT_DRIVE_WHEEL_PORTS {12, 15, -16, 4, -18}
 
-constexpr int INITIAL_INTAKE_PORT = 22;
-constexpr int INITIAL_INTAKE_PORT2 = -22;
-constexpr int LEVER_ONE_PORT = -22;
-constexpr int LEVER_TWO_PORT = 22;
+constexpr int INITIAL_INTAKE_PORT = 1;
+constexpr int INITIAL_INTAKE_PORT2 = -17;
+constexpr int LEVER_ONE_PORT = -9;
+constexpr int LEVER_TWO_PORT = 14;
 
-constexpr char IMU_PORT = 1; 
+constexpr char IMU_PORT = 21; 
 
 constexpr char BALL_BLOCKER_PORT = 'A';
 constexpr char SCORING_LIFTER = 'B';
@@ -40,7 +40,7 @@ constexpr double PERPINDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behin
 
 /* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
 
-constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 3.25;
+constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 2.0;
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
