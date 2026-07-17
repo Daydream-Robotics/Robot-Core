@@ -592,8 +592,8 @@
       }
     },
     "upload_options": {
-      "slot": 1,
-      "icon": "X",
+      "slot": 8,
+      "icon": "robot",
       "description": "My PROS Project",
       "after": "run"
     },
