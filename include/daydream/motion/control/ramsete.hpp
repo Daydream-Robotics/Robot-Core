@@ -1,6 +1,7 @@
 #pragma once
-#include "constants.h"
-#include "odometry.hpp"
+
+#include "daydream/motion/control/motionController.hpp"
+#include "daydream/motion/odometry.hpp"
 
 struct RamseteConfig {
     double b;
@@ -8,24 +9,20 @@ struct RamseteConfig {
     double trackWidthInches;
 };
 
-struct WheelVelocities {
-    double left;
-    double right;
-};
-
 /**
- * @class Ramsete Controller
+ * @class RamseteController
+ * @brief Computes differential-drive commands using a Ramsete controller.
  */
 class RamseteController {
     public:
         /**
-         * @brief Constructs Ramsete controller instance
-         * @param config The config for the ramsete controller
+         * @brief Constructs a Ramsete controller instance.
+         * @param config The configuration for the Ramsete controller.
          */
         RamseteController(RamseteConfig config);
 
         /**
-         * @brief Computes the commanded wheel velocities
+         * @brief Computes the commanded wheel velocities.
          */
         WheelVelocities compute(Pose currentPose, Pose targetPose, double targetLinearVel, double targetAngularVel);
 
@@ -35,7 +32,7 @@ class RamseteController {
         double m_trackWidthInches;
 
         /**
-         * @brief computes sin(x)/x with divide by zero catch
+         * @brief Computes sin(x)/x with a divide-by-zero guard.
          */
         double sinc(double x);
 };

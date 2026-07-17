@@ -1,6 +1,6 @@
 #pragma once
-#include "sd_card_logging.hpp"
-#include "arclengthSplining.hpp"
+#include "daydream/utils/sd_card_logging.hpp"
+#include "daydream/motion/pathing/arclengthSplining.hpp"
 #include <vector>
 #include <cmath>
 

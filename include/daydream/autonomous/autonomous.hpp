@@ -1,10 +1,8 @@
 // include/autonomous.hpp
-
-
 #pragma once
 
-#include "pid.hpp"
-#include "odometry.hpp"
+#include "daydream/motion/control/pid.hpp"
+#include "daydream/motion/odometry.hpp"
 
 // Autonomous class containing
 class Autonomous {

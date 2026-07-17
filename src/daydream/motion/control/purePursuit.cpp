@@ -1,11 +1,11 @@
-#include "purePursuit.hpp"
-#include "helpers.hpp"
+#include "daydream/motion/control/purePursuit.hpp"
+#include "daydream/utils/helpers.hpp"
 #include <cmath>
-#include "odometry.hpp"
-#include "subsystems.hpp"
-#include "arclengthSplining.hpp"
+#include "daydream/motion/odometry.hpp"
+#include "daydream/config/subsystems.hpp"
+#include "daydream/motion/pathing/arclengthSplining.hpp"
 #include "main.h"
-#include "sd_card_logging.hpp"
+#include "daydream/utils/sd_card_logging.hpp"
 
 PurePursuitController::PurePursuitController() {}
 

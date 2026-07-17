@@ -1,8 +1,7 @@
 #pragma once
-#include "arclengthSplining.hpp"
-#include "motionController.hpp"
-#include "fieldLogger.hpp"
-#include "fieldLogger.hpp"
+#include "daydream/motion/pathing/arclengthSplining.hpp"
+#include "daydream/motion/control/motionController.hpp"
+#include "daydream/utils/fieldLogger.hpp"
 
 class PathFollower {
     public:

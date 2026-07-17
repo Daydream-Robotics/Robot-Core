@@ -2,8 +2,8 @@
 
 
 #include "main.h"
-#include "odometry.hpp"
-#include "constants.h"
+#include "daydream/motion/odometry.hpp"
+#include "daydream/config/constants.h"
 
 inline pros::Controller controller(pros::E_CONTROLLER_MASTER);
 

@@ -1,8 +1,8 @@
-#include "arclengthSplining.hpp"
+#include "daydream/motion/pathing/arclengthSplining.hpp"
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
-#include "sd_card_logging.hpp" 
+#include "daydream/utils/sd_card_logging.hpp" 
 
 // ----------------------------------------
 //             MAIN INTERFACE
