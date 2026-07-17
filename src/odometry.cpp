@@ -38,7 +38,15 @@ void Odometry::updatePose(void) {
 
 	// Determine change in local x and in local y
 	double dx_local = arcs.parallel - (del_theta * m_config.parallelTrackingWheelOffset);
-	double dy_local = arcs.perpendicular - (del_theta * m_config.perpendicularTrackingWheelOffset);
+	double dy_local = arcs.perpendicular + (del_theta * m_config.perpendicularTrackingWheelOffset);
+
+	// Arc-length, chord-length correction
+	double chordFactor = 1.0;
+	if (std::abs(del_theta) > 1e-9) {
+		chordFactor = 2.0 * std::sin(del_theta / 2.0) / del_theta;
+	}
+	dx_local *= chordFactor;
+	dy_local *= chordFactor;
 
 	double theta_mid = m_prevTheta + del_theta / 2.0;
     theta_mid = normalizeAngle(theta_mid);
@@ -157,7 +165,7 @@ WheelLengths Odometry::getOdomWheelTravel(void) {
 }
 
 double Odometry::getParallelVel() {
-	double deg_s = parallelTrackingWheel.get_velocity();
+	double deg_s = parallelTrackingWheel.get_velocity() / 100.0;
 	return (deg_s / 360.0) * m_config.parallelWheelDiameter * std::numbers::pi;
 }
 
