@@ -595,7 +595,7 @@
       "slot": 8,
       "icon": "robot",
       "description": "My PROS Project",
-      "after": "run"
+      "after": "screen"
     },
     "use_early_access": false
   }
