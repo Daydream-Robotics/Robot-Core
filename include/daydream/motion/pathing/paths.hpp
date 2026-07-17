@@ -1,6 +1,6 @@
 #pragma once
-#include "odometry.hpp"
-#include "arclengthSplining.hpp"
+#include "daydream/motion/odometry.hpp"
+#include "daydream/motion/pathing/arclengthSplining.hpp"
 #include <vector>
 #include <fstream>
 

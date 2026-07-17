@@ -1,6 +1,6 @@
 // src/pid.cpp
 
-#include "pid.hpp"
+#include "daydream/motion/control/pid.hpp"
 
 #include <cmath>
 

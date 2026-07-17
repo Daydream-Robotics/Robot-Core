@@ -1,7 +1,7 @@
 #pragma once
 #include <stdio.h>
 #include <vector>
-#include "odometry.hpp"
+#include "daydream/motion/odometry.hpp"
 
 struct Sample {
     double t = 0.0; // where in spline param

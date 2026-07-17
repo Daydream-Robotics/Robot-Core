@@ -1,7 +1,7 @@
-#include "autonomous.hpp"
-#include "subsystems.hpp"
-#include "constants.h"
-#include "helpers.hpp"
+#include "daydream/autonomous/autonomous.hpp"
+#include "daydream/config/subsystems.hpp"
+#include "daydream/config/constants.h"
+#include "daydream/utils/helpers.hpp"
 #include <cmath>
 #include <numbers>
 

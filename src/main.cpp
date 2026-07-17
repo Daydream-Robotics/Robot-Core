@@ -1,11 +1,11 @@
 #include "main.h"
-#include "sd_card_logging.hpp"
+#include "daydream/utils/sd_card_logging.hpp"
 // #include "constants.h"
-#include "subsystems.hpp"
-#include "autonomous.hpp"
-#include "paths.hpp"
-#include "pathFollower.hpp"
-#include "purePursuit.hpp"
+#include "daydream/config/subsystems.hpp"
+#include "daydream/autonomous/autonomous.hpp"
+#include "daydream/motion/pathing/paths.hpp"
+#include "daydream/motion/pathFollower.hpp"
+#include "daydream/motion/control/purePursuit.hpp"
 
 
 // #include "slam.h"

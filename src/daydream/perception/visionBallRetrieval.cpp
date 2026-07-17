@@ -1,9 +1,9 @@
 #include "main.h"
-#include "slam.h"
-#include "objectHandler.h"
-#include "constants.h"
-#include "subsystems.hpp"
-#include "autonomous.hpp"
+#include "daydream/perception/visionBallRetrieval.hpp"
+#include "daydream/perception/objectHandler.h"
+#include "daydream/config/constants.h"
+#include "daydream/config/subsystems.hpp"
+#include "daydream/autonomous/autonomous.hpp"
 
 
 

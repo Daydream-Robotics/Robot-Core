@@ -1,6 +1,6 @@
-#include "paths.hpp"
+#include "daydream/motion/pathing/paths.hpp"
 #include "main.h"
-#include "helpers.hpp"
+#include "daydream/utils/helpers.hpp"
 
 std::vector<ALS_Path> Path::buildAllPathsFromJerryIO(const std::string& filePath, double sampleSpacing) {
     std::vector<ALS_Path> newPaths;

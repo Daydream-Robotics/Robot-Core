@@ -1,7 +1,7 @@
-#include "odometry.hpp"
-#include "constants.h"
-#include "subsystems.hpp"
-#include "helpers.hpp"
+#include "daydream/motion/odometry.hpp"
+#include "daydream/config/constants.h"
+#include "daydream/config/subsystems.hpp"
+#include "daydream/utils/helpers.hpp"
 #include <cmath>
 #include <numbers>
 
