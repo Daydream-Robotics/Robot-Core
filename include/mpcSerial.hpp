@@ -17,9 +17,14 @@ public:
     struct Params {
         double h; //sample period (s)
         double gear_ratio; //gear multiplier: (driver teeth / driven teeth)
+        double track_width; //track width in in"
+        double a;//motor time-constant
+        double b; //motor gain constant
+        double a_max; //max accel of bot in in/s^2
+        double v_ref_min; // in in/s speed floor
 
-        Params(double frequency, double ratio = 1.0);
-    };
+        Params(double frequency, double ratio, double trackWidth, double A, double B, double aMax, double vMin = 3);
+    }; 
 
     //stores prediction horizon (must match microcontroller)
     static constexpr std::size_t F = 15;

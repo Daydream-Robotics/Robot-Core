@@ -75,8 +75,10 @@ class MPCController : public MotionController {
         WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) 
             override ;
         
-        WheelVelocities compute(const Pose& currentPose, Eigen::Matrix<double, r_states * (F + 1), 1>& z_desired, double omega_L, double omega_R, double V_battery, double I_total);
-
+        WheelVelocities compute(const Pose& currentPose, const Eigen::Matrix<double, r_states * (F + 1), 1>& z_desired, double omega_L, double omega_R, double V_battery, double I_total);
+	void notifyAppliedVoltage(double left, double right) {
+            m_u_prev << left, right;
+        }
         private:
 
             struct State {
@@ -234,4 +236,5 @@ class MPCController : public MotionController {
             
 };
 #endif
+
 

@@ -42,7 +42,7 @@ void initialize() {
 	}
 
 
-    constexpr double GEAR_RATIO = 450.0 / 600.0;
+    constexpr double GEAR_RATIO = 450.0/600.0;
     MPCSerial::Params mpc_serial_params(0.02, GEAR_RATIO);
     mpc_serial_controller = new MPCSerial(mpc_serial_params);
     pathFollower = new PathFollower(*mpc_serial_controller);
@@ -128,7 +128,7 @@ void autonomous() {
 }
 
 void opcontrol() {
-	MPCSerial::identifyMotorModel(450.0/600.0);                                                      
+	// MPCSerial::identifyMotorModel(450.0/600.0);                                                      
     leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     descorer.set_value(true);

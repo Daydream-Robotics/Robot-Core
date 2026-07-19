@@ -15,20 +15,20 @@ int main() {
    typename MPCController<V::value, F::value>::Params params(
         1.625, //wheel radius (in)
         10.5, //track width (in)
-        30.0308, //motor time-constant
-        138.9554, //motor gain constant
+        16.7211, //motor time-constant
+        71.3105, //motor gain constant
         0.02, //sampling period (s)
-        132.0, //output weight for x
-        132.0, //output weight for y
-        10.0, //output weight for theta
-        0.5, //input penalty
-        5.0, //multiplier for first Q_i
-        5.0, //multiplier for last Q_i
-        50.0, //multiplier for last P_i
+        200.0, //output weight for x
+        200.0, //output weight for y
+        60.0, //output weight for theta
+        0.1, //input penalty
+        2.0, //multiplier for first Q_i
+        1.0, //multiplier for last Q_i
+        20.0, //multiplier for last P_i
         12.0, //voltage max
         0.083, //internal resistance of battery
-        24.0, //max positive change in voltage between steps
-        -24.0, //max negative change in voltage between steps
+        8.0, //max positive change in voltage between steps
+        -8.0, //max negative change in voltage between steps
         140, //max allowed x position on field
         140, //max allowed y position on field
         100, //max allowed rad/s

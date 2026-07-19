@@ -235,8 +235,9 @@ void MPCController<V, F>::buildStageModels() {
         if (std::abs(omega_sum) < OMEGA_SUM_EPS)
             omega_sum = (omega_sum >= 0.0) ? OMEGA_SUM_EPS : -OMEGA_SUM_EPS;
 
-        double c = std::cos(theta), s = std::sin(theta);
-        m_Ac 
+        double c = std::cos(theta);
+	double s = std::sin(theta);
+        m_Ac <<
             0, 0, -R_TWO*omega_sum*s,  R_TWO*c,     R_TWO*c,
             0, 0,  R_TWO*omega_sum*c,  R_TWO*s,     R_TWO*s,
             0, 0,  0,                 -R_L,         R_L,
@@ -255,6 +256,39 @@ void MPCController<V, F>::buildStageModels() {
                  - m_A_k[k] * m_x_ref.col(k)
                  - m_B_k[k] * m_u_ref.col(k);
     }
+}
+
+//reconstruct full reference states (x,y,theta,omega_L,omega_R) and
+//feedforward voltages from the F+1 reference poses
+template<std::size_t V, std::size_t F>
+void MPCController<V, F>::buildReferenceStates() {
+    const double h = m_params.h;
+    const double r = m_params.r;
+    const double L = m_params.L;
+
+    for (std::size_t k = 0; k < F; k++) {
+        double x0  = m_z_desired(3*k + 0);
+        double y0  = m_z_desired(3*k + 1);
+        double th  = m_z_desired(3*k + 2);
+        double x1  = m_z_desired(3*(k+1) + 0);
+        double y1  = m_z_desired(3*(k+1) + 1);
+        double th1 = m_z_desired(3*(k+1) + 2);
+
+        //signed forward speed: displacement projected onto heading
+        double v = ((x1 - x0) * std::cos(th) + (y1 - y0) * std::sin(th)) / h;
+        double w = wrapAngle(th1 - th) / h;
+
+        double wl = (v - w * L / 2.0) / r;
+        double wr = (v + w * L / 2.0) / r;
+
+        m_x_ref.col(k) << x0, y0, th, wl, wr;
+        //steady-state feedforward voltage: u = (a/b)*omega
+        m_u_ref.col(k) << (m_params.a / m_params.b) * wl,
+                          (m_params.a / m_params.b) * wr;
+    }
+    //terminal reference state: last pose, hold last wheel speeds
+    m_x_ref.col(F) << m_z_desired(3*F + 0), m_z_desired(3*F + 1), m_z_desired(3*F + 2),
+                      m_x_ref(3, F - 1), m_x_ref(4, F - 1);
 }
 
 template<std::size_t V, std::size_t F>
@@ -494,7 +528,7 @@ typename MPCController<V, F>::CscStorage MPCController<V, F>::eigenToCSC(Eigen::
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::assembleQP() {
     // tracking error: s = z_desired - free response
-    m_s.noalias() = m_z_desired - m_O * m_x_hat - m_D_z;
+    m_s.noalias() = m_z_desired.template segment<r_states * F>(r_states) - m_O * m_x_hat - m_D_z;
     for (std::size_t i = 0; i < F; i++) {
         double& theta_err = m_s(i * r_states + 2);
         while (theta_err > M_PI) theta_err -= 2.0 * M_PI;
@@ -505,12 +539,14 @@ void MPCController<V, F>::assembleQP() {
     m_W_four_M.noalias() = m_W_four * m_M;
     m_P.noalias() = m_M.transpose() * m_W_four_M + m_W_three;
     //regularization for stability
-    m_P.diagonal().array() += 2;
+    m_P.diagonal().array() += 1e-2;
 
     //q = -M^T*W_4*s (linear term)
     Eigen::Matrix<double, r_states*F, 1> m_W_four_s;
     m_W_four_s.noalias() = m_W_four * m_s;
     m_q.noalias() = -m_M.transpose() * m_W_four_s;  
+    m_q.template segment<m_inputs>(0) -=
+    m_params.q_zero_multiplier * m_params.q_u * m_u_prev;
 }
 
 template<std::size_t V, std::size_t F>
@@ -595,8 +631,24 @@ void MPCController<V, F>::solveQP() {
         throw std::runtime_error("OSQP solve failed");   
     }
 
-    m_u_left = m_solver->solution->x[0];
-    m_u_right = m_solver->solution->x[1];
+    double u0_left = m_solver->solution->x[0];
+    double u0_right = m_solver->solution->x[1];
+
+    // OSQP_SOLVED_INACCURATE can return a stage-0 input that violates the hard
+    // delta-u rate limit; treat that the same as a failed solve rather than
+    // sending the robot a voltage step the real motors/battery can't handle
+    constexpr double kDeltaSlack = 0.25; // numerical tolerance above the hard limit
+    double d_left = u0_left - m_u_prev(0);
+    double d_right = u0_right - m_u_prev(1);
+    if (d_left  > m_params.delta_u_max + kDeltaSlack || d_left  < m_params.delta_u_min - kDeltaSlack ||
+        d_right > m_params.delta_u_max + kDeltaSlack || d_right < m_params.delta_u_min - kDeltaSlack) {
+        std::cerr << "OSQP solution violates delta-u limit (d_left=" << d_left
+                   << " d_right=" << d_right << ")\n";
+        throw std::runtime_error("OSQP solution violates rate limit");
+    }
+
+    m_u_left = u0_left;
+    m_u_right = u0_right;
     m_u_prev << m_u_left, m_u_right;
 
     static std::vector<OSQPFloat> x_ws(N_VARS);
@@ -616,7 +668,7 @@ WheelVelocities MPCController<V, F>::compute(const Pose& currentPose,
         double omega_L, double omega_R, double V_battery, double I_total)
 {
     m_z_ref = z_ref;
-    m_z_desired = z_ref.template segment<r_states * F>(r_states); 
+    m_z_desired = z_ref;
     m_x_hat << currentPose.x, currentPose.y, currentPose.theta, omega_L, omega_R;
 
     buildReferenceStates();
@@ -650,6 +702,7 @@ void MPCController<V, F>::reset() {
     m_b_z_omega.setZero();
     m_u_left = 0.0;
     m_u_right = 0.0;
+    m_u_prev.setZero();
 }
 
 
@@ -715,4 +768,5 @@ MPCController<V, F>::~MPCController() {
 
 //explicit instantiation for V=F=15
 template class MPCController<15, 15>;
+
 
