@@ -1,6 +1,14 @@
 #include "daydream/motion/pathFollower.hpp"
 #include "daydream/config/subsystems.hpp"
 #include "daydream/config/constants.h"
+<<<<<<< HEAD
+=======
+#include "daydream/utils/fieldLogger.hpp"
+
+double omega_L = 0.0;
+double omega_R = 0.0;
+WheelVelocities wheelVelocities;
+>>>>>>> 72c3512 (chnaged issues when merging)
 
 PathFollower::PathFollower(MotionController& controller)
      : m_controller(controller) {}

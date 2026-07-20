@@ -5,9 +5,8 @@
 #include "daydream/autonomous/autonomous.hpp"
 #include "daydream/motion/pathing/paths.hpp"
 #include "daydream/motion/pathFollower.hpp"
-#include "daydream/motion/control/purePursuit.hpp"
-
-#include "fieldLogger.hpp"
+#include "daydream/motion/control/mpcSerial.hpp"
+#include "daydream/utils/fieldLogger.hpp"
 
 Autonomous auton = Autonomous();
 
@@ -44,7 +43,7 @@ void initialize() {
 
 
     constexpr double GEAR_RATIO = 450.0/600.0;
-    MPCSerial::Params mpc_serial_params(0.02, GEAR_RATIO);
+    MPCSerial::Params mpc_serial_params(0.02, GEAR_RATIO, 16.7211, 71.3105, 10.5, 60);
     mpc_serial_controller = new MPCSerial(mpc_serial_params);
     pathFollower = new PathFollower(*mpc_serial_controller);
 
@@ -72,10 +71,6 @@ void autonomous() {
         velocity_log.log(leftMotors.get_actual_velocity(0), pros::millis()/1000.0);
 		pros::delay(20);
 	}
-	sin_log.flush();
-	sin_log.close();
-	cos_log.flush();
-	cos_log.close();
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
     pros::lcd::print(5, "done");
 

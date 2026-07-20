@@ -1,10 +1,10 @@
 #ifndef _MPC_SERIAL_HPP_
 #define _MPC_SERIAL_HPP_
 
-#include "motionController.hpp"
-#include "odometry.hpp"
-#include "arclengthSplining.hpp"
-#include "serialProtocol.hpp"
+#include "daydream/motion/control/motionController.hpp"
+#include "daydream/motion/odometry.hpp"
+#include "daydream/motion/pathing/arclengthSplining.hpp"
+#include "daydream/utils/serialProtocol.hpp"
 
 #include <cstddef>
 #include <string>

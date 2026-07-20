@@ -1,12 +1,12 @@
-#include "mpcSerial.hpp"
-#include "subsystems.hpp"
+#include "daydream/motion/control/mpcSerial.hpp"
+#include "daydream/config/subsystems.hpp"
 #include "pros/rtos.hpp"
 #include "pros/misc.hpp"
 #include <cmath>
 #include <algorithm>
-#include "pathFollower.hpp"
-#include "sd_card_logging.hpp"
-#include "constants.h"
+#include "daydream/motion/pathFollower.hpp"
+#include "daydream/utils/sd_card_logging.hpp"
+#include "daydream/config/constants.h"
 
 //store sample period and gear ratio
 MPCSerial::Params::Params(double frequency, double ratio, double trackWidth, double A, double B, double aMax, double vMin)

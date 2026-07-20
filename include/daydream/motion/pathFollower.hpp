@@ -7,7 +7,11 @@ class PathFollower {
     public:
         PathFollower(MotionController& controller);
         ~PathFollower() = default;
+<<<<<<< HEAD
         void setPath(ALS_Path& path, PathFlag flag = PathFlag::FORWARDS, bool logging = false, const char* baseName = "noname");
+=======
+         void setPath(ALS_Path& path, PathFlag flag = PathFlag::FORWARDS, bool logging = false, const char* baseName = "noname");
+>>>>>>> 72c3512 (chnaged issues when merging)
         bool step();
 
     private:
