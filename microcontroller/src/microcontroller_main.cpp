@@ -21,7 +21,7 @@ int main() {
         200.0, //output weight for x
         200.0, //output weight for y
         60.0, //output weight for theta
-        0.1, //input penalty
+        0.1, //input penalty q_u
         2.0, //multiplier for first Q_i
         1.0, //multiplier for last Q_i
         20.0, //multiplier for last P_i
@@ -61,16 +61,15 @@ int main() {
     std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
     std::cerr << "Ready\n";
+    //background heartbeat which send a null wakeup byte every 500 ms so the brain knows the coprocessor is alive
 	std::thread wakeupTask([&serial]() {
     while (true) {
         serial.sendWakeup(std::string(1, '\0'));
-
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(500)
-        );
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 });
 
+//heartbeat runs independently for the life of the process
 wakeupTask.detach();
     //50 Hz control loop
     while (true) {
