@@ -4,6 +4,21 @@
 #include "daydream/utils/helpers.hpp"
 #include <cmath>
 #include <numbers>
+#include <vector>
+
+static double averageMotorGroupPosition(const pros::MotorGroup& group) {
+    std::vector<double> positions = group.get_position_all();
+    if (positions.empty()) {
+        return 0.0;
+    }
+
+    double sum = 0.0;
+    for (double pos : positions) {
+        sum += pos;
+    }
+
+    return sum / static_cast<double>(positions.size());
+}
 
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
@@ -21,17 +36,26 @@ void Odometry::updatePose(void) {
 	
 	if (!m_initialized) {
 		m_prevTheta = theta_rad;
-		
-		// get initial position of tracking wheels
-		m_prevParallel = parallelTrackingWheel.get_position();
-		m_prevPerpendicular = perpendicularTrackingWheel.get_position();
+
+		if (m_config.useMotorEncoders) {
+			m_prevLeft = averageMotorGroupPosition(leftMotors);
+			m_prevRight = averageMotorGroupPosition(rightMotors);
+		} else {
+			m_prevParallel = parallelTrackingWheel.get_position();
+			m_prevPerpendicular = perpendicularTrackingWheel.get_position();
+		}
 		
 		m_initialized = true;
 		return;
 	}
 
-	// Calculate distance travelled by each tracking wheel
-	WheelLengths arcs = getOdomWheelTravel();
+	// Calculate distance travelled by either drive encoders or tracking wheels
+	WheelLengths arcs;
+	if (m_config.useMotorEncoders) {
+		arcs = getDriveEncoderTravel();
+	} else {
+		arcs = getOdomWheelTravel();
+	}
 	
 	// Determine change in heading 
 	double del_theta = normalizeAngle(theta_rad - m_prevTheta);
@@ -164,6 +188,27 @@ WheelLengths Odometry::getOdomWheelTravel(void) {
 	return {delParallel, delPerpendicular};
 }
 
+WheelLengths Odometry::getDriveEncoderTravel(void) {
+	if (!m_initialized) {
+		return {0, 0};
+	}
+
+    double currLeft = averageMotorGroupPosition(leftMotors);
+    double currRight = averageMotorGroupPosition(rightMotors);
+
+    double dLeft = currLeft - m_prevLeft;
+    double dRight = currRight - m_prevRight;
+
+    double leftInches = (dLeft / 360.0) * m_config.driveWheelDiameter * std::numbers::pi;
+    double rightInches = (dRight / 360.0) * m_config.driveWheelDiameter * std::numbers::pi;
+
+    m_prevLeft = currLeft;
+    m_prevRight = currRight;
+
+    double forwardInches = (leftInches + rightInches) / 2.0;
+    return {forwardInches, 0.0};
+}
+
 double Odometry::getParallelVel() {
 	double deg_s = parallelTrackingWheel.get_velocity() / 100.0;
 	return (deg_s / 360.0) * m_config.parallelWheelDiameter * std::numbers::pi;
@@ -181,5 +226,7 @@ Odometry odom({
 	PARALLEL_TRACKING_WHEEL_DIAMETER,
 	PERPENDICULAR_TRACKING_WHEEL_DIAMETER,
 	PARALLEL_TRACKING_WHEEL_OFFSET,
-	PERPINDICULAR_TRACKING_WHEEL_OFFSET	
+	PERPINDICULAR_TRACKING_WHEEL_OFFSET,
+	true,
+	DRIVE_WHEEL_DIAMETER_INCHES
 });
