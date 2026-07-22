@@ -63,7 +63,7 @@ void autonomous() {
 		printf("[MAIN-ERROR] FIRST_PATH index out of bounds! Array size is %zu\n", paths.size());
 		return;
 	}
-    FieldLogger velocity_log(LoggerType::VALUE, "test","sine");
+    FieldLogger velocity_log(LoggerType::VALUE, "test", "sine");
 	printf("[MAIN] Setting FIRST_PATH...\n");
 	pathFollower->setPath(paths[PathName::FIRST_PATH], PathFlag::FORWARDS, true, "test");
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
@@ -71,6 +71,8 @@ void autonomous() {
         velocity_log.log(leftMotors.get_actual_velocity(0), pros::millis()/1000.0);
 		pros::delay(20);
 	}
+	velocity_log.flush();
+	velocity_log.close();
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
     pros::lcd::print(5, "done");
 

@@ -139,38 +139,48 @@ class FieldLogger: public Logger {
         }
 
         static Waypoint closestPointOnPath(const std::vector<Sample>& samples, std::size_t idx, const Position& p) {
-            auto project = [&](const Sample& a, const Sample& b) {
+            // projects the current position onto a line segment and interpolates the velocity at that point
+            auto project_on_segment = [&](const Sample& a, const Sample& b) {
+                // segment direction vector
                 double ex = b.x - a.x, ey = b.y - a.y;
-                double len2 = ex * ex + ey * ey;
-                double t = (len2 < 1e-12)
+                // squared segment length
+                double len_squared = ex * ex + ey * ey;
+                // projection parameter (clamped so it stays on the segment)
+                double t = (len_squared < 1e-12)
                     ? 0.0
-                    : std::clamp(((p.x - a.x) * ex + (p.y - a.y) * ey) / len2, 0.0, 1.0);
+                    : std::clamp(((p.x - a.x) * ex + (p.y - a.y) * ey) / len_squared, 0.0, 1.0);
+                // return projected point with interpolated velocity
                 return Waypoint{a.x + t * ex, a.y + t * ey, a.v + t * (b.v - a.v)};
             };
 
+            // initialize with the closest sampled waypoint
             Waypoint best{samples[idx].x, samples[idx].y, samples[idx].v};
-            double bestD = std::hypot(p.x - best.x, p.y - best.y);
+            double best_distance = std::hypot(p.x - best.x, p.y - best.y);
 
+            // check the segment after the closest sample
             if (idx + 1 < samples.size()) {
-                Waypoint w = project(samples[idx], samples[idx + 1]);
+                Waypoint w = project_on_segment(samples[idx], samples[idx + 1]);
                 double d = std::hypot(p.x - w.x, p.y - w.y);
-                if (d < bestD) { bestD = d; best = w; }
+                if (d < best_distance) {
+                    best_distance = d;
+                    best = w;
+                }
             }
+
+            // check the segment before the closest sample
             if (idx > 0) {
-                Waypoint w = project(samples[idx - 1], samples[idx]);
+                Waypoint w = project_on_segment(samples[idx - 1], samples[idx]);
                 double d = std::hypot(p.x - w.x, p.y - w.y);
-                if (d < bestD) best = w;
+                if (d < best_distance) {
+                    best = w;
+                }
             }
             return best;
         }
 
-        //prevent copying because file handles can't be duplicated
+        // prevent copying because file handles can't be duplicated
         FieldLogger(const FieldLogger&) = delete;
         FieldLogger& operator=(const FieldLogger&) = delete;
-
-
-        
-
     private:
         //file handles for PATH mode
         FILE* target_pos_file = nullptr;
@@ -233,6 +243,5 @@ class FieldLogger: public Logger {
                 flush_counter = 0;
             }
         }
-
 };
 

@@ -1,14 +1,7 @@
 #include "daydream/motion/pathFollower.hpp"
 #include "daydream/config/subsystems.hpp"
 #include "daydream/config/constants.h"
-<<<<<<< HEAD
-=======
 #include "daydream/utils/fieldLogger.hpp"
-
-double omega_L = 0.0;
-double omega_R = 0.0;
-WheelVelocities wheelVelocities;
->>>>>>> 72c3512 (chnaged issues when merging)
 
 PathFollower::PathFollower(MotionController& controller)
      : m_controller(controller) {}
@@ -33,8 +26,10 @@ bool PathFollower::step() {
     if (m_isFinished || !m_path || !m_path->isValid() || m_path->getSamples().empty()) {
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
-        path_log->flush();
-        path_log->close();
+        if (logging && path_log) {
+            path_log->flush();
+            path_log->close();
+        }
         return true;
     }
 
@@ -56,8 +51,10 @@ bool PathFollower::step() {
     if (m_distanceFromEnd < END_TOLERANCE) {
         leftMotors.move_velocity(0);
         rightMotors.move_velocity(0);
-        path_log->flush();
-        path_log->close();
+        if (logging && path_log) {
+            path_log->flush();
+            path_log->close();
+        }
         m_isFinished = true;
         return true;
     }
@@ -76,11 +73,10 @@ bool PathFollower::step() {
             break;
     }
     if (logging && path_log) {
-        std::size_t logIdx = m_path->findClosestSampleIndex({currentPose.x, currentPose.y}, m_currentSampleIdx);
-        Waypoint closest = FieldLogger::closestPointOnPath(m_path->getSamples(), logIdx,{currentPose.x, currentPose.y});
+        std::size_t log_idx = m_path->findClosestSampleIndex({currentPose.x, currentPose.y}, m_currentSampleIdx);
+        Waypoint closest = FieldLogger::closestPointOnPath(m_path->getSamples(), log_idx, {currentPose.x, currentPose.y});
         path_log->log(closest, Waypoint{currentPose.x, currentPose.y, 0.0}, pros::millis() / 1000.0);
-     }
-    
+    }
 
     return false;
 }
