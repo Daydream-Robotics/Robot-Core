@@ -37,6 +37,13 @@ double angleDiffDeg(double a, double b) {
     return c;
 }
 
+double angleDiffRad(double a, double b) {
+    double c = a - b;
+    while (c > M_PI) c -= M_PI;
+    while (c < -M_PI) c += M_PI;
+    return c;
+}
+
 // Determine deceleration speed scaling
 double computeDecelScale(double remaining, double totalDistance) {
 	double decelDistance = std::max(0.2, std::fabs(totalDistance) * 0.15);
