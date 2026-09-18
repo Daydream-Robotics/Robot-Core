@@ -39,8 +39,8 @@ double angleDiffDeg(double a, double b) {
 
 double angleDiffRad(double a, double b) {
     double c = a - b;
-    while (c > M_PI) c -= M_PI;
-    while (c < -M_PI) c += M_PI;
+    while (c > M_PI) c -= 2 * M_PI;
+    while (c < -M_PI) c += 2 * M_PI;
     return c;
 }
 
