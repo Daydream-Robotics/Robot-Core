@@ -13,8 +13,8 @@ inline pros::Rotation perpendicularTrackingWheel(PERPENDICULAR_TRACKING_WHEEL_PO
 inline pros::MotorGroup leftMotors(LEFT_DRIVE_WHEEL_PORTS, pros::v5::MotorGears::blue);
 inline pros::MotorGroup rightMotors(RIGHT_DRIVE_WHEEL_PORTS, pros::v5::MotorGears::blue);
 
-inline pros::MotorGroup intake({INITIAL_INTAKE_PORT, INITIAL_INTAKE_PORT2});
-inline pros::MotorGroup lever({LEVER_ONE_PORT, LEVER_TWO_PORT}, pros::v5::MotorGears::red);
+// inline pros::MotorGroup intake({INITIAL_INTAKE_PORT, INITIAL_INTAKE_PORT2});
+// inline pros::MotorGroup lever({LEVER_ONE_PORT, LEVER_TWO_PORT}, pros::v5::MotorGears::red);
 
 inline pros::IMU imu(IMU_PORT);
 

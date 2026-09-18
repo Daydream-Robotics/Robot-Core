@@ -37,6 +37,11 @@ bool PathFollower::step() {
     odom.updatePose();
     Pose currentPose = odom.getPose();
 
+    // std::size_t searchWindowEnd = m_currentSampleIdx + MAX_VIEWABLE_INDEX_AHEAD;
+    // if (searchWindowEnd > m_path->getSamples().size()) {
+    //     searchWindowEnd = m_path->getSamples().size();
+    // }
+
     m_currentSampleIdx = m_path->findClosestSampleIndex({currentPose.x, currentPose.y}, m_currentSampleIdx);
 
     if (m_currentSampleIdx >= m_path->getSamples().size()) {

@@ -1,18 +1,30 @@
 #include "main.h"
 #include "daydream/utils/sd_card_logging.hpp"
-// #include "constants.h"
 #include "daydream/config/subsystems.hpp"
 #include "daydream/autonomous/autonomous.hpp"
 #include "daydream/motion/pathing/paths.hpp"
 #include "daydream/motion/pathFollower.hpp"
 #include "daydream/motion/control/mpcSerial.hpp"
 #include "daydream/utils/fieldLogger.hpp"
+#include "daydream/motion/control/purePursuit.hpp"
+#include "daydream/motion/control/ramsete.hpp"
 
+
+// #include "slam.h"
+// #include "objectHandler.h"
+// #include <numbers>
+// #include "arclengthSplining.hpp"
+
+StanleyController stan = StanleyController();
 Autonomous auton = Autonomous();
 
 // Declare pointers globally so they are visible to both initialize and autonomous
 MPCSerial* mpc_serial_controller = nullptr;
 PathFollower* pathFollower = nullptr;
+RamseteController ramsete = RamseteController(0.007, 0.7, 10.1875, 4); // 0.003 - 0.01
+PurePursuitController purePursuit = PurePursuitController();
+
+PathFollower pathFollower = PathFollower(purePursuit);
 
 std::vector<ALS_Path> paths;
 
@@ -32,9 +44,10 @@ void initialize() {
     printf("[MAIN] Loading paths...\n");
 	paths = Path::buildAllPathsFromJerryIO("/usd/path.jerryio.txt");
 	printf("[MAIN] Paths loaded: %zu\n", paths.size());
+
 	if (paths.size() != PathName::COUNT) {
 		printf("[MAIN] ERROR: Path count mismatch\n");
-		pros::lcd::print(1, "ERROR: Path count mismatch");
+		pros::lcd::print(1, "EsRROR: Path count mismatch");
 		pros::lcd::print(2, "Expected: %d, Actual: %d", PathName::COUNT, paths.size());
 	} else {
 		printf("[MAIN] Trajectories Loaded successfully\n");
@@ -57,7 +70,12 @@ void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
-    printf("[MAIN] Starting autonomous()\n");
+	// while (true){
+	// 	odom.updatePose();
+	// 	pros::delay(20);
+	// }
+
+	printf("[MAIN] Starting autonomous()\n");
 	
 	if (paths.size() <= PathName::FIRST_PATH) {
 		printf("[MAIN-ERROR] FIRST_PATH index out of bounds! Array size is %zu\n", paths.size());
@@ -145,26 +163,31 @@ void opcontrol() {
     bool leverMovingDown = false;
     uint32_t timeToMoveLeverDown = 500;
 
-    while (true) {
-        drive(DriveType::SPLIT_ARCADE);
+	while(true){
 
-        if (controller.get_digital(DIGITAL_R1)) {
-            intake.move(HIGH_VOLTAGE);
-        } else if (controller.get_digital(DIGITAL_L2)) {
-            intake.move(-HIGH_VOLTAGE);
-        } else {
-            intake.move(STOP);
-        }
+		drive(DriveType::SPLIT_ARCADE);
 
-        if (controller.get_digital(DIGITAL_Y)) {
-            matchloader.set_value(true);
-        } else {
-            matchloader.set_value(false);
-        }
+		// NEW INTAKE
+		if (controller.get_digital(DIGITAL_R1)) { // intake
+			// intake.move(HIGH_VOLTAGE);
+		} else if (controller.get_digital(DIGITAL_L2)) { // outtake
+			// intake.move(-HIGH_VOLTAGE);
+		} else {
+			// intake.move(STOP);
+		}
+
+		// Matchloader
+		if (controller.get_digital(DIGITAL_Y)) {
+			matchloader.set_value(true); //r
+		} else {
+			matchloader.set_value(false); //r
+		}
         
-        if (controller.get_digital_new_press(DIGITAL_RIGHT)) {
-            lifterUp = !lifterUp;
-        }
+        // Raise Lifter
+        // if (controller.get_digital_new_press(DIGITAL_RIGHT)) {
+            // scoringLifter.toggle();
+            // lifterUp = !lifterUp;
+        // }
 
         if (controller.get_digital(DIGITAL_L1)) {
             descorer.set_value(false);
@@ -174,9 +197,9 @@ void opcontrol() {
 
         if (controller.get_digital_new_press(DIGITAL_R2)) {
             leverMovingDown = false;
-            lever.move(MAX_VOLTAGE);
-            ballBlocker.set_value(true);
-        } else if (controller.get_digital_new_release(DIGITAL_R2)) {
+			// lever.move(MAX_VOLTAGE);
+			ballBlocker.set_value(true);
+		} else if(controller.get_digital_new_release(DIGITAL_R2)){
             leverMovingDown = true;
             leverMoveStart = pros::millis();
             ballBlocker.set_value(false);
@@ -184,10 +207,10 @@ void opcontrol() {
 
         if (leverMovingDown) {
             if (pros::millis() - leverMoveStart > timeToMoveLeverDown) {
-                lever.move(STOP);
+                // lever.move(STOP);
                 leverMovingDown = false;
             } else {
-                lever.move(-MAX_VOLTAGE);
+                // lever.move(-MAX_VOLTAGE);
             }
         }
 
@@ -252,47 +275,67 @@ void drive(DriveType type) {
 }
 
 void score() {
-    intake.move(MAX_VOLTAGE);
+	// lever up
+    // intake.move(MAX_VOLTAGE);
+	pros::delay(500);
+
+    // lever.move(125);
+    pros::delay(500);
+    // intake.move(-MAX_VOLTAGE);
     pros::delay(500);
 
-    lever.move(125);
-    pros::delay(500);
-    intake.move(-MAX_VOLTAGE);
-    pros::delay(500);
+	// lever down
+	// lever.move(-MAX_VOLTAGE);
+	pros::delay(600);
+	// lever.move(STOP);
 
-    lever.move(-MAX_VOLTAGE);
-    pros::delay(600);
-    lever.move(STOP);
-
-    intake.move(STOP);
+    // intake.move(STOP);
     pros::delay(100);
 }
 
 void matchload(int numRam) {
-    intake.move(MAX_VOLTAGE);
+    // intake.move(MAX_VOLTAGE);
     pros::delay(300);
 
-    for (int i = 0; i < numRam; i++) {
-        leftMotors.move_velocity(-70);
-        rightMotors.move_velocity(-70);
-        pros::delay(400);
-        leftMotors.move_velocity(0);
-        rightMotors.move_velocity(0);
-        pros::delay(300);
-        leftMotors.move_velocity(70);
-        rightMotors.move_velocity(70);
-        pros::delay(350);
-        leftMotors.move_velocity(0);
-        rightMotors.move_velocity(0);
-        pros::delay(500);
-    }
-    intake.move(STOP);
+	for (int i = 0; i < numRam; i++) {
+		leftMotors.move_velocity(-70);
+		rightMotors.move_velocity(-70);
+		pros::delay(400);
+		leftMotors.move_velocity(0);
+		rightMotors.move_velocity(0);
+		pros::delay(300);
+		leftMotors.move_velocity(70);
+		rightMotors.move_velocity(70);
+		pros::delay(350); //400
+		leftMotors.move_velocity(0);
+		rightMotors.move_velocity(0);
+		pros::delay(500);
+	}
+    // intake.move(STOP);
 }
+
+// void fullMatchload() {
+	// intake.move(MAX_VOLTAGE); // 'intake' is not defined
+//     pros::delay(300);
+//     leftMotors.move_velocity(-70);
+//     rightMotors.move_velocity(-70);
+//     pros::delay(250);
+// 	leftMotors.move_velocity(0);
+// 	rightMotors.move_velocity(0);
+// 	pros::delay(250);
+//     leftMotors.move_velocity(70);
+//     rightMotors.move_velocity(70);
+//     pros::delay(250);
+//     leftMotors.move_velocity(0);
+//     rightMotors.move_velocity(0);
+// 	pros::delay(400);
+    // intake.move(STOP); // 'intake' is not defined
+// }
 
 void wallBall() {
     int turnSpeed = 40;
 
-    intake.move(MAX_VOLTAGE);
+    // intake.move(MAX_VOLTAGE);
     leftMotors.move_velocity(turnSpeed);
     rightMotors.move_velocity(-turnSpeed);
     pros::delay(500);
@@ -304,5 +347,5 @@ void wallBall() {
     pros::delay(500);
     leftMotors.move_velocity(0);
     rightMotors.move_velocity(0);
-    intake.move(STOP);
+    // intake.move(STOP);
 }
