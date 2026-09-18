@@ -1,13 +1,12 @@
 #include "main.h"
-#include "sd_card_logging.hpp"
-// #include "constants.h"
-#include "subsystems.hpp"
-#include "autonomous.hpp"
-#include "paths.hpp"
-#include "pathFollower.hpp"
-#include "purePursuit.hpp"
-#include "ramsete.hpp"
-#include "odometry.hpp"
+#include "daydream/utils/sd_card_logging.hpp"
+#include "daydream/config/subsystems.hpp"
+#include "daydream/autonomous/autonomous.hpp"
+#include "daydream/motion/pathing/paths.hpp"
+#include "daydream/motion/pathFollower.hpp"
+#include "daydream/motion/control/purePursuit.hpp"
+#include "daydream/motion/control/ramsete.hpp"
+
 
 // #include "slam.h"
 // #include "objectHandler.h"
@@ -18,7 +17,8 @@ Autonomous auton = Autonomous();
 
 RamseteController ramsete = RamseteController(0.007, 0.7, 10.1875, 4); // 0.003 - 0.01
 PurePursuitController purePursuit = PurePursuitController();
-PathFollower pathFollower = PathFollower(ramsete);
+
+PathFollower pathFollower = PathFollower(purePursuit);
 
 std::vector<ALS_Path> paths;
 
@@ -41,10 +41,6 @@ void initialize() {
 	printf("[MAIN] Loading paths...\n");
 	paths = Path::buildAllPathsFromJerryIO("/usd/path.jerryio.txt");
 	printf("[MAIN] Paths loaded: %zu\n", paths.size());
-
-	for (auto& p : paths) {
-		RamseteController::applyCurvatureSpeedLimit(p, 40.0, 60.0); // tune these two
-	}
 
 	if (paths.size() != PathName::COUNT) {
 		printf("[MAIN] ERROR: Path count mismatch\n");
@@ -77,24 +73,33 @@ void autonomous() {
 		return;
 	}
 
+
+	FieldLogger sin_log(LoggerType::VALUE, "test","sine");
+	FieldLogger cos_log(LoggerType::VALUE, "test","cosine");
 	printf("[MAIN] Setting FIRST_PATH...\n");
-	pathFollower.setPath(paths[PathName::FIRST_PATH]);
+	pathFollower.setPath(paths[PathName::FIRST_PATH], PathFlag::FORWARDS, true, "test");
 	printf("[MAIN] FIRST_PATH set. Tracking...\n");
 	while (not pathFollower.step()) {
+		sin_log.log(sin(pros::millis()/1000.0), pros::millis()/1000.0);
+		cos_log.log(cos(pros::millis()/1000.0), pros::millis()/1000.0);
 		pros::delay(20);
 	}
+	sin_log.flush();
+	sin_log.close();
+	cos_log.flush();
+	cos_log.close();
 	printf("[MAIN] FIRST_PATH tracking complete.\n");
 
 	printf("[MAIN] Delaying 2000ms...\n");
 	pros::delay(2000);
-
 	if (paths.size() <= PathName::SECOND_PATH) {
 		printf("[MAIN-ERROR] SECOND_PATH index out of bounds! Array size is %zu\n", paths.size());
 		return;
 	}
 
 	printf("[MAIN] Setting SECOND_PATH...\n");
-	pathFollower.setPath(paths[PathName::SECOND_PATH], PathFlag::REVERSE);
+	
+	pathFollower.setPath(paths[PathName::SECOND_PATH], PathFlag::REVERSE, true, "test_back");
 	printf("[MAIN] SECOND_PATH set. Tracking...\n");
 	while (not pathFollower.step()) {
 		pros::delay(20);
@@ -109,12 +114,12 @@ void opcontrol() {
 
 	descorer.set_value(true);
 
-	intake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+	// intake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 
-	lever.move(-HIGH_VOLTAGE);
+	// lever.move(-HIGH_VOLTAGE);
 	pros::delay(100);
-    lever.move(STOP);
-	lever.set_zero_position(lever.get_position());
+    // lever.move(STOP);
+	// lever.set_zero_position(lever.get_position());
 
 	// bool raised = false;
 	// bool lowered = true;
@@ -133,11 +138,11 @@ void opcontrol() {
 
 		// NEW INTAKE
 		if (controller.get_digital(DIGITAL_R1)) { // intake
-			intake.move(HIGH_VOLTAGE);
+			// intake.move(HIGH_VOLTAGE);
 		} else if (controller.get_digital(DIGITAL_L2)) { // outtake
-			intake.move(-HIGH_VOLTAGE);
+			// intake.move(-HIGH_VOLTAGE);
 		} else {
-			intake.move(STOP);
+			// intake.move(STOP);
 		}
 
 		// Matchloader
@@ -148,10 +153,10 @@ void opcontrol() {
 		}
         
         // Raise Lifter
-        if (controller.get_digital_new_press(DIGITAL_RIGHT)) {
+        // if (controller.get_digital_new_press(DIGITAL_RIGHT)) {
             // scoringLifter.toggle();
-            lifterUp = !lifterUp;
-        }
+            // lifterUp = !lifterUp;
+        // }
 
 		// Descore Wing
         if (controller.get_digital(DIGITAL_L1)) {
@@ -163,7 +168,7 @@ void opcontrol() {
 		// Lever Hold
 		if (controller.get_digital_new_press(DIGITAL_R2)) {
             leverMovingDown = false;
-			lever.move(MAX_VOLTAGE);
+			// lever.move(MAX_VOLTAGE);
 			ballBlocker.set_value(true);
 		} else if(controller.get_digital_new_release(DIGITAL_R2)){
             leverMovingDown = true;
@@ -174,10 +179,10 @@ void opcontrol() {
 
         if (leverMovingDown) {
             if (pros::millis() - leverMoveStart > timeToMoveLeverDown) {
-                lever.move(STOP);
+                // lever.move(STOP);
                 leverMovingDown = false;
             } else {
-                lever.move(-MAX_VOLTAGE);
+                // lever.move(-MAX_VOLTAGE);
             }
         }
 
@@ -263,26 +268,26 @@ void drive(DriveType type) {
 // score
 void score() {
 	// lever up
-    intake.move(MAX_VOLTAGE);
+    // intake.move(MAX_VOLTAGE);
 	pros::delay(500);
 
-    lever.move(125);
+    // lever.move(125);
     pros::delay(500);
-    intake.move(-MAX_VOLTAGE);
+    // intake.move(-MAX_VOLTAGE);
     pros::delay(500);
 
 	// lever down
-	lever.move(-MAX_VOLTAGE);
+	// lever.move(-MAX_VOLTAGE);
 	pros::delay(600);
-	lever.move(STOP);
+	// lever.move(STOP);
 
-    intake.move(STOP);
+    // intake.move(STOP);
     pros::delay(100);
 }
 
 
 void matchload(int numRam) {
-    intake.move(MAX_VOLTAGE);
+    // intake.move(MAX_VOLTAGE);
     pros::delay(300);
 
 	for (int i = 0; i < numRam; i++) {
@@ -299,11 +304,11 @@ void matchload(int numRam) {
 		rightMotors.move_velocity(0);
 		pros::delay(500);
 	}
-    intake.move(STOP);
+    // intake.move(STOP);
 }
 
 // void fullMatchload() {
-// 	intake.move(MAX_VOLTAGE);
+	// intake.move(MAX_VOLTAGE); // 'intake' is not defined
 //     pros::delay(300);
 //     leftMotors.move_velocity(-70);
 //     rightMotors.move_velocity(-70);
@@ -317,13 +322,13 @@ void matchload(int numRam) {
 //     leftMotors.move_velocity(0);
 //     rightMotors.move_velocity(0);
 // 	pros::delay(400);
-//     intake.move(STOP);
+    // intake.move(STOP); // 'intake' is not defined
 // }
 
 void wallBall() {
     int turnSpeed = 40;
 
-    intake.move(MAX_VOLTAGE);
+    // intake.move(MAX_VOLTAGE);
     leftMotors.move_velocity(turnSpeed);
     rightMotors.move_velocity(-turnSpeed);
     pros::delay(500);
@@ -335,5 +340,5 @@ void wallBall() {
     pros::delay(500);
     leftMotors.move_velocity(0);
     rightMotors.move_velocity(0);
-    intake.move(STOP);
+    // intake.move(STOP);
 }

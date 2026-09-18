@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "W_AWP",
+    "project_name": "MotionControl",
     "target": "v5",
     "templates": {
       "kernel": {
@@ -593,8 +593,9 @@
     },
     "upload_options": {
       "slot": 8,
-      "icon": "X",
-      "description": "My PROS Project"
+      "icon": "robot",
+      "description": "My PROS Project",
+      "after": "screen"
     },
     "use_early_access": false
   }
