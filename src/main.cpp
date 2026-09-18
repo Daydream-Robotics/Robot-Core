@@ -13,6 +13,7 @@
 // #include <numbers>
 // #include "arclengthSplining.hpp"
 
+StanleyController stan = StanleyController();
 Autonomous auton = Autonomous();
 
 RamseteController ramsete = RamseteController(0.007, 0.7, 10.1875, 4); // 0.003 - 0.01
@@ -44,7 +45,7 @@ void initialize() {
 
 	if (paths.size() != PathName::COUNT) {
 		printf("[MAIN] ERROR: Path count mismatch\n");
-		pros::lcd::print(1, "ERROR: Path count mismatch");
+		pros::lcd::print(1, "EsRROR: Path count mismatch");
 		pros::lcd::print(2, "Expected: %d, Actual: %d", PathName::COUNT, paths.size());
 	} else {
 		printf("[MAIN] Trajectories Loaded successfully\n");

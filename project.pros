@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "MotionControl",
+    "project_name": "Robot-Core",
     "target": "v5",
     "templates": {
       "kernel": {
@@ -592,10 +592,9 @@
       }
     },
     "upload_options": {
-      "slot": 8,
-      "icon": "robot",
-      "description": "My PROS Project",
-      "after": "screen"
+      "slot": 1,
+      "icon": "alien",
+      "description": "Robot-Core"
     },
     "use_early_access": false
   }
