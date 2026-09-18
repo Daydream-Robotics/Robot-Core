@@ -11,6 +11,7 @@
 *.sln.docstates
 *.env
 tests/*.cpp
+*.DS_Store
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 *.DS_Store
@@ -47,6 +48,7 @@ bld/
 [Oo]ut/
 [Ll]og/
 [Ll]ogs/
+.d/
 
 # Build results on 'Bin' directories
 **/[Bb]in/*
