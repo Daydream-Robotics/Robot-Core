@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "Stanley Controller",
+    "project_name": "Robot-Core",
     "target": "v5",
     "templates": {
       "kernel": {
@@ -592,9 +592,9 @@
       }
     },
     "upload_options": {
-      "slot": 7,
+      "slot": 1,
       "icon": "alien",
-      "description": "Stanley Controller Feature Testing"
+      "description": "Robot-Core"
     },
     "use_early_access": false
   }
