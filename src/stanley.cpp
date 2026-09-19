@@ -1,8 +1,8 @@
-#include "stanley.hpp"
-#include "helpers.hpp"
-#include "subsystems.hpp"
 #include <cmath>
 #include <algorithm>
+#include "daydream/motion/control/stanley.hpp"
+#include "daydream/utils/helpers.hpp"
+#include "daydream/config/subsystems.hpp"
 
 void StanleyController::setPath(ALS_Path& path) {
     m_als_path       = &path;

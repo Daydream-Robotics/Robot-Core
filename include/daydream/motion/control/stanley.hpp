@@ -1,9 +1,8 @@
 #pragma once
 
-#include "arclengthSplining.hpp"
-#include "odometry.hpp"
 #include <numbers>
-
+#include "daydream/motion/pathing/arclengthSplining.hpp"
+#include "daydream/motion/odometry.hpp"
 
 //STANLEY CONSTANTS
 constexpr double STANLEY_K = 4.0; //tuning constant
