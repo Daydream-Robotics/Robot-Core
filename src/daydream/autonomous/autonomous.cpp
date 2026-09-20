@@ -44,7 +44,7 @@ void Autonomous::turnTo(double targetHeading) {
 		double rawHeading = odom.getYaw();
 		odom.updatePose();
 
-		if (rawHeading < 180.0) {
+		if (rawHeading < -std::numbers::pi) {
 			pros::lcd::print(0, "[TurnTo] IMU Failure! YAW: %lf", rawHeading);
 			// TODO: Add more verbose error handling
 			return;
@@ -74,7 +74,7 @@ void Autonomous::turnTo(double targetHeading) {
 		leftMotors.move_velocity(turnSpeed);
         rightMotors.move_velocity(-turnSpeed);
 		
-		double currentVelocity = (std::fabs(angleDiffDeg(targetHeading, filteredHeading)) < 1.0) ? angleDiffDeg(rawHeading, prevHeading) / dt : 999.0;
+		double currentVelocity = (std::fabs(angleDiffDeg(targetHeading, filteredHeading)) < (1.0 * std::numbers::pi / 180)) ? angleDiffDeg(rawHeading, prevHeading) / dt : 999.0;
 		if (turnPID.exit_condition(currentVelocity) != PID::RUNNING)
 			break;
 		prevHeading = rawHeading;
@@ -98,8 +98,8 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
     };
 
     auto normalizeDeg = [](double a) {
-        while (a >= 180.0) a -= 360.0;
-        while (a < -180.0) a += 360.0;
+        while (a >= std::numbers::pi) a -= (2 * std::numbers::pi);
+        while (a < -std::numbers::pi) a += (2 * std::numbers::pi);
         return a;
     };
 	// int count = 0;
@@ -164,7 +164,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 
         // Heading error
         double rawHeading = odom.getYaw();
-        if (rawHeading < 180.0) {
+        if (rawHeading < -std::numbers::pi) {
             pros::lcd::print(0, "[Travel] IMU Failure!");
             break;
         }
@@ -221,11 +221,11 @@ bool Autonomous::travelToPoint(double targetX, double targetY, double maxSpeed, 
 	double dy = targetY - start.y;
 	
 	double distance = std::hypot(dx, dy); //euclidean distance from start to end point	
-	double targetHeading = std::atan2(dy, dx) * 180.0  / std::numbers::pi;
+	double targetHeading = std::atan2(dy, dx);
 	
 	if (reverse) {
-		targetHeading += 180;
-		if (targetHeading > 180) targetHeading -= 360;
+		targetHeading += std::numbers::pi;
+		if (targetHeading > std::numbers::pi) targetHeading -= (2 * std::numbers::pi);
 		
 		distance = -distance;
 	}

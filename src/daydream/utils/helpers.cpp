@@ -29,11 +29,11 @@ double convertRadToDeg(double rad) {
     return rad * (180.0 / std::numbers::pi);
 }
 
-// Subtract angles with [-180, 180] wrapping
+// Subtract angles with [-pi, pi] wrapping
 double angleDiffDeg(double a, double b) {
     double c = a - b;
-    while (c > 180.0) c -= 360.0;
-    while (c <= -180.0) c += 360.0;
+    while (c > std::numbers::pi) c -= 2 * std::numbers::pi;
+    while (c <= -std::numbers::pi) c += 2 * std::numbers::pi;
     return c;
 }
 
