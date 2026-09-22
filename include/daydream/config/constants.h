@@ -36,7 +36,7 @@ constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.0425;
 
 // distance from tracking center to wheels
 constexpr double PARALLEL_TRACKING_WHEEL_OFFSET = 0.0; // positive is to the right of tracking center
-constexpr double PERPINDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behind tracking center
+constexpr double PERPENDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behind tracking center
 
 /* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
 
