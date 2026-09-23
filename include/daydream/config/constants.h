@@ -21,7 +21,7 @@ constexpr int INITIAL_INTAKE_PORT2 = -22;
 constexpr int LEVER_ONE_PORT = -22;
 constexpr int LEVER_TWO_PORT = 22;
 
-constexpr char IMU_PORT = 1; 
+constexpr int IMU_PORT = 1; 
 
 constexpr char BALL_BLOCKER_PORT = 'A';
 constexpr char SCORING_LIFTER = 'B';
@@ -36,7 +36,7 @@ constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.0425;
 
 // distance from tracking center to wheels
 constexpr double PARALLEL_TRACKING_WHEEL_OFFSET = 0.0; // positive is to the right of tracking center
-constexpr double PERPINDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behind tracking center
+constexpr double PERPENDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behind tracking center
 
 /* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
 

@@ -1,19 +1,19 @@
 #include "main.h"
-#include "daydream/utils/sd_card_logging.hpp"
+
 #include "daydream/config/subsystems.hpp"
 #include "daydream/autonomous/autonomous.hpp"
-#include "daydream/motion/pathing/paths.hpp"
+
 #include "daydream/motion/pathFollower.hpp"
+
+#include "daydream/motion/pathing/paths.hpp"
+
 #include "daydream/motion/control/mpcSerial.hpp"
-#include "daydream/utils/fieldLogger.hpp"
 #include "daydream/motion/control/purePursuit.hpp"
 #include "daydream/motion/control/ramsete.hpp"
+#include "daydream/motion/control/stanley.hpp"
 
-
-// #include "slam.h"
-// #include "objectHandler.h"
-// #include <numbers>
-// #include "arclengthSplining.hpp"
+#include "daydream/utils/fieldLogger.hpp"
+#include "daydream/utils/sd_card_logging.hpp"
 
 StanleyController stan = StanleyController();
 Autonomous auton = Autonomous();
@@ -23,8 +23,6 @@ MPCSerial* mpc_serial_controller = nullptr;
 PathFollower* pathFollower = nullptr;
 RamseteController ramsete = RamseteController(0.007, 0.7, 10.1875, 4); // 0.003 - 0.01
 PurePursuitController purePursuit = PurePursuitController();
-
-PathFollower pathFollower = PathFollower(purePursuit);
 
 std::vector<ALS_Path> paths;
 
@@ -151,12 +149,12 @@ void opcontrol() {
     leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     descorer.set_value(true);
-    intake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+    // intake.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 
-    lever.move(-HIGH_VOLTAGE);
+    // lever.move(-HIGH_VOLTAGE);
     pros::delay(100);
-    lever.move(STOP);
-    lever.set_zero_position(lever.get_position());
+    // lever.move(STOP);
+    // lever.set_zero_position(lever.get_position());
 
     bool lifterUp = true;
     uint32_t leverMoveStart = pros::millis();
