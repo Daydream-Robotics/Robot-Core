@@ -8,7 +8,7 @@
 namespace mcl {
 
     //robot position structure with x, y, theta
-    struct robot_position {
+    struct RobotPosition {
         double x;
         double y;
         double theta;
@@ -16,37 +16,37 @@ namespace mcl {
 
     //particle structure for MCL
     struct Particle {
-        double x;           //x position
-        double y;           //y position
-        double theta;       //heading angle
-        double w;           //unnormalized weight
-        double W;           //normalized weight
-        double log_w;       //log weight for numerical stability
+        double x;                   //x position
+        double y;                   //y position
+        double theta;               //heading angle
+        double weight;              //unnormalized weight
+        double normalizedWeight;    //normalized weight
+        double logWeight;           //log weight for numerical stability
     };
 
     //covariance matrix for motion noise
     struct Covariance {
-        double x_x, x_y, x_theta;
-        double y_x, y_y, y_theta;
-        double theta_x, theta_y, theta_theta;
+        double xx, xy, xTheta;
+        double yx, yy, yTheta;
+        double thetaX, thetaY, thetaTheta;
     };
 
     //initializes MCL system with uniformly distributed particles
-    void init_mcl(const lemlib::Pose& init_pose);
+    void initMcl(const lemlib::Pose& initPose);
     //main MCL update loop running in background task
-    void mcl_update();
+    void mclUpdate();
     //returns current estimated robot position
-    robot_position get_est_pos();
+    RobotPosition getEstPos();
     //prints particle statistics for debugging
-    void print_particle_stats();
+    void printParticleStats();
 
     //prints all particle data for debugging
-    void print_particle_data();
+    void printParticleData();
 
     //estimated robot position from MCL
-    extern robot_position est_pos;
+    extern RobotPosition estPos;
     //mutex for thread-safe position updates
-    extern pros::Mutex pos_update_mutex;
+    extern pros::Mutex posUpdateMutex;
 
 }
 #endif

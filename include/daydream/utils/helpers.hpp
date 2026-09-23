@@ -22,14 +22,14 @@ double angleDiffDeg(double a, double b);
 double computeDecelScale(double remaining, double totalDistance);
 
 // Limit acceleration takeoff
-double accelLimit(double prev, double target, double dt, double accel_limit);
+double accelLimit(double prev, double target, double dt, double maxAccel);
 
 // Utility class for smoothing heading changes
 class HeadingFilter {
 	private:
-		double alpha;
-		double heading = 0.0;
-		bool initialized = false;
+		double m_alpha;
+		double m_heading = 0.0;
+		bool m_initialized = false;
 
 	public:
 		HeadingFilter(double alpha);
@@ -46,7 +46,7 @@ double calcDistBetweenPoints(Position pt1, Position pt2);
 //========= MCL Helpers =========//
 
 //distance sensor objects for all 4 directions
-struct range_sensors {
+struct RangeSensors {
 	pros::Distance front;
 	pros::Distance left;
 	pros::Distance back;
@@ -54,99 +54,99 @@ struct range_sensors {
 };
 
 //odom mode
-enum class odom_mode {
+enum class OdomMode {
 	TWO_TRACKING,
 	ONE_TRACKING,
 	DRIVE_ENCODERS
 };
 
-struct odom_sensors {
+struct OdomSensors {
 	//odom mode
-	odom_mode mode;
+	OdomMode mode;
 
 	//rotation sensors
-	std::optional<pros::Rotation> parallel_tracking;
-	std::optional<pros::Rotation> perpendicular_tracking;
+	std::optional<pros::Rotation> parallelTracking;
+	std::optional<pros::Rotation> perpendicularTracking;
 
 	//IMEs
-	std::optional<pros::Motor> drive_left;
-	std::optional<pros::Motor> drive_right;
+	std::optional<pros::Motor> driveLeft;
+	std::optional<pros::Motor> driveRight;
 
 	//imus
-	pros::Imu imu_one;
-	std::optional<pros::Imu> imu_two;
+	pros::Imu imuOne;
+	std::optional<pros::Imu> imuTwo;
 };
 
-	//distance sensor readings in inches (supports named and array access)
-    struct range_readings {
-        union {
-            struct { double front, left, back, right; };
-            double direction[4];
-        };
-    };
-
-    //odometry sensor readings
-    struct odom_readings {
-        double parallel_tracking;
-        double perpendicular_tracking;
-        double heading;
-    };
-
-	//previous odom readings
-    struct prev_odom {
-		double parallel_tracking;
-		double perpendicular_tracking;
-		double heading;
-		double left_drive;
-		double right_drive;
+//distance sensor readings in inches (supports named and array access)
+struct RangeReadings {
+	union {
+		struct { double front, left, back, right; };
+		double direction[4];
 	};
+};
 
-    //calibration factors for distance sensors
-    struct range_calibration {
-        union {
-            struct { double front, left, back, right; };
-            double direction[4];
-        };
-    };
+//odometry sensor readings
+struct OdomReadings {
+	double parallelTracking;
+	double perpendicularTracking;
+	double heading;
+};
 
-    //calibration factors for odometry sensors
-    struct odom_calibration {
-        double parallel_tracking_tpi;
-        double perpendicular_tracking_tpi;
-        double imu_one_scale;
-        double imu_two_scale;
-    };
+//previous odom readings
+struct PrevOdom {
+	double parallelTracking;
+	double perpendicularTracking;
+	double heading;
+	double leftDrive;
+	double rightDrive;
+};
 
-    //physical offsets for distance sensors
-    struct range_offset {
-        union {
-            struct { double front, left, back, right; };
-            double direction[4];
-        };
-    };
+//calibration factors for distance sensors
+struct RangeCalibration {
+	union {
+		struct { double front, left, back, right; };
+		double direction[4];
+	};
+};
 
-    //physical offsets for tracking wheels
-    struct odom_offset {
-        double parallel_tracking;
-        double perpendicular_tracking;
-    };
+//calibration factors for odometry sensors
+struct OdomCalibration {
+	double parallelTrackingTpi;
+	double perpendicularTrackingTpi;
+	double imuOneScale;
+	double imuTwoScale;
+};
 
-    //distance sensor objects
-    extern range_sensors distance_sensors;
-    //odometry sensor objects
-    extern odom_sensors chassis_odom_sensors;
-    //current odometry readings
-    extern odom_readings odom_values;
-    //tracking wheel offsets from robot center
-    extern odom_offset tracking_offset;
-    //current distance sensor readings
-    extern range_readings distance_readings;
+//physical offsets for distance sensors
+struct RangeOffset {
+	union {
+		struct { double front, left, back, right; };
+		double direction[4];
+	};
+};
 
-    //updates odometry sensor readings
-    void update_odom_sensors();
-    //updates distance sensor readings
-    void update_range_sensors();
-    //prints raw + converted range sensor values for unit checking
-    void print_range_sensor_debug();
-    //prints raw + converted odom sensor values for sign/unit checking
-    void print_odom_sensor_debug();
+//physical offsets for tracking wheels
+struct OdomOffset {
+	double parallelTracking;
+	double perpendicularTracking;
+};
+
+//distance sensor objects
+extern RangeSensors distanceSensors;
+//odometry sensor objects
+extern OdomSensors chassisOdomSensors;
+//current odometry readings
+extern OdomReadings odomValues;
+//tracking wheel offsets from robot center
+extern OdomOffset trackingOffset;
+//current distance sensor readings
+extern RangeReadings distanceReadings;
+
+//updates odometry sensor readings
+void updateOdomSensors();
+//updates distance sensor readings
+void updateRangeSensors();
+//prints raw + converted range sensor values for unit checking
+void printRangeSensorDebug();
+//prints raw + converted odom sensor values for sign/unit checking
+void printOdomSensorDebug();

@@ -55,8 +55,8 @@ double computeDecelScale(double remaining, double totalDistance) {
 }
 
 // Limit acceleration takeoff
-double accelLimit(double prev, double target, double dt, double accel_limit) {
-	double maxDelta = accel_limit * dt;
+double accelLimit(double prev, double target, double dt, double maxAccel) {
+	double maxDelta = maxAccel * dt;
 	double delta = target - prev;
 
 	if (delta > maxDelta) delta = maxDelta;
@@ -65,21 +65,21 @@ double accelLimit(double prev, double target, double dt, double accel_limit) {
 	return prev + delta;
 }
 
-HeadingFilter::HeadingFilter(double alpha) : alpha(alpha) {}
+HeadingFilter::HeadingFilter(double alpha) : m_alpha(alpha) {}
 
 double HeadingFilter::update(double raw) {
-    if (!initialized) {
-        heading = raw;
-        initialized = true;
-        return heading;
+    if (!m_initialized) {
+        m_heading = raw;
+        m_initialized = true;
+        return m_heading;
     }
 
-    heading += alpha * angleDiffDeg(raw, heading);
-    return heading;
+    m_heading += m_alpha * angleDiffDeg(raw, m_heading);
+    return m_heading;
 }
 
 void HeadingFilter::reset() {
-    initialized = false;
+    m_initialized = false;
 }
 
 
@@ -93,27 +93,27 @@ double calcDistBetweenPoints(Position pt1, Position pt2) {
 //========= MCL Helpers =========//
 
 //helper function to sanatize distance sensor reading
-double sanitize_distance_reading(long val) {
+double sanitizeDistanceReading(long val) {
     return (val == 9999 || val == PROS_ERR) ? NAN : static_cast<double>(val);
 }
 
 //helper function to sanatize other values
-double sanitize_numeric_reading(double val) {
+double sanitizeNumericReading(double val) {
     return (val == PROS_ERR || val == PROS_ERR_F) ? NAN : val;
 }
 
 //helper function to take in tracking enum and return string
-const char* odom_mode_name(odom_mode mode) {
+const char* odomModeName(OdomMode mode) {
     switch (mode) {
-        case odom_mode::TWO_TRACKING: return "TWO_TRACKING"; 
-        case odom_mode::ONE_TRACKING: return "ONE_TRACKING"; 
-        case odom_mode::DRIVE_ENCODERS: return "DRIVE_ENCODERS";
+        case OdomMode::TWO_TRACKING: return "TWO_TRACKING"; 
+        case OdomMode::ONE_TRACKING: return "ONE_TRACKING"; 
+        case OdomMode::DRIVE_ENCODERS: return "DRIVE_ENCODERS";
         default: return "UNKNOWN";
     }
 }
 
 //helper function to take in unit enum and return string
-const char* motor_units_name(pros::MotorUnits units) {
+const char* motorUnitsName(pros::MotorUnits units) {
     switch (units) {
         case pros::MotorUnits::degrees: return "deg";
         case pros::MotorUnits::rotations: return "rot";
@@ -123,48 +123,48 @@ const char* motor_units_name(pros::MotorUnits units) {
 }
 
 //converts motor position into the linear distance the wheel has traveled compared to 0 position of encoder
-double motor_position_to_wheel_inches(double raw_position, pros::MotorUnits units) {
-    if (std::isnan(raw_position)) {
+double motorPositionToWheelInches(double rawPosition, pros::MotorUnits units) {
+    if (std::isnan(rawPosition)) {
         return NAN;
     }
     switch (units) {
         case pros::MotorUnits::degrees:
-            return raw_position * DRIVE_IN_PER_DEG * DRIVE_GEAR_RATIO;
+            return rawPosition * DRIVE_IN_PER_DEG * DRIVE_GEAR_RATIO;
         case pros::MotorUnits::rotations:
-            return raw_position * DRIVE_WHEEL_CIRCUMFERENCE_IN * DRIVE_GEAR_RATIO;
+            return rawPosition * DRIVE_WHEEL_CIRCUMFERENCE_IN * DRIVE_GEAR_RATIO;
         default:
             return NAN;
     }
 }
 
 //returns the drive motor's accumulated wheel travel in inches, or NAN if unavailable.
-double drive_motor_inches(const std::optional<pros::Motor>& motor) {
+double driveMotorInches(const std::optional<pros::Motor>& motor) {
     if (!motor) {
         return NAN;
     }
-    const double raw_position = sanitize_numeric_reading(motor->get_position());
-    return motor_position_to_wheel_inches(raw_position, motor->get_encoder_units());
+    const double rawPosition = sanitizeNumericReading(motor->get_position());
+    return motorPositionToWheelInches(rawPosition, motor->get_encoder_units());
 }
 
 //converts a tracking wheel rotation sensor reading to wheel travel in inches.
-double tracking_wheel_inches(const std::optional<pros::Rotation>& sensor, double scale) {
+double trackingWheelInches(const std::optional<pros::Rotation>& sensor, double scale) {
     if (!sensor) {
         return NAN;
     }
-    const double raw_centideg = sanitize_numeric_reading(sensor->get_position());
-    return std::isnan(raw_centideg) ? NAN : raw_centideg * scale;
+    const double rawCentideg = sanitizeNumericReading(sensor->get_position());
+    return std::isnan(rawCentideg) ? NAN : rawCentideg * scale;
 }
 
 //rangle sensors for MCL
-range_sensors distance_sensors = {
+RangeSensors distanceSensors = {
     pros::Distance(3),  // front
     pros::Distance(2),  // left
     pros::Distance(8),  // back
     pros::Distance(9)}; // right
 
 // struct for odom with backups
-odom_sensors chassis_odom_sensors = {
-    odom_mode::DRIVE_ENCODERS,
+OdomSensors chassisOdomSensors = {
+    OdomMode::DRIVE_ENCODERS,
     std::nullopt,
     std::nullopt,
     pros::Motor(-11, pros::MotorGears::blue, pros::MotorUnits::degrees),
@@ -174,18 +174,18 @@ odom_sensors chassis_odom_sensors = {
 };   
 
 //vars to hold distance and odom readings
-range_readings distance_readings;
-odom_readings odom_values;
+RangeReadings distanceReadings;
+OdomReadings odomValues;
 
 //values to calibrate distance sensors
 // ! should be moved to constants but does depend on the structs
-range_calibration distance_calibration = {0.9896,0.9896,0.9896,0.9816};
+RangeCalibration distanceCalibration = {0.9896,0.9896,0.9896,0.9816};
 // Odometry scale factors:
 // - NEW_2 omniwheel: 2.0" diameter, circumference = 6.283185"
 // - Rotation sensor: 36000 centidegrees/revolution
 // - TPI = 36000 / 6.283185 = 5729.578 centidegrees/inch
 // - IMU scale: degrees to radians = π/180 = 0.017453293
-odom_calibration odom_scale = {
+OdomCalibration odomScale = {
     1.0 / 5729.578,  // parallel tracking TPI (inches per centidegree)
     1.0 / 5729.578,  // perpendicular tracking TPI (inches per centidegree)
     0.017453293,     // IMU scale (radians per degree)
@@ -193,106 +193,106 @@ odom_calibration odom_scale = {
 };
 
 // odom tracking wheel offsets offset
-odom_offset tracking_offset = {0.5, 0.75};  // parallel=0.5", perpendicular=0.75"
+OdomOffset trackingOffset = {0.5, 0.75};  // parallel=0.5", perpendicular=0.75"
 
 //update range sensor readings, (store, sanatize, convert to in, apply calibration)
-void update_range_sensors () {
-    distance_readings.front = sanitize_distance_reading(distance_sensors.front.get_distance()) * MM_TO_IN * distance_calibration.front;
-    distance_readings.left = sanitize_distance_reading(distance_sensors.left.get_distance()) * MM_TO_IN * distance_calibration.left;
-    distance_readings.back = sanitize_distance_reading(distance_sensors.back.get_distance()) * MM_TO_IN * distance_calibration.back;
-    distance_readings.right = sanitize_distance_reading(distance_sensors.right.get_distance()) * MM_TO_IN * distance_calibration.right;
+void updateRangeSensors() {
+    distanceReadings.front = sanitizeDistanceReading(distanceSensors.front.get_distance()) * MM_TO_IN * distanceCalibration.front;
+    distanceReadings.left = sanitizeDistanceReading(distanceSensors.left.get_distance()) * MM_TO_IN * distanceCalibration.left;
+    distanceReadings.back = sanitizeDistanceReading(distanceSensors.back.get_distance()) * MM_TO_IN * distanceCalibration.back;
+    distanceReadings.right = sanitizeDistanceReading(distanceSensors.right.get_distance()) * MM_TO_IN * distanceCalibration.right;
 }
 
 // ! update odom sensors, ie return the parallel and perpindicular local distance, either using tracking wheels or IMES
-void update_odom_sensors() {
+void updateOdomSensors() {
     double parallel = NAN;
     double perpendicular = NAN;
 
     // Case 1: parallel tracking wheel exists
-    if (chassis_odom_sensors.parallel_tracking) {
-        parallel = sanitize_numeric_reading(chassis_odom_sensors.parallel_tracking->get_position())
-            * odom_scale.parallel_tracking_tpi;
+    if (chassisOdomSensors.parallelTracking) {
+        parallel = sanitizeNumericReading(chassisOdomSensors.parallelTracking->get_position())
+            * odomScale.parallelTrackingTpi;
     }
     // Case 2: use drivetrain encoders
-    else if (chassis_odom_sensors.drive_left && chassis_odom_sensors.drive_right) {
-        const double left = drive_motor_inches(chassis_odom_sensors.drive_left);
-        const double right = drive_motor_inches(chassis_odom_sensors.drive_right);
+    else if (chassisOdomSensors.driveLeft && chassisOdomSensors.driveRight) {
+        const double left = driveMotorInches(chassisOdomSensors.driveLeft);
+        const double right = driveMotorInches(chassisOdomSensors.driveRight);
         // forward displacement from differential drive
         parallel = (left + right) * 0.5;
     }
 
     // perpendicular tracking wheel
-    if (chassis_odom_sensors.perpendicular_tracking) {
-        perpendicular = sanitize_numeric_reading(chassis_odom_sensors.perpendicular_tracking->get_position())
-            * odom_scale.perpendicular_tracking_tpi;
+    if (chassisOdomSensors.perpendicularTracking) {
+        perpendicular = sanitizeNumericReading(chassisOdomSensors.perpendicularTracking->get_position())
+            * odomScale.perpendicularTrackingTpi;
     }
     else {
         // no strafe measurement
         perpendicular = 0.0;
     }
 
-    const double heading = sanitize_numeric_reading(chassis_odom_sensors.imu_one.get_rotation()) *
+    const double heading = sanitizeNumericReading(chassisOdomSensors.imuOne.get_rotation()) *
         IMU_RAD_PER_DEG;
 
-    odom_values = {parallel, perpendicular, heading};
+    odomValues = {parallel, perpendicular, heading};
 }
 
 //debug printing for range sensors
-void print_range_sensor_debug() {
-    const double front_mm = sanitize_distance_reading(distance_sensors.front.get_distance());
-    const double left_mm = sanitize_distance_reading(distance_sensors.left.get_distance());
-    const double back_mm = sanitize_distance_reading(distance_sensors.back.get_distance());
-    const double right_mm = sanitize_distance_reading(distance_sensors.right.get_distance());
+void printRangeSensorDebug() {
+    const double frontMm = sanitizeDistanceReading(distanceSensors.front.get_distance());
+    const double leftMm = sanitizeDistanceReading(distanceSensors.left.get_distance());
+    const double backMm = sanitizeDistanceReading(distanceSensors.back.get_distance());
+    const double rightMm = sanitizeDistanceReading(distanceSensors.right.get_distance());
 
-    update_range_sensors();
+    updateRangeSensors();
 
     printf("=== RANGE SENSOR DEBUG ===\n");
     printf("Units: raw=mm, converted=inches, MM_TO_IN=%.6f\n", MM_TO_IN);
-    printf("Front: raw=%.2f mm, cal=%.4f, out=%.4f in\n", front_mm, distance_calibration.front, distance_readings.front);
-    printf("Left:  raw=%.2f mm, cal=%.4f, out=%.4f in\n", left_mm, distance_calibration.left, distance_readings.left);
-    printf("Back:  raw=%.2f mm, cal=%.4f, out=%.4f in\n", back_mm, distance_calibration.back, distance_readings.back);
-    printf("Right: raw=%.2f mm, cal=%.4f, out=%.4f in\n", right_mm, distance_calibration.right, distance_readings.right);
+    printf("Front: raw=%.2f mm, cal=%.4f, out=%.4f in\n", frontMm, distanceCalibration.front, distanceReadings.front);
+    printf("Left:  raw=%.2f mm, cal=%.4f, out=%.4f in\n", leftMm, distanceCalibration.left, distanceReadings.left);
+    printf("Back:  raw=%.2f mm, cal=%.4f, out=%.4f in\n", backMm, distanceCalibration.back, distanceReadings.back);
+    printf("Right: raw=%.2f mm, cal=%.4f, out=%.4f in\n", rightMm, distanceCalibration.right, distanceReadings.right);
     printf("==========================\n");
 }
 
 //debug print for odom sensors
-void print_odom_sensor_debug() {
-    const double left_raw = chassis_odom_sensors.drive_left
-        ? sanitize_numeric_reading(chassis_odom_sensors.drive_left->get_position()) : NAN;
-    const double right_raw = chassis_odom_sensors.drive_right
-        ? sanitize_numeric_reading(chassis_odom_sensors.drive_right->get_position()) : NAN;
-    const pros::MotorUnits left_units = chassis_odom_sensors.drive_left
-        ? chassis_odom_sensors.drive_left->get_encoder_units() : pros::MotorUnits::invalid;
-    const pros::MotorUnits right_units = chassis_odom_sensors.drive_right
-        ? chassis_odom_sensors.drive_right->get_encoder_units() : pros::MotorUnits::invalid;
-    const double left_inches = drive_motor_inches(chassis_odom_sensors.drive_left);
-    const double right_inches = drive_motor_inches(chassis_odom_sensors.drive_right);
+void printOdomSensorDebug() {
+    const double leftRaw = chassisOdomSensors.driveLeft
+        ? sanitizeNumericReading(chassisOdomSensors.driveLeft->get_position()) : NAN;
+    const double rightRaw = chassisOdomSensors.driveRight
+        ? sanitizeNumericReading(chassisOdomSensors.driveRight->get_position()) : NAN;
+    const pros::MotorUnits leftUnits = chassisOdomSensors.driveLeft
+        ? chassisOdomSensors.driveLeft->get_encoder_units() : pros::MotorUnits::invalid;
+    const pros::MotorUnits rightUnits = chassisOdomSensors.driveRight
+        ? chassisOdomSensors.driveRight->get_encoder_units() : pros::MotorUnits::invalid;
+    const double leftInches = driveMotorInches(chassisOdomSensors.driveLeft);
+    const double rightInches = driveMotorInches(chassisOdomSensors.driveRight);
 
-    const double parallel_raw_centideg = chassis_odom_sensors.parallel_tracking
-        ? sanitize_numeric_reading(chassis_odom_sensors.parallel_tracking->get_position()) : NAN;
-    const double perp_raw_centideg = chassis_odom_sensors.perpendicular_tracking
-        ? sanitize_numeric_reading(chassis_odom_sensors.perpendicular_tracking->get_position()) : NAN;
-    const double parallel_inches = tracking_wheel_inches(chassis_odom_sensors.parallel_tracking, odom_scale.parallel_tracking_tpi);
-    const double perp_inches = tracking_wheel_inches(chassis_odom_sensors.perpendicular_tracking, odom_scale.perpendicular_tracking_tpi);
+    const double parallelRawCentideg = chassisOdomSensors.parallelTracking
+        ? sanitizeNumericReading(chassisOdomSensors.parallelTracking->get_position()) : NAN;
+    const double perpRawCentideg = chassisOdomSensors.perpendicularTracking
+        ? sanitizeNumericReading(chassisOdomSensors.perpendicularTracking->get_position()) : NAN;
+    const double parallelInches = trackingWheelInches(chassisOdomSensors.parallelTracking, odomScale.parallelTrackingTpi);
+    const double perpInches = trackingWheelInches(chassisOdomSensors.perpendicularTracking, odomScale.perpendicularTrackingTpi);
 
-    const double imu_heading_deg = sanitize_numeric_reading(chassis_odom_sensors.imu_one.get_heading());
-    const double imu_rotation_deg = sanitize_numeric_reading(chassis_odom_sensors.imu_one.get_rotation());
+    const double imuHeadingDeg = sanitizeNumericReading(chassisOdomSensors.imuOne.get_heading());
+    const double imuRotationDeg = sanitizeNumericReading(chassisOdomSensors.imuOne.get_rotation());
 
-    update_odom_sensors();
+    updateOdomSensors();
 
     printf("=== ODOM SENSOR DEBUG ===\n");
-    printf("Mode: %s\n", odom_mode_name(chassis_odom_sensors.mode));
+    printf("Mode: %s\n", odomModeName(chassisOdomSensors.mode));
     printf("Drive encoder conversion: wheel_diam=%.3f in, wheel_circ=%.6f in, ext_ratio=%.6f\n",
             DRIVE_WHEEL_DIAMETER_INCHES, DRIVE_WHEEL_CIRCUMFERENCE_IN, DRIVE_GEAR_RATIO);
-    printf("Left drive:  raw=%.4f %s, conv=%.4f in\n", left_raw, motor_units_name(left_units), left_inches);
-    printf("Right drive: raw=%.4f %s, conv=%.4f in\n", right_raw, motor_units_name(right_units), right_inches);
+    printf("Left drive:  raw=%.4f %s, conv=%.4f in\n", leftRaw, motorUnitsName(leftUnits), leftInches);
+    printf("Right drive: raw=%.4f %s, conv=%.4f in\n", rightRaw, motorUnitsName(rightUnits), rightInches);
     printf("Drive avg parallel=%.4f in, left-right diff=%.4f in\n",
-            (left_inches + right_inches) * 0.5, left_inches - right_inches);
-    printf("Parallel tracker: raw=%.4f cdeg, conv=%.4f in\n", parallel_raw_centideg, parallel_inches);
-    printf("Perp tracker:     raw=%.4f cdeg, conv=%.4f in\n", perp_raw_centideg, perp_inches);
+            (leftInches + rightInches) * 0.5, leftInches - rightInches);
+    printf("Parallel tracker: raw=%.4f cdeg, conv=%.4f in\n", parallelRawCentideg, parallelInches);
+    printf("Perp tracker:     raw=%.4f cdeg, conv=%.4f in\n", perpRawCentideg, perpInches);
     printf("IMU heading=%.4f deg (wrapped), rotation=%.4f deg, rotation=%.6f rad\n",
-            imu_heading_deg, imu_rotation_deg, imu_rotation_deg * IMU_RAD_PER_DEG);
+            imuHeadingDeg, imuRotationDeg, imuRotationDeg * IMU_RAD_PER_DEG);
     printf("Computed odom_values: parallel=%.4f in, perp=%.4f in, heading=%.6f rad\n",
-            odom_values.parallel_tracking, odom_values.perpendicular_tracking, odom_values.heading);
+            odomValues.parallelTracking, odomValues.perpendicularTracking, odomValues.heading);
     printf("=========================\n");
 }
