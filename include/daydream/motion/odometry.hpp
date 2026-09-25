@@ -8,9 +8,30 @@ struct OdomConfig {
     double perpendicularTrackingWheelOffset;
 };
 
+// Custom error type vars
+enum class OdomError {
+    None,
+    IMUDisconnected,
+    IMUCalibrating,
+    IMUCommunicationError,
+    TrackingWheelError
+};
+
+// New yaw parameters for decimal or error return
+struct YawResult {
+    double yaw;
+    OdomError error;
+};
+
 struct WheelLengths {
     double parallel;
     double perpendicular;
+};
+
+// New wheel travel parameters for parallel/perpendicular travel and error
+struct WheelTravelResult {
+    WheelLengths travel;
+    OdomError error;
 };
 
 struct Position {
@@ -89,17 +110,14 @@ public:
     /** 
      * @brief gets the yaw of the robot
      * @note Counter clockwise is positive
-     * @returns returns yaw/heading in degrees bounded by [-180, 180]
-     * @retval	-180.1	IMU disconnected
-     * @retval	-180.2	IMU calibrating
-     * @retval	-180.3	Pros communication failure
+     * @returns returns yaw/heading in degrees and error status
      */
-    double getYaw(void);
+    YawResult getYaw(void);
     
     /**
      * @brief Returns struct of distances travelled by Odometry Wheels
      */
-    WheelLengths getOdomWheelTravel(void);
+    WheelTravelResult getOdomWheelTravel(void);
     
     /**
      * @brief gets the current velocity of the parallel tracking wheel
