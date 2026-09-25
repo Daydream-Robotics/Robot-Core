@@ -6,8 +6,7 @@
 
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
- #include <stdio.h>
-
+#include <numbers>
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
 constexpr int PARALLEL_TRACKING_WHEEL_PORT = 6;
@@ -41,6 +40,10 @@ constexpr double PERPENDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behin
 /* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
 
 constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 3.25;
+constexpr double DRIVE_WHEEL_CIRCUMFERENCE_IN = DRIVE_WHEEL_DIAMETER_INCHES * std::numbers::pi;
+constexpr double DRIVE_IN_PER_DEG = DRIVE_WHEEL_DIAMETER_INCHES * std::numbers::pi / 360;
+constexpr double DRIVE_GEAR_RATIO = 36.0 / 48.0;
+constexpr double IMU_RAD_PER_DEG = std::numbers::pi / 180.0;
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
@@ -53,6 +56,7 @@ constexpr int HIGH_VOLTAGE = 100;
 constexpr int MID_VOLTAGE = 60;
 constexpr int LOW_VOLTAGE = 40;
 constexpr int STOP = 0;
+constexpr double MM_TO_IN = 1.0 / 25.4;
 
 /* - - - - - - - - - - - - - - [PIDS] - - - - - - - - - - - - - - */
 

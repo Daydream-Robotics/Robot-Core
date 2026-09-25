@@ -110,6 +110,12 @@ void Odometry::setPose(Pose pose) {
 	m_currentPosition.y = pose.y;
 	m_currentPosition.theta = pose.theta;
 	m_mutex.give();
+
+	// Reset sensor baselines so setting a pose does not create a false odometry delta.
+	m_prevTheta = pose.theta;
+	m_prevParallel = parallelTrackingWheel.get_position();
+	m_prevPerpendicular = perpendicularTrackingWheel.get_position();
+	m_initialized = true;
 }
 
 Position Odometry::getPosition() {
