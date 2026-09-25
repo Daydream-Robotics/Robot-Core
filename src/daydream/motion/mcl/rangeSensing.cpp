@@ -1,15 +1,15 @@
 //Inclusions
 #include "main.h"
 #include "daydream/utils/helpers.hpp"
-#include "control/odom.hpp"
+#include "daydream/motion/odometry.hpp"
 #include "daydream/mcl/mcl.hpp"
 #include "daydream/mcl/rangeSensing.hpp"
 #include <cmath>
 #include <algorithm>
 
-//converts chassis/field heading (90 deg = +x) to math heading
+//Odometry headings already use the math frame: +x forward, +y left, CCW positive.
 float RangeSensing::fieldHeadingToMathHeading(float fieldHeadingRad) {
-    return fieldHeadingRad - static_cast<float>(M_PI_2);
+    return fieldHeadingRad;
 }
 
 //initializes lookup tables and precomputed data
@@ -54,7 +54,7 @@ void RangeSensing::fastSincos(float theta, float& sinOut, float& cosOut) {
 RangeReadings RangeSensing::raycast(const mcl::Particle& particle) {
     RangeReadings expectedReadings;
 
-    //convert chassis/field heading (90 deg = +x) to math heading for rotation math
+    //Use the odometry heading directly for rotation math.
     float headingSin, headingCos;
     fastSincos(fieldHeadingToMathHeading(static_cast<float>(particle.theta)), headingSin, headingCos);
 
@@ -218,8 +218,8 @@ void RangeSensing::printPositionFromSensors() {
 
 //calculates robot position using 1 or 2 sensors + IMU heading
 RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1Idx, int sensor2Idx, bool silent) {
-    //get current pose from chassis
-    lemlib::Pose currentPose = drive::chassis.getPose();
+    //Get the current pose from odometry.
+    Pose currentPose = odom.getPose();
 
     if (!silent) {
         printf("Current Pose: X: %.6f, Y: %.6f, Theta: %.6f\n",
@@ -235,7 +235,7 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
     };
 
     //convert robot heading to math heading
-    double headingRad = (currentPose.theta - 90.0) * M_PI / 180.0;
+    double headingRad = currentPose.theta;
     double c = std::cos(headingRad);
     double s = std::sin(headingRad);
 
@@ -359,12 +359,7 @@ void RangeSensing::checkRaycastAccuracy() {
     printf("=== RAYCAST ACCURACY CHECK ===\n");
 
     //get current odometry position
-    odom::odom_position currentPos;
-    {
-        odom::odom_update_mutex.lock();
-        currentPos = odom::chassis_odom_position;
-        odom::odom_update_mutex.unlock();
-    }
+    const Pose currentPos = odom.getPose();
 
     //get actual sensor readings
     updateRangeSensors();

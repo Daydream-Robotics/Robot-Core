@@ -1,7 +1,6 @@
 //Inclusions
-#include "main.h"
 #include "daydream/utils/helpers.hpp"
-#include "control/odom.hpp"
+#include "daydream/motion/odometry.hpp"
 #include "daydream/mcl/rangeSensing.hpp"
 #include "daydream/mcl/mcl.hpp"
 #include "daydream/utils/rng.hpp"
@@ -43,9 +42,9 @@ namespace mcl {
     // std::uint32_t lastPoseCorrectionMs = 0;
     std::uint32_t lastEstimatePrintMs = 0;
     //previous odometry position for delta calculation
-    odom::odom_position prevOdomPos;
+    RobotPosition prevOdomPos;
     //change in odometry position since last update
-    odom::odom_position deltaOdomPos;
+    RobotPosition deltaOdomPos;
 
     //motion noise covariance matrix
     constexpr Covariance EPSILON = {
@@ -70,8 +69,8 @@ namespace mcl {
     }
 
     //subtracts two odometry positions with angle wrapping
-    inline odom::odom_position operator-(const odom::odom_position& a,
-        const odom::odom_position& b) {
+    inline RobotPosition operator-(const RobotPosition& a,
+        const RobotPosition& b) {
         return {
             a.x - b.x,
             a.y - b.y,
@@ -85,20 +84,25 @@ namespace mcl {
         return -(r * r) * INV_2_SIGMA2 - 0.5 * LOG_NORM;
     }
 
+    //clamps value to 0 or 1
     inline double clamp01(double value) {
         if (value < 0.0) return 0.0;
         if (value > 1.0) return 1.0;
         return value;
     }
 
-    double chassisDeltaScore(const RobotPosition& estimate, const lemlib::Pose& currentPose) {
+    //measures how close mcl estimate to current chassis pose
+    double chassisDeltaScore(const RobotPosition& estimate, const RobotPosition& currentPose) {
         const double dx = estimate.x - currentPose.x;
         const double dy = estimate.y - currentPose.y;
+        //calcs position delta
         const double positionDelta = std::sqrt(dx * dx + dy * dy);
 
+        //clamos the value from 0 to 1, where 1 means the psoition matches and 0.0 means they are at least 18 in apart, values between decrease linearly
         return clamp01((18.0 - positionDelta) / 18.0);
     }
 
+    //checks whether a PROS task handle represents a currently usable task
     bool taskIsActive(pros::task_t taskHandle) {
         if (taskHandle == nullptr) return false;
 
@@ -114,6 +118,7 @@ namespace mcl {
         return x;
     }
 
+    //initialisez weights for all particles
     void setUniformWeights() {
         if (particles.empty()) return;
 
@@ -125,6 +130,7 @@ namespace mcl {
         }
     }
 
+    //scores how tightly weighted particles cluster around the MCL estimate.
     double particleConcentrationScore(const RobotPosition& estimate) {
         if (particles.empty()) return 0.0;
 
@@ -137,17 +143,21 @@ namespace mcl {
             const double dx = particle.x - estimate.x;
             const double dy = particle.y - estimate.y;
 
+            // accumulate each particle's weighted squared distance from the estimate.
             weightedSqRadius += particle.normalizedWeight * (dx * dx + dy * dy);
             totalWeight += particle.normalizedWeight;
         }
 
+        //a nonpositive total weight cannot produce a meaningful concentration score.
         if (!std::isfinite(totalWeight) || totalWeight <= 0.0) return 0.0;
 
+        //convert the weighted squared spread into an RMS radius before scoring it.
         const double rmsRadius = std::sqrt(weightedSqRadius / totalWeight);
         return clamp01((18.0 - rmsRadius) / 18.0);
     }
 
-    double trustMclNow(const RobotPosition& estimate, const lemlib::Pose& currentPose) {
+    double trustMclNow(const RobotPosition& estimate, const RobotPosition& currentPose) {
+        //do not trust an estimate until MCL is initialized and its pose is valid.
         if (!mclInitialized || particles.empty()) return 0.0;
         if (!std::isfinite(estimate.x) || !std::isfinite(estimate.y) || !std::isfinite(estimate.theta)) {
             return 0.0;
@@ -162,6 +172,7 @@ namespace mcl {
             0.0
         };
 
+        //predict sensor readings at the MCL estimate for comparison with the real sensors.
         const RangeReadings expected = rangeSensing.raycast(estimateParticle);
         double totalError = 0.0;
         int validSensorCount = 0;
@@ -170,6 +181,7 @@ namespace mcl {
             const double actual = distanceReadings.direction[i];
             const double predicted = expected.direction[i];
 
+            //ignore a sensor direction when either reading is invalid.
             if (!std::isfinite(actual) || !std::isfinite(predicted)) continue;
 
             totalError += std::fabs(actual - predicted);
@@ -178,12 +190,14 @@ namespace mcl {
 
         if (validSensorCount == 0) return 0.0;
 
+        //convert sensor coverage and average error into normalized confidence scores.
         const double validSensorScore = clamp01(validSensorCount / 2.0);
         const double avgSensorError = totalError / validSensorCount;
         const double sensorMatchScore = clamp01((8.0 - avgSensorError) / 8.0);
         const double concentrationScore = particleConcentrationScore(estimate);
         const double deltaScore = chassisDeltaScore(estimate, currentPose);
 
+        //combine independent confidence signals into one score from 0 to 1.
         return clamp01(
             0.40 * sensorMatchScore +
             0.25 * concentrationScore +
@@ -196,16 +210,19 @@ namespace mcl {
         const std::uint32_t currTime = pros::millis();
 
         /*
-        const auto current = drive::chassis.getPose();
-        const double trust = trustMclNow(estimate, current);
+        // apply an MCL correction only after the estimate passes the trust threshold.
+        const Pose current = odom.getPose();
+        const RobotPosition currentPosition = {current.x, current.y, current.theta};
+        const double trust = trustMclNow(estimate, currentPosition);
 
         if (trust >= MCL_SETPOSE_TRUST_THRESHOLD &&
             currTime - lastPoseCorrectionMs >= MCL_SETPOSE_COOLDOWN_MS) {
-            drive::chassis.setPose(estimate.x, estimate.y, current.theta);
+            odom.setPose({estimate.x, estimate.y, current.theta});
             lastPoseCorrectionMs = currTime;
         }
         */
 
+        //limit console output so the background MCL task does not print every update.
         if (currTime - lastEstimatePrintMs >= MCL_ESTIMATE_PRINT_INTERVAL_MS) {
             printf("MCL est=(%.3f, %.3f, %.6f)\n", estimate.x, estimate.y, estimate.theta);
             lastEstimatePrintMs = currTime;
@@ -290,10 +307,11 @@ namespace mcl {
         if ((!std::isfinite(maxLogWeight) || !std::isfinite(sumWeight)) && nanDebugPrints < 8) {
             printf("MCL invalid weights: max_log_w=%f sum_w=%f nan_log_sum_count=%d\n",
                    maxLogWeight, sumWeight, nanLogSumCount);
-            printf("  current odom=(%.3f, %.3f, %.6f)\n",
-                   odom::chassis_odom_position.x,
-                   odom::chassis_odom_position.y,
-                   odom::chassis_odom_position.theta);
+                 const Pose currentPose = odom.getPose();
+                 printf("  current odom=(%.3f, %.3f, %.6f)\n",
+                     currentPose.x,
+                     currentPose.y,
+                     currentPose.theta);
             printf("  current range=[%.3f, %.3f, %.3f, %.3f]\n",
                    distanceReadings.front,
                    distanceReadings.left,
@@ -317,10 +335,11 @@ namespace mcl {
 
     //calculates weighted average position from all particles
     RobotPosition estimatePosition() {
+        const Pose currentPose = odom.getPose();
         RobotPosition est = {
-            odom::chassis_odom_position.x,
-            odom::chassis_odom_position.y,
-            odom::chassis_odom_position.theta
+            currentPose.x,
+            currentPose.y,
+            currentPose.theta
         };
         double totalWeight = 0.0;
 
@@ -337,16 +356,16 @@ namespace mcl {
             est.x /= totalWeight;
             est.y /= totalWeight;
         } else {
-            est.x = odom::chassis_odom_position.x;
-            est.y = odom::chassis_odom_position.y;
+            est.x = currentPose.x;
+            est.y = currentPose.y;
         }
 
         if ((!std::isfinite(est.x) || !std::isfinite(est.y)) && nanDebugPrints < 10) {
             printf("MCL est_pos became NaN: est=(%f, %f, %f) odom=(%.3f, %.3f, %.6f)\n",
                    est.x, est.y, est.theta,
-                   odom::chassis_odom_position.x,
-                   odom::chassis_odom_position.y,
-                   odom::chassis_odom_position.theta);
+                   currentPose.x,
+                   currentPose.y,
+                   currentPose.theta);
             printf("  first particle W/log_w=(%f, %f) pos=(%.2f, %.2f, %.4f)\n",
                    particles.empty() ? NAN : particles[0].normalizedWeight,
                    particles.empty() ? NAN : particles[0].logWeight,
@@ -398,7 +417,7 @@ namespace mcl {
         const double noiseXStddev = std::sqrt(EPSILON.xx);
         const double noiseYStddev = std::sqrt(EPSILON.yy);
         const double noiseThetaStddev = std::sqrt(EPSILON.thetaTheta);
-        const double theta = odom::chassis_odom_position.theta;
+        const double theta = odom.getPose().theta;
 
         //update each particle with odometry delta plus noise
         for (auto& particle : particles) {
@@ -415,18 +434,17 @@ namespace mcl {
     }
 
     //initializes MCL system with uniformly distributed particles
-    void initMcl(const lemlib::Pose& initPose) {
-        odom::init_odom(initPose.x, initPose.y, initPose.theta);
+    void initMcl(const Pose& initPose) {
+        odom.setPose(initPose);
         if (!taskIsActive(odomTaskHandle)) {
             odomTaskHandle = pros::Task::create(
-                odom::update_odom_position,
+                Odometry::odomTask,
                 TASK_PRIORITY_DEFAULT + 2,
                 TASK_STACK_DEPTH_DEFAULT,
                 "Custom Odom"
             );
         }
 
-        drive::chassis.setPose(initPose);
         mclInitialized = false;
         if (!rangeSystemInitialized) {
             rangeSensing.initRangeSystem();
@@ -435,25 +453,25 @@ namespace mcl {
 
         updateRangeSensors();
         particles.resize(N);
-        prevOdomPos = odom::chassis_odom_position;
+        prevOdomPos = {initPose.x, initPose.y, initPose.theta};
         deltaOdomPos = {0.0, 0.0, 0.0};
         estPos = {
-            odom::chassis_odom_position.x,
-            odom::chassis_odom_position.y,
-            odom::chassis_odom_position.theta
+            initPose.x,
+            initPose.y,
+            initPose.theta
         };
         nanDebugPrints = 0;
         lastEstimatePrintMs = 0;
         printf("MCL init: odom=(%.3f, %.3f, %.6f) particles=%zu\n",
-               odom::chassis_odom_position.x,
-               odom::chassis_odom_position.y,
-               odom::chassis_odom_position.theta,
+             initPose.x,
+             initPose.y,
+             initPose.theta,
                particles.size());
         //initialize particles uniformly across field
         for (int i=0; i<N; i++) {
             particles[i].x = X_MIN + rngGen.uniform() * (X_MAX-X_MIN);
             particles[i].y = Y_MIN + rngGen.uniform() * (Y_MAX-Y_MIN);
-            particles[i].theta = odom::chassis_odom_position.theta;
+            particles[i].theta = initPose.theta;
             particles[i].weight = ONE_N;
             particles[i].normalizedWeight = ONE_N;
             particles[i].logWeight = 0.0;
@@ -496,8 +514,13 @@ namespace mcl {
             //get latest sensor readings
             updateRangeSensors();
             //calculate odometry change since last update
-            deltaOdomPos = odom::chassis_odom_position - prevOdomPos;
-            prevOdomPos = odom::chassis_odom_position;
+            const Pose currentPose = odom.getPose();
+            deltaOdomPos = {
+                currentPose.x - prevOdomPos.x,
+                currentPose.y - prevOdomPos.y,
+                wrapToPi(currentPose.theta - prevOdomPos.theta)
+            };
+            prevOdomPos = {currentPose.x, currentPose.y, currentPose.theta};
             //propagate particles with motion model
             stateSample();
             //update particle weights based on sensor readings

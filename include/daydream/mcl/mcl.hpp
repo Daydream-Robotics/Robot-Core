@@ -2,7 +2,7 @@
 #define _MCL_HPP_
 
 //Inclusions
-#include "api.h"
+#include "daydream/motion/odometry.hpp"
 
 //Created namespace mcl
 namespace mcl {
@@ -32,7 +32,7 @@ namespace mcl {
     };
 
     //initializes MCL system with uniformly distributed particles
-    void initMcl(const lemlib::Pose& initPose);
+    void initMcl(const Pose& initPose);
     //main MCL update loop running in background task
     void mclUpdate();
     //returns current estimated robot position
