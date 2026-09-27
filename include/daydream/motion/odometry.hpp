@@ -34,6 +34,12 @@ struct WheelTravelResult {
     OdomError error;
 };
 
+// New velocity parameters to account for error
+struct VelocityResult {
+    double velocity;
+    OdomError error;
+};
+
 struct Position {
     double x;
     double y;
@@ -123,7 +129,7 @@ public:
      * @brief gets the current velocity of the parallel tracking wheel
      * @returns velocity of parallel tracking wheel in inches per second
      */
-    double getParallelVel();
+    VelocityResult getParallelVel();
     
     /**
      * @brief Background task entry point

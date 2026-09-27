@@ -178,9 +178,20 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	return {{delParallel, delPerpendicular}, OdomError::None};
 }
 
-double Odometry::getParallelVel() {
-	double deg_s = parallelTrackingWheel.get_velocity() / 100.0;
-	return (deg_s / 360.0) * m_config.parallelWheelDiameter * std::numbers::pi;
+VelocityResult Odometry::getParallelVel() {
+	double initialVelocity = parallelTrackingWheel.get_velocity();
+
+	if (initialVelocity == PROS_ERR) {
+		return {0.0, OdomError::TrackingWheelError};
+	}
+
+	double deg_s = initialVelocity / 100.0;
+
+	double velocity = (deg_s / 360.0)
+		* m_config.parallelWheelDiameter
+		* std::numbers::pi;
+
+	return {velocity, OdomError::None};
 }
 
 // could be used to do odom in background

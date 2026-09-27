@@ -71,7 +71,12 @@ WheelVelocities PurePursuitController::compute(const Pose& currentPose, const AL
 
 
     if (m_stepCounter % 10 == 0) {
-        double current_vel = odom.getParallelVel();
+        VelocityResult velocityResult = odom.getParallelVel();
+        // Fail-safe for failed wheel velocity measurements
+        if (velocityResult.error != OdomError::None) {
+            return WheelVelocities{0.0, 0.0};
+        }
+        double current_vel = velocityResult.velocity;
         // pros::lcd::print(5, "Velocity: %.2lf in/s", current_vel);
         // pros::lcd::print(6, "LX %.2lf, LY %.2lf", robotFrameTargetPt.x, robotFrameTargetPt.y);
         // pros::lcd::print(1, "Cur: %lf", steeringCurvature);
@@ -119,7 +124,12 @@ Position PurePursuitController::convertPtToRobotFrame(Position targetPoint, cons
 
 // gets the dynamic lookahead distance based off of the forward velocity of the robot.
 double PurePursuitController::getLookaheadDist() {
-    double vel = std::abs(odom.getParallelVel());
+    VelocityResult velocityResult = odom.getParallelVel();
+    // Fail-safe for failed velocity sensors
+    if (velocityResult.error != OdomError::None) {
+        return MIN_LOOKAHEAD_DIST;
+    }
+    double vel = std::abs(velocityResult.velocity);
     // pros::lcd::print(5, "Velocity: %lf in/s", vel); // Commented out to prevent LVGL crashes
     double dynamicLookahead = std::clamp(LOOKAHEAD_SECONDS * vel, MIN_LOOKAHEAD_DIST, MAX_LOOKAHEAD_DIST);
     // printf("Dynamic Lookahead: %lf\n", dynamicLookahead);
