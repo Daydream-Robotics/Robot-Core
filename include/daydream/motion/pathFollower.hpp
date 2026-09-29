@@ -1,3 +1,8 @@
+﻿/**
+ * @file pathFollower.hpp
+ * @brief Project interface or implementation.
+ */
+
 #pragma once
 #include "daydream/motion/pathing/arclengthSplining.hpp"
 #include "daydream/motion/control/motionController.hpp"

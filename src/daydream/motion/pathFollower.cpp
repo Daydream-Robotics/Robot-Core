@@ -1,3 +1,8 @@
+﻿/**
+ * @file pathFollower.cpp
+ * @brief Project interface or implementation.
+ */
+
 #include "daydream/motion/pathFollower.hpp"
 #include "daydream/config/subsystems.hpp"
 #include "daydream/config/constants.h"
@@ -37,10 +42,10 @@ bool PathFollower::step() {
     odom.updatePose();
     Pose currentPose = odom.getPose();
 
-    // std::size_t searchWindowEnd = m_currentSampleIdx + MAX_VIEWABLE_INDEX_AHEAD;
-    // if (searchWindowEnd > m_path->getSamples().size()) {
-    //     searchWindowEnd = m_path->getSamples().size();
-    // }
+    /// std::size_t searchWindowEnd = m_currentSampleIdx + MAX_VIEWABLE_INDEX_AHEAD;
+    /// if (searchWindowEnd > m_path->getSamples().size()) {
+    ///     searchWindowEnd = m_path->getSamples().size();
+    /// }
 
     m_currentSampleIdx = m_path->findClosestSampleIndex({currentPose.x, currentPose.y}, m_currentSampleIdx);
 

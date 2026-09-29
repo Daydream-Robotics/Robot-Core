@@ -1,11 +1,16 @@
+﻿/**
+ * @file ramsete.cpp
+ * @brief Project interface or implementation.
+ */
+
 #include "daydream/motion/control/ramsete.hpp"
 #include "daydream/utils/helpers.hpp"
 #include "daydream/utils/sd_card_logging.hpp"
 #include "daydream/config/constants.h"
 #include <cmath>
 
-// Notes:
-// Check that all headings are in radians (also add these to comments)
+/// Notes:
+/// Check that all headings are in radians (also add these to comments)
 
 RamseteController::RamseteController(RamseteConfig config) {
     this->m_b = config.b;
@@ -42,7 +47,7 @@ void RamseteController::applyCurvatureSpeedLimit(ALS_Path& path, double maxLatAc
     std::vector<Sample>& samples = const_cast<std::vector<Sample>&>(path.getSamples());
     if (samples.empty()) return;
 
-    // Forward pass: cap v by curvature at each sample
+    /// Forward pass: cap v by curvature at each sample
     for (auto& s : samples) {
         double absCurv = std::abs(s.curvature);
         if (absCurv > 1e-6) {
@@ -51,7 +56,7 @@ void RamseteController::applyCurvatureSpeedLimit(ALS_Path& path, double maxLatAc
         }
     }
 
-    // Backward pass: ensure there's room to decelerate into each capped sample
+    /// Backward pass: ensure there's room to decelerate into each capped sample
     for (std::size_t i = samples.size() - 1; i-- > 0; ) {
         double ds = samples[i + 1].s - samples[i].s;
         double vMaxFromNext = std::sqrt(samples[i + 1].v * samples[i + 1].v
@@ -59,7 +64,7 @@ void RamseteController::applyCurvatureSpeedLimit(ALS_Path& path, double maxLatAc
         samples[i].v = std::min(samples[i].v, vMaxFromNext);
     }
 
-    // Recompute omega since v changed
+    /// Recompute omega since v changed
     for (auto& s : samples) {
         s.omega = s.v * s.curvature;
     }
@@ -68,52 +73,52 @@ void RamseteController::applyCurvatureSpeedLimit(ALS_Path& path, double maxLatAc
 }
 
 WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& targetIdx, PathFlag flag) {
-    // Sample target = als_path.getSamples()[targetIdx];
+    /// Sample target = als_path.getSamples()[targetIdx];
     Sample target = getLookaheadSample(als_path, targetIdx);
 
-    // set up virtual pose (this is used to make the robot consider it's back as forward when moving in reverse)
+    /// set up virtual pose (this is used to make the robot consider it's back as forward when moving in reverse)
     Pose virtualPose = currentPose;
     if (flag == PathFlag::REVERSE) {
-        // rotate robot orientation 180 degrees to consider the back as forward
+        /// rotate robot orientation 180 degrees to consider the back as forward
         virtualPose.theta = angleDiffRad(currentPose.theta + M_PI, 0.0);
     }
-    // temp
-    // virtualPose.theta = -currentPose.theta;
+    /// temp
+    /// virtualPose.theta = -currentPose.theta;
 
-    // calculate global displacement errors
+    /// calculate global displacement errors
     double dx = target.x - currentPose.x;
     double dy = target.y - currentPose.y;
 
-    // project global errors to local coordinate frame
+    /// project global errors to local coordinate frame
     double e_x = (std::cos(virtualPose.theta) * dx) + (std::sin(virtualPose.theta) * dy);
     double e_y = (-std::sin(virtualPose.theta) * dx) + (std::cos(virtualPose.theta) * dy);
     double e_theta = angleDiffRad(target.heading, virtualPose.theta);
 
-    // calculate target angular velocity
+    /// calculate target angular velocity
     double targetAngularVel = target.v * target.curvature;
 
-    // calculate gain
-    // k = 2 * zeta * sqrt(w_d^2 + b * v_d^2)
+    /// calculate gain
+    /// k = 2 * zeta * sqrt(w_d^2 + b * v_d^2)
     double k = 2.0 * m_zeta * std::sqrt(std::pow(targetAngularVel,2) + (m_b * std::pow(target.v,2)) );
 
-    // calculate linear and angular velocity to command
+    /// calculate linear and angular velocity to command
     double commandLinearVel_preClamp = (target.v * std::cos(e_theta)) + (k * e_x);
     double commmandAngularVel = targetAngularVel + (k * e_theta) + (m_b * target.v * sinc(e_theta) * e_y);
 
     double maxLinearSpeedInchesPerSecond = (450.0 / 60.0) * (M_PI * DRIVE_WHEEL_DIAMETER_INCHES);
     double commandLinearVel = std::clamp(commandLinearVel_preClamp, 0.0, maxLinearSpeedInchesPerSecond);
 
-    // reverse linear velocity in case of reverse
+    /// reverse linear velocity in case of reverse
     if (flag == PathFlag::REVERSE) {
         commandLinearVel = -commandLinearVel;
     }
 
-    // get target inches per second for each side
+    /// get target inches per second for each side
     double leftInchesPerSec = commandLinearVel - (commmandAngularVel * m_trackWidthInches / 2.0);
     double rightInchesPerSec = commandLinearVel + (commmandAngularVel * m_trackWidthInches / 2.0);
 
-    // convert linear wheel speeds from inch/ser to motor rpm
-    // TODO: Add gear ratio math
+    /// convert linear wheel speeds from inch/ser to motor rpm
+    /// TODO: Add gear ratio math
     double inchToRpmConversion = 60.0 / (M_PI * DRIVE_WHEEL_DIAMETER_INCHES);
 
     WheelVelocities speeds;
@@ -124,7 +129,7 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
     double left_preClamp = speeds.left;
     double right_preClamp = speeds.right;
 
-    // scale to remain within wheel bounds
+    /// scale to remain within wheel bounds
     double max_req = std::max(std::abs(speeds.left), std::abs(speeds.right));
     bool wasScaled = false;
     if (max_req > 600.0) {
@@ -133,7 +138,7 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
         wasScaled = true;
     }
 
-    // !START OF DEBUG
+    /// !START OF DEBUG
     static int debugTick = 0;
     if (++debugTick % 5 == 0) {
         char logBuf[256];
@@ -149,7 +154,7 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
         printf("%s\n", logBuf);
         LOG(logBuf);
     }
-    // !END OF DEBUG
+    /// !END OF DEBUG
 
     return speeds;
 }

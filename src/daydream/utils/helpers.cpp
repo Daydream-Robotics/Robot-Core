@@ -1,3 +1,8 @@
+﻿/**
+ * @file helpers.cpp
+ * @brief Project interface or implementation.
+ */
+
 #include "daydream/config/constants.h"
 #include "daydream/utils/helpers.hpp"
 #include "main.h"
@@ -5,7 +10,7 @@
 #include <numbers>
 #include <algorithm>
 
-// ====== Helper functions ======
+/// ====== Helper functions ======
 
 /**
  * @brief Normalize angle between [-pi, +pi]
@@ -15,22 +20,22 @@ double normalizeAngle(double a) {
     return std::atan2(std::sin(a), std::cos(a));
 }
 
-// Return Euclidean distance btwn points p1 and p2
+/// Return Euclidean distance btwn points p1 and p2
 double getDistance(Position p1, Position p2) {
     return std::sqrt(std::pow((p2.x - p1.x), 2) + std::pow((p2.y - p1.y), 2));
 }
 
-// Convert Degrees to Radians
+/// Convert Degrees to Radians
 double convertDegToRad(double degree) {
     return degree * (std::numbers::pi / 180.0);
 }
 
-// Covert Radians to Degrees
+/// Covert Radians to Degrees
 double convertRadToDeg(double rad) {
     return rad * (180.0 / std::numbers::pi);
 }
 
-// Subtract angles with [-180, 180] wrapping
+/// Subtract angles with [-180, 180] wrapping
 double angleDiffDeg(double a, double b) {
     double c = a - b;
     while (c > 180.0) c -= 360.0;
@@ -45,7 +50,7 @@ double angleDiffRad(double a, double b) {
     return c;
 }
 
-// Determine deceleration speed scaling
+/// Determine deceleration speed scaling
 double computeDecelScale(double remaining, double totalDistance) {
 	double decelDistance = std::max(0.2, std::fabs(totalDistance) * 0.15);
 
@@ -54,14 +59,14 @@ double computeDecelScale(double remaining, double totalDistance) {
 
 	double x = std::clamp(remaining / decelDistance, 0.0, 1.0);
 
-	// Step smoothing
+	/// Step smoothing
 	double smooth = x * x * (3.0 - 2.0 * x);
 
-	// Return speed scaling
+	/// Return speed scaling
 	return std::clamp(smooth, 0.0, 1.0);
 }
 
-// Limit acceleration takeoff
+/// Limit acceleration takeoff
 double accelLimit(double prev, double target, double dt, double maxAccel) {
 	double maxDelta = maxAccel * dt;
 	double delta = target - prev;
@@ -95,21 +100,21 @@ double calcDistBetweenPoints(Position pt1, Position pt2) {
 }
 
 
-// ! INTEGRATION TEAM: HI, also this is stuff I had as MCL helper functions, I had it before in a file called sensors.cpp/hpp but idk where you want it now
-// ! This also has some odom logic that you guys don't have, ie falling back to IMES and sanatizing
-//========= MCL Helpers =========//
+/// ! INTEGRATION TEAM: HI, also this is stuff I had as MCL helper functions, I had it before in a file called sensors.cpp/hpp but idk where you want it now
+/// ! This also has some odom logic that you guys don't have, ie falling back to IMES and sanatizing
+///========= MCL Helpers =========//
 
-//helper function to sanatize distance sensor reading
+///helper function to sanatize distance sensor reading
 double sanitizeDistanceReading(long val) {
     return (val == 9999 || val == PROS_ERR) ? NAN : static_cast<double>(val);
 }
 
-//helper function to sanatize other values
+///helper function to sanatize other values
 double sanitizeNumericReading(double val) {
     return (val == PROS_ERR || val == PROS_ERR_F) ? NAN : val;
 }
 
-//helper function to take in tracking enum and return string
+///helper function to take in tracking enum and return string
 const char* odomModeName(OdomMode mode) {
     switch (mode) {
         case OdomMode::TWO_TRACKING: return "TWO_TRACKING"; 
@@ -119,7 +124,7 @@ const char* odomModeName(OdomMode mode) {
     }
 }
 
-//helper function to take in unit enum and return string
+///helper function to take in unit enum and return string
 const char* motorUnitsName(pros::MotorUnits units) {
     switch (units) {
         case pros::MotorUnits::degrees: return "deg";
@@ -129,7 +134,7 @@ const char* motorUnitsName(pros::MotorUnits units) {
     }
 }
 
-//converts motor position into the linear distance the wheel has traveled compared to 0 position of encoder
+///converts motor position into the linear distance the wheel has traveled compared to 0 position of encoder
 double motorPositionToWheelInches(double rawPosition, pros::MotorUnits units) {
     if (std::isnan(rawPosition)) {
         return NAN;
@@ -144,7 +149,7 @@ double motorPositionToWheelInches(double rawPosition, pros::MotorUnits units) {
     }
 }
 
-//returns the drive motor's accumulated wheel travel in inches, or NAN if unavailable.
+///returns the drive motor's accumulated wheel travel in inches, or NAN if unavailable.
 double driveMotorInches(const std::optional<pros::Motor>& motor) {
     if (!motor) {
         return NAN;
@@ -153,7 +158,7 @@ double driveMotorInches(const std::optional<pros::Motor>& motor) {
     return motorPositionToWheelInches(rawPosition, motor->get_encoder_units());
 }
 
-//converts a tracking wheel rotation sensor reading to wheel travel in inches.
+///converts a tracking wheel rotation sensor reading to wheel travel in inches.
 double trackingWheelInches(const std::optional<pros::Rotation>& sensor, double scale) {
     if (!sensor) {
         return NAN;
@@ -162,14 +167,14 @@ double trackingWheelInches(const std::optional<pros::Rotation>& sensor, double s
     return std::isnan(rawCentideg) ? NAN : rawCentideg * scale;
 }
 
-//rangle sensors for MCL
+///rangle sensors for MCL
 RangeSensors distanceSensors = {
     pros::Distance(3),  // front
     pros::Distance(2),  // left
     pros::Distance(8),  // back
     pros::Distance(9)}; // right
 
-// struct for odom with backups
+/// struct for odom with backups
 OdomSensors chassisOdomSensors = {
     OdomMode::DRIVE_ENCODERS,
     std::nullopt,
@@ -180,18 +185,18 @@ OdomSensors chassisOdomSensors = {
     std::nullopt
 };   
 
-//vars to hold distance and odom readings
+///vars to hold distance and odom readings
 RangeReadings distanceReadings;
 OdomReadings odomValues;
 
-//values to calibrate distance sensors
-// ! should be moved to constants but does depend on the structs
+///values to calibrate distance sensors
+/// ! should be moved to constants but does depend on the structs
 RangeCalibration distanceCalibration = {0.9896,0.9896,0.9896,0.9816};
-// Odometry scale factors:
-// - NEW_2 omniwheel: 2.0" diameter, circumference = 6.283185"
-// - Rotation sensor: 36000 centidegrees/revolution
-// - TPI = 36000 / 6.283185 = 5729.578 centidegrees/inch
-// - IMU scale: degrees to radians = π/180 = 0.017453293
+/// Odometry scale factors:
+/// - NEW_2 omniwheel: 2.0" diameter, circumference = 6.283185"
+/// - Rotation sensor: 36000 centidegrees/revolution
+/// - TPI = 36000 / 6.283185 = 5729.578 centidegrees/inch
+/// - IMU scale: degrees to radians = Ï€/180 = 0.017453293
 OdomCalibration odomScale = {
     1.0 / 5729.578,  // parallel tracking TPI (inches per centidegree)
     1.0 / 5729.578,  // perpendicular tracking TPI (inches per centidegree)
@@ -199,10 +204,10 @@ OdomCalibration odomScale = {
     1.0              // IMU two scale (unused)
 };
 
-// odom tracking wheel offsets offset
+/// odom tracking wheel offsets offset
 OdomOffset trackingOffset = {0.5, 0.75};  // parallel=0.5", perpendicular=0.75"
 
-//update range sensor readings, (store, sanatize, convert to in, apply calibration)
+///update range sensor readings, (store, sanatize, convert to in, apply calibration)
 void updateRangeSensors() {
     distanceReadings.front = sanitizeDistanceReading(distanceSensors.front.get_distance()) * MM_TO_IN * distanceCalibration.front;
     distanceReadings.left = sanitizeDistanceReading(distanceSensors.left.get_distance()) * MM_TO_IN * distanceCalibration.left;
@@ -210,31 +215,31 @@ void updateRangeSensors() {
     distanceReadings.right = sanitizeDistanceReading(distanceSensors.right.get_distance()) * MM_TO_IN * distanceCalibration.right;
 }
 
-// ! update odom sensors, ie return the parallel and perpindicular local distance, either using tracking wheels or IMES
+/// ! update odom sensors, ie return the parallel and perpindicular local distance, either using tracking wheels or IMES
 void updateOdomSensors() {
     double parallel = NAN;
     double perpendicular = NAN;
 
-    // Case 1: parallel tracking wheel exists
+    /// Case 1: parallel tracking wheel exists
     if (chassisOdomSensors.parallelTracking) {
         parallel = sanitizeNumericReading(chassisOdomSensors.parallelTracking->get_position())
             * odomScale.parallelTrackingTpi;
     }
-    // Case 2: use drivetrain encoders
+    /// Case 2: use drivetrain encoders
     else if (chassisOdomSensors.driveLeft && chassisOdomSensors.driveRight) {
         const double left = driveMotorInches(chassisOdomSensors.driveLeft);
         const double right = driveMotorInches(chassisOdomSensors.driveRight);
-        // forward displacement from differential drive
+        /// forward displacement from differential drive
         parallel = (left + right) * 0.5;
     }
 
-    // perpendicular tracking wheel
+    /// perpendicular tracking wheel
     if (chassisOdomSensors.perpendicularTracking) {
         perpendicular = sanitizeNumericReading(chassisOdomSensors.perpendicularTracking->get_position())
             * odomScale.perpendicularTrackingTpi;
     }
     else {
-        // no strafe measurement
+        /// no strafe measurement
         perpendicular = 0.0;
     }
 
@@ -244,7 +249,7 @@ void updateOdomSensors() {
     odomValues = {parallel, perpendicular, heading};
 }
 
-//debug printing for range sensors
+///debug printing for range sensors
 void printRangeSensorDebug() {
     const double frontMm = sanitizeDistanceReading(distanceSensors.front.get_distance());
     const double leftMm = sanitizeDistanceReading(distanceSensors.left.get_distance());
@@ -262,7 +267,7 @@ void printRangeSensorDebug() {
     printf("==========================\n");
 }
 
-//debug print for odom sensors
+///debug print for odom sensors
 void printOdomSensorDebug() {
     const double leftRaw = chassisOdomSensors.driveLeft
         ? sanitizeNumericReading(chassisOdomSensors.driveLeft->get_position()) : NAN;

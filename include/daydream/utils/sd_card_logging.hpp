@@ -1,3 +1,8 @@
+﻿/**
+ * @file sd_card_logging.hpp
+ * @brief Project interface or implementation.
+ */
+
 #pragma once
 #include <cstdio>
 #include "pros/rtos.hpp"
@@ -33,7 +38,7 @@ public:
         return pros::usd::is_installed(); 
     }
 
-    // prevent copies
+    /// prevent copies
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
 
@@ -43,5 +48,5 @@ protected:
     FILE* m_file = nullptr;
 };
 
-// Convenience macro
+/// Convenience macro
 #define LOG(msg) Logger::getInstance().log(msg)

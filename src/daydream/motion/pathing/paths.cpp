@@ -1,3 +1,8 @@
+﻿/**
+ * @file paths.cpp
+ * @brief Project interface or implementation.
+ */
+
 #include "daydream/motion/pathing/paths.hpp"
 #include "main.h"
 #include "daydream/utils/helpers.hpp"
@@ -13,7 +18,7 @@ std::vector<ALS_Path> Path::buildAllPathsFromJerryIO(const std::string& filePath
     printf("[PATH] parseFile returned %zu paths\n", rawPaths.size());
     if (rawPaths.empty()) return newPaths;
     
-    // convert jerryio heading to robot heading
+    /// convert jerryio heading to robot heading
     initialHeading = 90.0 - initialHeading;
     double initalHeadingRad = normalizeAngle(initialHeading * (M_PI / 180.0));
 
@@ -51,7 +56,7 @@ std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, 
     std::vector<std::vector<Waypoint>> raw_paths;
     std::vector<Waypoint> currentPath;
 
-    // open master path file
+    /// open master path file
     std::ifstream file(filePath);
     if (!file.is_open()) {
         printf("[Trajectory] Failed to open file: %s\n", filePath.c_str());
@@ -68,14 +73,14 @@ std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, 
 
     while (std::getline(file, line)) {
         lineCount++;
-        // handle windows CRLF
+        /// handle windows CRLF
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
         }
 
-        // check for new path start
+        /// check for new path start
         if (line.find("#PATH-POINTS-START") != std::string::npos) {
-            // save previous path if exists
+            /// save previous path if exists
             if (!currentPath.empty()) {
                 printf("[PATH] Pushing path to raw_paths (size %zu) at line %d\n", currentPath.size(), lineCount);
                 raw_paths.push_back(currentPath);
@@ -85,7 +90,7 @@ std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, 
             continue;
         }
 
-        // end for JSON footer
+        /// end for JSON footer
         if (line.find("#PATH.JERRYIO-DATA") != std::string::npos) {
             if (!currentPath.empty()) {
                 printf("[PATH] End of paths reached at line %d, pushing final path (size %zu)\n", lineCount, currentPath.size());
@@ -99,7 +104,7 @@ std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, 
         double x = 0.0, y = 0.0, v = 0.0, h = 0.0;
         int parsed = std::sscanf(line.c_str(), "%lf,%lf,%lf,%lf", &x, &y, &v, &h);
         if (parsed >= 3) {
-            // set init heading
+            /// set init heading
             if (!initialHeadingSet) {
                 outInitalHeading = h;
                 initialHeadingSet = true;
@@ -108,7 +113,7 @@ std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, 
 
             Waypoint newWp = {x / 2.54, y / 2.54, v};
 
-            // Prevent adding duplicate points.
+            /// Prevent adding duplicate points.
             if (!currentPath.empty()) {
                 double dx = newWp.x - currentPath.back().x;
                 double dy = newWp.y - currentPath.back().y;
@@ -118,7 +123,7 @@ std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, 
                 }
             }
 
-            // add points converted to inches
+            /// add points converted to inches
             currentPath.push_back(newWp);
         }
     }

@@ -1,3 +1,8 @@
+﻿/**
+ * @file arclengthSplining.hpp
+ * @brief Project interface or implementation.
+ */
+
 #pragma once
 #include <stdio.h>
 #include <vector>
@@ -17,8 +22,8 @@ struct Sample {
 };
 
 struct SplineSegment {
-    //cubic polynomial on [t0, t1]
-    // f(t) = a + bu + cu^2 + du^3, where u = t - t0
+    ///cubic polynomial on [t0, t1]
+    /// f(t) = a + bu + cu^2 + du^3, where u = t - t0
     double a = 0.0;
     double b = 0.0;
     double c = 0.0;
@@ -39,15 +44,15 @@ class CubicSpline {
     public:
         CubicSpline() = default;
 
-        // build a cubic spline through points (t[i], values[i])
+        /// build a cubic spline through points (t[i], values[i])
         bool buildSpline(const std::vector<double>& t, const std::vector<double>& values);
 
-        // Eval spline & derivs
+        /// Eval spline & derivs
         double evaluate(double tQuery) const;
         double evalFirstDeriv(double tQuery) const;
         double evalSecondDeriv(double tQuery) const;
 
-        // Utilities
+        /// Utilities
 
         bool isValid() const;
         std::size_t segmentCount() const;
@@ -65,22 +70,22 @@ class ALS_Path {
     public:
         ALS_Path() = default;
 
-        // ===============================================
-        //    MAIN PATH BUILDING & QUERY INTERFACE
-        //  Primary External Query Interface for lookahead point
-        // ===============================================
+        /// ===============================================
+        ///    MAIN PATH BUILDING & QUERY INTERFACE
+        ///  Primary External Query Interface for lookahead point
+        /// ===============================================
         Waypoint returnLookaheadPoint(const Position& currentPos, double lookaheadDistance);
         
-        // moved to public to support other controllers
+        /// moved to public to support other controllers
         Waypoint getPointAtArcLength(double sQuery) const;
 
-        // Main build function, computes paramterization, fit, and sample table
+        /// Main build function, computes paramterization, fit, and sample table
         bool buildFromPoints(const std::vector<Waypoint>& points, double sampleSpacing = 0.25);
 
-        // Closest Point helper
+        /// Closest Point helper
         std::size_t findClosestSampleIndex(const Position& robotPos, std::size_t startIdx = 0, std::size_t endIdx = static_cast<std::size_t>(-1)) const;
         
-        // Utilities
+        /// Utilities
         double getMaxAbsCurvatureInRange(double sStart, double sEnd) const;
         
         const std::vector<double>& getParameters() const;
@@ -93,7 +98,7 @@ class ALS_Path {
         double getTotalLength() const;
         
     private:
-        // Build Helpers
+        /// Build Helpers
         static std::vector<double> computeChordLengthParameters(const std::vector<Waypoint>& points);
         
         void buildSamples(double sampleSpacing);
@@ -103,19 +108,19 @@ class ALS_Path {
         CubicSpline m_splineY;
         CubicSpline m_splineV;
         
-        // Original params for points
+        /// Original params for points
         std::vector<double> m_parameters;
         
-        // Dense lookup able for arc-length queries
+        /// Dense lookup able for arc-length queries
         std::vector<Sample> m_samples;
         
-        // Query points and geometry
+        /// Query points and geometry
         Waypoint getPointAtParameter(double tQuery) const;
         
         double getHeadingAtParameter(double tQuery) const;
         double getCurvatureAtParameter(double tQuery) const;
         
-        // globals
+        /// globals
         double m_totalLength = 0.0;
         std::size_t m_lastIndex = 0; // for efficient closest point queries
         bool m_valid = false;

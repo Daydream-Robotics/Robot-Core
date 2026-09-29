@@ -1,7 +1,12 @@
+﻿/**
+ * @file autons.hpp
+ * @brief Project interface or implementation.
+ */
+
 #ifndef AUTOPROGRAMS_H
 #define AUTOPROGRAMS_H
 
-//Declares the autonomous and skills functions f
+///Declares the autonomous and skills functions f
 
 extern volatile bool auton_complete;
 extern bool filter_check;

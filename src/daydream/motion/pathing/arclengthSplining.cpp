@@ -1,12 +1,17 @@
+﻿/**
+ * @file arclengthSplining.cpp
+ * @brief Project interface or implementation.
+ */
+
 #include "daydream/motion/pathing/arclengthSplining.hpp"
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
 #include "daydream/utils/sd_card_logging.hpp" 
 
-// ----------------------------------------
-//             MAIN INTERFACE
-// ----------------------------------------
+/// ----------------------------------------
+///             MAIN INTERFACE
+/// ----------------------------------------
 
 Waypoint ALS_Path::returnLookaheadPoint(const Position& curPosition, double lookaheadDistance) {
     if (m_samples.empty()) {
@@ -14,7 +19,7 @@ Waypoint ALS_Path::returnLookaheadPoint(const Position& curPosition, double look
         return Waypoint{};
     }
 
-    // Get current closest point on line
+    /// Get current closest point on line
     std::size_t closestIdx = findClosestSampleIndex(curPosition, m_lastIndex, m_samples.size());
     const Sample& currentSample = getSamples()[closestIdx];
 
@@ -29,9 +34,9 @@ Waypoint ALS_Path::returnLookaheadPoint(const Position& curPosition, double look
 }
 
 
-// ----------------------------------------
-//    CUBICSPLINING & FUNCTION EVAL
-// ----------------------------------------
+/// ----------------------------------------
+///    CUBICSPLINING & FUNCTION EVAL
+/// ----------------------------------------
 bool CubicSpline::buildSpline(const std::vector<double>& t, const std::vector<double>& values) {
     m_segments.clear();
     m_valid = false;
@@ -45,14 +50,14 @@ bool CubicSpline::buildSpline(const std::vector<double>& t, const std::vector<do
         return false;
     }
 
-    // Ensure strictly increasing t
+    /// Ensure strictly increasing t
     for (std::size_t i = 1; i < n; i++) {
         if (t[i] <= t[i - 1]) {
             return false;
         }
     }
 
-    // SPECIAL CASE: ONLY 2 POINTS; 
+    /// SPECIAL CASE: ONLY 2 POINTS; 
     if (n == 2) {
         double h = t[1] - t[0];
         double slope = (values[1] - values[0]) / h;
@@ -70,13 +75,13 @@ bool CubicSpline::buildSpline(const std::vector<double>& t, const std::vector<do
         return true;
     }
 
-    // h[i] = t[i+1] - t[i]
+    /// h[i] = t[i+1] - t[i]
     std::vector<double> h(n-1);
     for (std::size_t i = 0; i < n - 1; i++) {
         h[i] = t[i+1] - t[i];
     }
 
-    // Solve for c coefficients using tridiagonal linear system (look it up)
+    /// Solve for c coefficients using tridiagonal linear system (look it up)
     std::vector<double> alpha(n, 0.0);
     for (std::size_t i = 1; i < n-1; i++) {
         alpha[i] = ((3.0 / h[i]) * (values[i+1] - values[i])) - ((3.0 / h[i-1]) * (values[i] - values[i-1]));
@@ -90,7 +95,7 @@ bool CubicSpline::buildSpline(const std::vector<double>& t, const std::vector<do
     mu[0] = z[0] = 0.0;
 
 
-    // Compute l
+    /// Compute l
     for (std::size_t i = 1; i < n - 1; i++) {
         l[i] = 2.0 * (t[i + 1] - t[i - 1]) - h[i - 1] * mu[i - 1];
         if (std::abs(l[i]) < 1e-12) {
@@ -136,18 +141,18 @@ bool CubicSpline::buildSpline(const std::vector<double>& t, const std::vector<do
     return true;
 }
 
-// Decides which cubic segment contains the t query
+/// Decides which cubic segment contains the t query
 std::size_t CubicSpline::findSegmentIndex(double tQuery) const {
     if (m_segments.empty()) {
         return 0;
     }
 
-    // Clamp to first
+    /// Clamp to first
     if (tQuery <= m_segments.front().t0) {
         return 0;
     }
 
-    // Clamp on last
+    /// Clamp on last
     if (tQuery >= m_segments.back().t1) {
         return m_segments.size() - 1;
     }
@@ -155,7 +160,7 @@ std::size_t CubicSpline::findSegmentIndex(double tQuery) const {
     std::size_t left = 0;
     std::size_t right = m_segments.size() - 1;
 
-    // binary search
+    /// binary search
     while (left <= right) {
         std::size_t mid = left + (right - left) / 2;
         const SplineSegment& seg = m_segments[mid];
@@ -175,7 +180,7 @@ std::size_t CubicSpline::findSegmentIndex(double tQuery) const {
     return m_segments.size() - 1;
 }
 
-// FUNCTION EVALUATION
+/// FUNCTION EVALUATION
 
 double CubicSpline::evaluate(double tQuery) const {
     
@@ -214,7 +219,7 @@ double CubicSpline::evalSecondDeriv(double tQuery) const {
     return 2.0 * seg.c + 6.0 * seg.d *u;
 }
 
-// UTILITIES
+/// UTILITIES
 
 bool CubicSpline::isValid() const {
     return m_valid;
@@ -230,9 +235,9 @@ const std::vector<SplineSegment>& CubicSpline::getSegments() const {
 
 
 
-// ----------------------------------------
-//    ARC-LENGTH PARAM. & PATHBUILDING
-// ----------------------------------------
+/// ----------------------------------------
+///    ARC-LENGTH PARAM. & PATHBUILDING
+/// ----------------------------------------
 std::vector<double> ALS_Path::computeChordLengthParameters(const std::vector<Waypoint>& points) {
     std::vector<double> t;
 
@@ -271,10 +276,10 @@ bool ALS_Path::buildFromPoints(const std::vector<Waypoint>& points, double sampl
         return false;
     }
 
-    // Compute t[i] from chord lengths
+    /// Compute t[i] from chord lengths
     m_parameters = computeChordLengthParameters(points);
 
-    // Reject duplicates that cause repeated t values (cleanup just in case)
+    /// Reject duplicates that cause repeated t values (cleanup just in case)
     for (std::size_t i = 1; i < m_parameters.size(); i++) {
         if (m_parameters[i] <= m_parameters[i - 1]) {
             LOG("Points contain duplicate or non-increasing positions");
@@ -282,7 +287,7 @@ bool ALS_Path::buildFromPoints(const std::vector<Waypoint>& points, double sampl
         }
     }
 
-    // Split points into x and y
+    /// Split points into x and y
     std::vector<double> xVals(points.size());
     std::vector<double> yVals(points.size());
     std::vector<double> vVals(points.size());
@@ -293,7 +298,7 @@ bool ALS_Path::buildFromPoints(const std::vector<Waypoint>& points, double sampl
         vVals[i] = points[i].v;
     }
 
-    // Build parametric splines
+    /// Build parametric splines
     if (!m_splineX.buildSpline(m_parameters, xVals)) {
         LOG("Failed to build X spline");
         return false;
@@ -309,7 +314,7 @@ bool ALS_Path::buildFromPoints(const std::vector<Waypoint>& points, double sampl
         return false;
     }
 
-    // Build sample table for arc-length quieries
+    /// Build sample table for arc-length quieries
     buildSamples(sampleSpacing);
 
     if (m_samples.empty()) {
@@ -345,7 +350,7 @@ double ALS_Path::getHeadingAtParameter(double tQuery) const {
     return std::atan2(dy, dx);
 }
 
-// κ(t)=(x′(t)2+y′(t)2)3/2x′(t)y′′(t)−y′(t)x′′(t)​
+/// Îº(t)=(xâ€²(t)2+yâ€²(t)2)3/2xâ€²(t)yâ€²â€²(t)âˆ’yâ€²(t)xâ€²â€²(t)â€‹
 double ALS_Path::getCurvatureAtParameter(double tQuery) const {
     double dx = m_splineX.evalFirstDeriv(tQuery);
     double dy = m_splineY.evalFirstDeriv(tQuery);
@@ -361,7 +366,7 @@ double ALS_Path::getCurvatureAtParameter(double tQuery) const {
 }
 
 
-// BUILD SAMPLE TABLE FOR ARC-LENGTH QUERIES
+/// BUILD SAMPLE TABLE FOR ARC-LENGTH QUERIES
 
 void ALS_Path::buildSamples(double sampleSpacing) {
     m_samples.clear();
@@ -498,7 +503,7 @@ double ALS_Path::arcLengthToParameter(double sQuery) const {
         return m_samples.back().t;
     }
 
-    // Binary search to find the right interval
+    /// Binary search to find the right interval
     std::size_t left = 0;
     std::size_t right = m_samples.size() - 1;
     while (left <= right) {
@@ -517,7 +522,7 @@ double ALS_Path::arcLengthToParameter(double sQuery) const {
         }
     }
 
-    // Interpolate between samples[right] and samples[left]
+    /// Interpolate between samples[right] and samples[left]
     std::size_t upper = left;
     std::size_t lower = upper - 1;
 
@@ -540,7 +545,7 @@ double ALS_Path::getMaxAbsCurvatureInRange(double sStart, double sEnd) const {
 
     double maxCurv = 0.0;
     
-    // Binary search to efficiently find the starting index
+    /// Binary search to efficiently find the starting index
     std::size_t left = 0;
     std::size_t right = m_samples.size() - 1;
     std::size_t startIdx = 0;
@@ -556,7 +561,7 @@ double ALS_Path::getMaxAbsCurvatureInRange(double sStart, double sEnd) const {
         }
     }
 
-    // Iterate through the range to find the sharpest curve
+    /// Iterate through the range to find the sharpest curve
     for (std::size_t i = startIdx; i < m_samples.size(); i++) {
         if (m_samples[i].s > sEnd) {
             break;
@@ -570,7 +575,7 @@ double ALS_Path::getMaxAbsCurvatureInRange(double sStart, double sEnd) const {
     return maxCurv;
 }
 
-// UTILITIES
+/// UTILITIES
 
 bool ALS_Path::isValid() const {
     return m_valid;

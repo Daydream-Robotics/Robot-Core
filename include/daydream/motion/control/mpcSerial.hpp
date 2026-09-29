@@ -1,3 +1,8 @@
+﻿/**
+ * @file mpcSerial.hpp
+ * @brief Project interface or implementation.
+ */
+
 #ifndef _MPC_SERIAL_HPP_
 #define _MPC_SERIAL_HPP_
 
@@ -9,11 +14,11 @@
 #include <cstddef>
 #include <string>
 
-//offboard MPC controller: runs on vex brain then sends state/references to embedded solver on microcontroller via serial, receives optimal voltages back.
+///offboard MPC controller: runs on vex brain then sends state/references to embedded solver on microcontroller via serial, receives optimal voltages back.
 
 class MPCSerial : public MotionController {
 public:
-    //timing and drivetrain parameters
+    ///timing and drivetrain parameters
     struct Params {
         double h; //sample period (s)
         double gear_ratio; //gear multiplier: (driver teeth / driven teeth)
@@ -26,7 +31,7 @@ public:
         Params(double frequency, double ratio, double trackWidth, double A, double B, double aMax, double vMin = 3);
     }; 
 
-    //stores prediction horizon (must match microcontroller)
+    ///stores prediction horizon (must match microcontroller)
     static constexpr std::size_t F = 15;
 
     explicit MPCSerial(const Params& params);
@@ -36,14 +41,14 @@ public:
         m_v_ref = -1.0; 
     }
 
-    //public compute: sends parameters plus robot telematry to private compute, gets voltages
+    ///public compute: sends parameters plus robot telematry to private compute, gets voltages
     WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx, PathFlag flag) override;
 
-    //motor model identification
+    ///motor model identification
     static void identifyMotorModel(double gear_ratio);
 
 private:
-    //binary packet def for the microcontroller the data it needs to compute input volatges
+    ///binary packet def for the microcontroller the data it needs to compute input volatges
     #pragma pack(push, 1)
     struct MPCUpdatePacket {
         float pose_x; //[in]
@@ -56,7 +61,7 @@ private:
         float z_desired[(F + 1) * 3];
     };
     #pragma pack(pop)
-    //binary packet def to send input voltages
+    ///binary packet def to send input voltages
     #pragma pack(push, 1)
     struct MPCControlPacket {
         float V_left; //[V]
@@ -64,7 +69,7 @@ private:
     };
     #pragma pack(pop)
 
-    //interpolated point on path with arc length parameterization
+    ///interpolated point on path with arc length parameterization
    struct InterpSample {
        double s = 0.0; // arc length along path (in)
        double x = 0.0; // x position (in)
@@ -76,14 +81,14 @@ private:
     SerialProtocol serial; //serial link to microcontroller
     Params m_params; //timing and gear ratio
     double m_v_ref = -1.0;
-    //private compute: sends full state + reference to microcontroller, gets voltages
+    ///private compute: sends full state + reference to microcontroller, gets voltages
     WheelVelocities compute(const Pose& currentPose, const ALS_Path& path, std::size_t& closestSampleIdx, PathFlag flag, double omega_L, double omega_R, double V_battery, double I_total);
-    //find closest point on spline for given arc length
+    ///find closest point on spline for given arc length
     InterpSample sampleAtArcLength(const std::vector<Sample>& samples, double sQuery);
-    //pack current state + build reference trajectory into update packet
+    ///pack current state + build reference trajectory into update packet
     MPCUpdatePacket buildUpdatePacket(const Pose& currentPose, const std::vector<Sample>& samples, std::size_t idx, PathFlag flag, double omega_L, double omega_R, double V_battery, double I_total);
 
-    //get motor model
+    ///get motor model
     static double estimateA(const std::vector<double>& time, const std::vector<double>& omega, double omega_ss);
     static double estimateB(double a, double omega_ss, double voltage);
     static void runSingleIdentificationTest(int voltage, double& out_a, double& out_b, double gear_ratio);

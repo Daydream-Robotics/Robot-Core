@@ -1,3 +1,8 @@
+﻿/**
+ * @file constants.h
+ * @brief Project interface or implementation.
+ */
+
 /**
  * \file constants.h
  *
@@ -29,11 +34,11 @@ constexpr char DESCORE_PORT = 'D';
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 
-// diameter of tracking wheels in inches
+/// diameter of tracking wheels in inches
 constexpr double PARALLEL_TRACKING_WHEEL_DIAMETER = 2.03895;
 constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.0425;
 
-// distance from tracking center to wheels
+/// distance from tracking center to wheels
 constexpr double PARALLEL_TRACKING_WHEEL_OFFSET = 0.0; // positive is to the right of tracking center
 constexpr double PERPENDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behind tracking center
 

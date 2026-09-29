@@ -1,7 +1,13 @@
+﻿/**
+ * @file odometry.hpp
+ * @brief Project interface or implementation.
+ */
+
 #pragma once
 
 #include "main.h"
 
+/** @brief Physical configuration and encoder source selection for odometry. */
 struct OdomConfig {
     double parallelWheelDiameter;
     double perpendicularWheelDiameter;
@@ -11,11 +17,13 @@ struct OdomConfig {
     double driveWheelDiameter = 0.0;
 };
 
+/** @brief Accumulated travel distances for parallel and perpendicular wheels. */
 struct WheelLengths {
     double parallel;
     double perpendicular;
 };
 
+/** @brief Two-dimensional robot or field position, measured in inches. */
 struct Position {
     double x;
     double y;
@@ -26,13 +34,13 @@ struct Position {
  * @note Made for the frame: +X forward, +Y left, CCW positive
  */
 struct Pose {
-    // x-position of bot (inches)
+    /// x-position of bot (inches)
     double x;
 
-    // y-position of bot (inches)
+    /// y-position of bot (inches)
     double y;
 
-    // Heading of bot (rads)
+    /// Heading of bot (rads)
     double theta;
 };
 
@@ -121,16 +129,16 @@ public:
     static void odomTask();
 
 private:
-    // the config for the robot
+    /// the config for the robot
     OdomConfig m_config;
 
-    // stores the latest global position and heading on the robot
+    /// stores the latest global position and heading on the robot
     Pose m_currentPosition = {0, 0, 0};
 
-    // ROTS mutex to keep data task safe
+    /// ROTS mutex to keep data task safe
     pros::Mutex m_mutex;
   
-    // previous state tracking
+    /// previous state tracking
     double m_prevTheta = 0;
     double m_prevParallel = 0;
     double m_prevPerpendicular = 0;

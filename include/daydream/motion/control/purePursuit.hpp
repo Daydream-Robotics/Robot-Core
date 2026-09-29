@@ -1,3 +1,8 @@
+﻿/**
+ * @file purePursuit.hpp
+ * @brief Project interface or implementation.
+ */
+
 #pragma once
 
 #include <vector>
@@ -56,7 +61,7 @@ class PurePursuitController : public MotionController {
         double m_lookAheadDist = 10.0;      /**< The current loop's lookahead distance */
         int m_stepCounter = 0;              /**< The number of times step has been called */
 
-        // modifiable
+        /// modifiable
         double m_speedMultiplier = 1;       /**< Scalar to adjust overall speed */ // TODO: make configurable from main or path follower
         
     public:

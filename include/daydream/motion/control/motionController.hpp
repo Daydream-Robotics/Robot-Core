@@ -1,3 +1,8 @@
+﻿/**
+ * @file motionController.hpp
+ * @brief Project interface or implementation.
+ */
+
 #pragma once
 #include "daydream/motion/pathing/arclengthSplining.hpp"
 #include "daydream/motion/odometry.hpp"
@@ -25,7 +30,7 @@ enum class PathFlag {
 struct WheelVelocities {
     double left;    /**< command value for left motor group */
     double right;   /**< command value for right motor group */
-    //! IMPORTANT: Would have renamed WheelVelocities but didn't want to make merging everyone else's code too difficult
+    ///! IMPORTANT: Would have renamed WheelVelocities but didn't want to make merging everyone else's code too difficult
     ControlMode input = ControlMode::INPUT_VELOCITY;
 };
 

@@ -1,33 +1,38 @@
-#include "autons.hpp"
-#include "display.hpp"
+﻿/**
+ * @file autons.cpp
+ * @brief Project interface or implementation.
+ */
+
+#include "daydream/autonomous/routines/autons.hpp"
+#include "daydream/utilities/display.hpp"
 #include "api.h"
 volatile bool auton_complete = false;
 
 
-// ! template
+/// ! template
 void solo_awp(int auton_color) {
     const int64_t start = pros::millis();
     auto_type = auton_color;
-    //do auto stuff
+    ///do auto stuff
     
     printf("done: %f\n", ((double)(pros::millis() - start))/1000);
 }
 
-// defines function for unicolor middle goal auton
+/// defines function for unicolor middle goal auton
 void middle_goal(int auton_color) {
-    //gutted
+    ///gutted
 }
 
 void left_seven_ball(int auton_color) {
-    //gutted
+    ///gutted
 }
 
 void low_goal(int auton_color) {
-    //gutted
+    ///gutted
 }
 
 void right_seven_ball(int auton_color) {
-    //gutted
+    ///gutted
 }
 
 void test_auton() {
@@ -154,7 +159,7 @@ void right_blue_three_auton() {
 
 
 void programming_skills() {
-     // prog skills
+     /// prog skills
 }
 
 void programming_skills_middle() {

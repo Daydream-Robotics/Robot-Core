@@ -1,4 +1,9 @@
-// src/pid.cpp
+﻿/**
+ * @file pid.cpp
+ * @brief Project interface or implementation.
+ */
+
+/// src/pid.cpp
 
 #include "daydream/motion/control/pid.hpp"
 
@@ -11,7 +16,7 @@ PID::PID(double p, double i, double d, double start_i) : kP(p), kI(i), kD(d), st
 double PID::compute(double current, bool usesAngle) {
     using clock = std::chrono::steady_clock;
 
-    // Determine time since last step
+    /// Determine time since last step
     auto now = clock::now();
     std::chrono::duration<double> dt_dur = now - lastTime;
     double dt = dt_dur.count();
@@ -25,18 +30,18 @@ double PID::compute(double current, bool usesAngle) {
     }
 
 
-    // Integral
+    /// Integral
     if (std::fabs(error) < start_i) {
         integral += error * dt;
     } else {
         integral = 0.0;
     }
 
-    // Derivative
+    /// Derivative
     derivative =  prevError ? (error - prevError) / dt : 0;
     prevError = error;
 
-    // Output
+    /// Output
     output = kP * error + kI * integral + kD * derivative;
     return output;
 }
@@ -53,19 +58,19 @@ void PID::setConstants(double p, double i, double d) {
 }
 
 void PID::reset() {
-    // Reset collected error
+    /// Reset collected error
     prevError = 0;
     error = 0;
     integral = 0;
     derivative = 0;
     output = 0;
 
-    // Reset counters
+    /// Reset counters
     smallCounter = 0;
     bigCounter = 0;
     velocityCounter = 0;
 
-    // Initialize start time
+    /// Initialize start time
     startTime = std::chrono::steady_clock::now();
     lastTime = startTime;
 }
@@ -89,7 +94,7 @@ PID::ExitState PID::exit_condition(double currentVelocity) {
     using clock = std::chrono::steady_clock;
     auto now = clock::now();
 
-    // Timeout
+    /// Timeout
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         now - startTime
     ).count();
@@ -97,7 +102,7 @@ PID::ExitState PID::exit_condition(double currentVelocity) {
     if (timeout > 0 && elapsed_ms > timeout)
         return TIMEOUT;
 
-    // Small error
+    /// Small error
     if (std::fabs(error) < smallError) {
         smallCounter += 10;
         if (smallCounter >= smallTime)
@@ -106,7 +111,7 @@ PID::ExitState PID::exit_condition(double currentVelocity) {
         smallCounter = 0;
     }
 
-    // Big error
+    /// Big error
     if (std::fabs(error) < bigError) {
         bigCounter += 10;
         if (bigCounter >= bigTime)
@@ -115,7 +120,7 @@ PID::ExitState PID::exit_condition(double currentVelocity) {
         bigCounter = 0;
     }
 
-    // Velocity
+    /// Velocity
     if (std::fabs(currentVelocity) < velocityThreshold) {
         velocityCounter += 10;
         if (velocityCounter >= velocityTime)

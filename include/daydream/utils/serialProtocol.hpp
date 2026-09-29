@@ -1,3 +1,8 @@
+﻿/**
+ * @file serialProtocol.hpp
+ * @brief Project interface or implementation.
+ */
+
 #ifndef SERIAL_PROTOCOL_HPP
 #define SERIAL_PROTOCOL_HPP
 
@@ -21,7 +26,7 @@
     #include <unistd.h>
 #endif
 
-//mode for sending data
+///mode for sending data
 class SerialProtocol {
 public:
     enum class Mode {
@@ -43,9 +48,9 @@ public:
         ------------------------------------------------
     */
     struct Packet {
-         // name/type of packet
+         /// name/type of packet
         std::string type;
-        //2d vector storing message data
+        ///2d vector storing message data
         /*
             Outer vector: individual message blocks
 
@@ -62,7 +67,7 @@ public:
         std::vector<std::vector<std::string>> message;
     };
 
-    // binary packet header
+    /// binary packet header
     #pragma pack(push, 1)
     struct BinaryHeader {
         uint16_t sync; // frame start marker
@@ -71,34 +76,34 @@ public:
     };
     #pragma pack(pop)
 
-    //enum for packet type header
+    ///enum for packet type header
     enum PacketType : uint16_t {
         GENERIC     = 0,
         MPC_UPDATE  = 1,
         MPC_CONTROL = 2
     };
 
-    //persistent buffer for binary
+    ///persistent buffer for binary
     std::vector<uint8_t> rx_buffer;
     size_t rx_buffer_pos;
 
-    //constructor with defaults (separators are now fixed)
+    ///constructor with defaults (separators are now fixed)
     SerialProtocol(int buffer_size, Mode mode = Mode::ASCII);
 
-    // T must have a fixed memory layout
+    /// T must have a fixed memory layout
     template <typename T>
-    //sends packet as binary or serialized string over serial
+    ///sends packet as binary or serialized string over serial
     bool send(const T& data);
     template <typename T>
     bool send(uint16_t type, const T& data);
 
-     //recieves either a fixed size binary struct or an ASCII line  over serial and returns either a packet struct or nulpptr if full packet isn't recieved 
+     ///recieves either a fixed size binary struct or an ASCII line  over serial and returns either a packet struct or nulpptr if full packet isn't recieved 
     template <typename T>
     std::optional<T> receive();
     template <typename T>
     std::optional<T> receive(uint16_t expected_type);
 
-    //send raw wakeup string to serial
+    ///send raw wakeup string to serial
     bool sendWakeup(const std::string& wakeup);
 
     #ifdef __microcontroller__
@@ -113,43 +118,43 @@ private:
     int buffer_size;
     Mode mode;
 
-    //check if the packet is a valid type
+    ///check if the packet is a valid type
     static bool isValidPacketType(const std::string& type);
 
-    // T must be trivially copyable ie no ptrs in the struct
+    /// T must be trivially copyable ie no ptrs in the struct
     template <typename T>
-    //sends struct as raw binary over serial
+    ///sends struct as raw binary over serial
     bool sendBinary(uint16_t type, const T& packet);
 
     template <typename T>
-    // Receives a fixed-size binary struct from serial and returns nullptr if full packet isn't recieved
+    /// Receives a fixed-size binary struct from serial and returns nullptr if full packet isn't recieved
     std::optional<T> receiveBinary(uint16_t expectedType);
 
-    //serializes packet into string then sends it over USB serial
+    ///serializes packet into string then sends it over USB serial
     bool sendASCII(const Packet& packet);
-    //reads one line from USB serial then parses into a packet object, returns std::nullopt if no packet is recieved
+    ///reads one line from USB serial then parses into a packet object, returns std::nullopt if no packet is recieved
     std::optional<Packet> receiveASCII();
 
     uint8_t crc8(const uint8_t* data, size_t len);
     bool readBytes(void* dest, size_t n, int timeout_ms = 100);
 
-    //converts packet struct to raw string packet to send
+    ///converts packet struct to raw string packet to send
     static std::string serializePacket(const Packet& packet);
-    //converts raw packet string (from serial) to a packet struct
+    ///converts raw packet string (from serial) to a packet struct
     static std::optional<Packet> deserializePacket(const std::string& line);
 
-    //function to skip bytes
+    ///function to skip bytes
     inline bool skipBytes(size_t num_bytes) {
-        //buffer to hold discarded data
+        ///buffer to hold discarded data
         char discard[256];
-        //continue until all requested bytes have been discarded
+        ///continue until all requested bytes have been discarded
         size_t remaining = num_bytes;
-        //calc num bytes to read but not more than buffer size
+        ///calc num bytes to read but not more than buffer size
         while (remaining > 0) {
             size_t to_read = std::min(remaining, sizeof(discard));
-            //put bytes into discard buffer and are ignored
+            ///put bytes into discard buffer and are ignored
             if (!readBytes(discard, to_read, 100)) {
-                //hit EOF or an error
+                ///hit EOF or an error
                 return false;
             }
             remaining -= to_read;
@@ -159,8 +164,8 @@ private:
 };
 
 
-//template functions
-//unified send without a type (ie used more for ASCI or with the generic type 0)
+///template functions
+///unified send without a type (ie used more for ASCI or with the generic type 0)
 template <typename T>
 bool SerialProtocol::send(const T& data) {
     if (mode == Mode::ASCII) {
@@ -178,7 +183,7 @@ bool SerialProtocol::send(const T& data) {
     return false;
 }
 
-//unified send with a type (ie used more for Binary)
+///unified send with a type (ie used more for Binary)
 template <typename T>
 bool SerialProtocol::send(uint16_t type, const T& data) {
     if (mode == Mode::ASCII) {
@@ -196,7 +201,7 @@ bool SerialProtocol::send(uint16_t type, const T& data) {
     return false;
 }
 
-//unified recieve (used more for ASCII or looking for type 0)
+///unified recieve (used more for ASCII or looking for type 0)
 template <typename T>
 std::optional<T> SerialProtocol::receive() {
     if (mode == Mode::ASCII) {
@@ -214,7 +219,7 @@ std::optional<T> SerialProtocol::receive() {
     return std::nullopt;
 }
 
-//unified recieve (used more for Binary)
+///unified recieve (used more for Binary)
 template <typename T>
 std::optional<T> SerialProtocol::receive(uint16_t expected_type) {
     if (mode == Mode::ASCII) {
@@ -232,47 +237,47 @@ std::optional<T> SerialProtocol::receive(uint16_t expected_type) {
     return std::nullopt;
 }
 
-//sends struct as raw binary over serial 
-// Packet format: [0x55][0xAA][type_lo][type_hi][size_lo][size_hi][payload][CRC-8]
+///sends struct as raw binary over serial 
+/// Packet format: [0x55][0xAA][type_lo][type_hi][size_lo][size_hi][payload][CRC-8]
 template <typename T>
 bool SerialProtocol::sendBinary(uint16_t type, const T& packet) {
-    //ensure type can be safley used as raw bytes
+    ///ensure type can be safley used as raw bytes
     static_assert(std::is_trivially_copyable_v<T>,
                   "Binary packet must be trivially copyable");
-    //makes a header and sets:
+    ///makes a header and sets:
     uint8_t header[6];
-    //sync bytes
+    ///sync bytes
     header[0] = 0x55;
     header[1] = 0xAA;
-    //type bytes
+    ///type bytes
     header[2] = type & 0xFF;
     header[3] = (type >> 8) & 0xFF;
-    //size bytes
+    ///size bytes
     header[4] = sizeof(T) & 0xFF;
     header[5] = (sizeof(T) >> 8) & 0xFF;
 
-    //writes header to USB serial and checks if it was properly written
+    ///writes header to USB serial and checks if it was properly written
     if (fwrite(header, 1, 6, stdout) != 6) {
         return false;
     }
-    //Interpret struct as a raw byte array
+    ///Interpret struct as a raw byte array
     const uint8_t* raw = reinterpret_cast<const uint8_t*>(&packet);
-    //writes message to USB serial and checks if it was properly written
+    ///writes message to USB serial and checks if it was properly written
     if (fwrite(raw, 1, sizeof(T), stdout) != sizeof(T)) {
         return false;
     }
-    //computes CRC
+    ///computes CRC
     uint8_t crc = crc8(raw, sizeof(T));
-    //writes crc byte to USB serial and checks if it was properly written
+    ///writes crc byte to USB serial and checks if it was properly written
     if (fwrite(&crc, 1, 1, stdout) != 1) {
         return false;
     }
-    //force immediate writing
+    ///force immediate writing
     fflush(stdout);
     return true;
 }
 
-// Receives a fixed-size binary struct from serial and returns nullptr if full packet isn't recieved
+/// Receives a fixed-size binary struct from serial and returns nullptr if full packet isn't recieved
 template <typename T>
 std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
     static_assert(std::is_trivially_copyable_v<T>,
@@ -288,7 +293,7 @@ std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
     int attempts   = 0;
     const int max_attempts = 10000;
 
-    // Scan for sync bytes 0x55 0xAA
+    /// Scan for sync bytes 0x55 0xAA
     while (sync_found < 2 && attempts < max_attempts) {
         if (std::chrono::steady_clock::now() > deadline) {
             return std::nullopt;
@@ -310,37 +315,37 @@ std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
         return std::nullopt;
     }
 
-    // Read type + size
+    /// Read type + size
     if (!readBytes(reinterpret_cast<uint8_t*>(&header) + 2, 
                    sizeof(BinaryHeader) - 2, 100)) {
         return std::nullopt;
     }
 
-    // Validate packet type
+    /// Validate packet type
     if (header.type != expectedType) {
         skipBytes(header.size + 1);
         return std::nullopt;
     }
 
-    // Validate payload size
+    /// Validate payload size
     if (header.size != sizeof(T)) {
         skipBytes(header.size + 1);
         return std::nullopt;
     }
 
-    // Prevent buffer overflow
+    /// Prevent buffer overflow
     if (header.size > (size_t)buffer_size || header.size == 0) {
         skipBytes(header.size + 1);
         return std::nullopt;
     }
 
-    // Read payload
+    /// Read payload
     T result;
     if (!readBytes(&result, sizeof(T), 100)) {
         return std::nullopt;
     }
 
-    // Read and verify CRC
+    /// Read and verify CRC
     uint8_t recv_crc;
     if (!readBytes(&recv_crc, 1, 100)) {
         return std::nullopt;
@@ -355,17 +360,17 @@ std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
     return result;
 }
 
-//compute CRC-8 (0x07) over a byte buffer
-//used to detect corruption over USB serial
+///compute CRC-8 (0x07) over a byte buffer
+///used to detect corruption over USB serial
 inline uint8_t SerialProtocol::crc8(const uint8_t* data, size_t len) {
     uint8_t crc = 0;
-    //process each byte in buffer
+    ///process each byte in buffer
     for (size_t i = 0; i < len; i++) {
-        //xor current byte into CRC register
+        ///xor current byte into CRC register
         crc ^= data[i];
-        //process all the current bytes
+        ///process all the current bytes
         for (int b = 0; b < 8; b++) {
-            // If most sig bit (bit 7) is set, shift left and apply polynomial
+            /// If most sig bit (bit 7) is set, shift left and apply polynomial
             crc = (crc & 0x80) ? (crc << 1) ^ 0x07 : crc << 1;
         }
     }
@@ -373,55 +378,55 @@ inline uint8_t SerialProtocol::crc8(const uint8_t* data, size_t len) {
 }
 
 #ifdef __microcontroller__
-// Configures a serial port for microcontroller communication
+/// Configures a serial port for microcontroller communication
 inline int SerialProtocol::setUpMicrocontrollerSerial(const char* port, speed_t baud) {
-    //open serial device (read/write, no controlling terminal, synchronous I/O)
+    ///open serial device (read/write, no controlling terminal, synchronous I/O)
     int fd = open(port, O_RDWR | O_NOCTTY | O_SYNC);
-    //failed to open port
+    ///failed to open port
     if (fd < 0) {
         return -1;
     }
     struct termios tty;
-    //retrieve current terminal attributes
+    ///retrieve current terminal attributes
     if(tcgetattr(fd, &tty) != 0) {
         return -1;
     }
-    //set input/output baud rate
+    ///set input/output baud rate
     cfsetospeed(&tty, baud);
     cfsetispeed(&tty, baud);
-    // Configure 8 data bits, enable receiver, ignore modem control lines
+    /// Configure 8 data bits, enable receiver, ignore modem control lines
     tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8 | CLOCAL | CREAD;
-    //disable software flow control and special handling of input bytes
+    ///disable software flow control and special handling of input bytes
     tty.c_iflag &= ~(IXON | IXOFF | IXANY | IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
-    //disable canonical mode, echo, signals, and extended input processing
+    ///disable canonical mode, echo, signals, and extended input processing
     tty.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
-    //disable output processing (raw output mode)
+    ///disable output processing (raw output mode)
     tty.c_oflag &= ~OPOST;
-    //set read behavior: minimum 1 byte, timeout = 0.1s
+    ///set read behavior: minimum 1 byte, timeout = 0.1s
     tty.c_cc[VMIN] = 1; 
     tty.c_cc[VTIME] = 1;
-    //apply configuration immediately
+    ///apply configuration immediately
     tcsetattr(fd, TCSANOW, &tty);
-    //redirect standard input/output to the serial port
+    ///redirect standard input/output to the serial port
     dup2(fd, STDIN_FILENO);
     dup2(fd, STDOUT_FILENO);
     setbuf(stdin, NULL);
     setbuf(stdout, NULL);
     setvbuf(stdin, NULL, _IONBF, 0);
     setvbuf(stdout, NULL, _IONBF, 0);
-    //return file descriptor for later use
+    ///return file descriptor for later use
     return fd;
 }
 #endif
 
 #ifdef __vexbrain__
-//configures serial settings for vex brain serial communication
+///configures serial settings for vex brain serial communication
 inline void SerialProtocol::setUpVexSerial() {
-    //disable COBS encoding in PROS serial layer (raw byte streaming mode)
+    ///disable COBS encoding in PROS serial layer (raw byte streaming mode)
     pros::c::serctl(SERCTL_DISABLE_COBS, nullptr);
-    //disable buffering for stdout to ensure immediate transmission
+    ///disable buffering for stdout to ensure immediate transmission
     setbuf(stdout, NULL);
-    //disable buffering for stdin to ensure immediate reception
+    ///disable buffering for stdin to ensure immediate reception
     setbuf(stdin, NULL);
 }
 #endif

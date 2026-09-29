@@ -1,3 +1,8 @@
+﻿/**
+ * @file odometry.cpp
+ * @brief Project interface or implementation.
+ */
+
 #include "daydream/motion/odometry.hpp"
 #include "daydream/config/constants.h"
 #include "daydream/config/subsystems.hpp"
@@ -30,7 +35,7 @@ void Odometry::updatePose(void) {
 		return;
 	}
 	
-	// Get orientation from IMU
+	/// Get orientation from IMU
 	double theta_rad = convertDegToRad(yaw_deg);
 	theta_rad = normalizeAngle(theta_rad);
 	
@@ -49,7 +54,7 @@ void Odometry::updatePose(void) {
 		return;
 	}
 
-	// Calculate distance travelled by either drive encoders or tracking wheels
+	/// Calculate distance travelled by either drive encoders or tracking wheels
 	WheelLengths arcs;
 	if (m_config.useMotorEncoders) {
 		arcs = getDriveEncoderTravel();
@@ -57,14 +62,14 @@ void Odometry::updatePose(void) {
 		arcs = getOdomWheelTravel();
 	}
 	
-	// Determine change in heading 
+	/// Determine change in heading 
 	double del_theta = normalizeAngle(theta_rad - m_prevTheta);
 
-	// Determine change in local x and in local y
+	/// Determine change in local x and in local y
 	double dx_local = arcs.parallel - (del_theta * m_config.parallelTrackingWheelOffset);
 	double dy_local = arcs.perpendicular + (del_theta * m_config.perpendicularTrackingWheelOffset);
 
-	// Arc-length, chord-length correction
+	/// Arc-length, chord-length correction
 	double chordFactor = 1.0;
 	if (std::abs(del_theta) > 1e-9) {
 		chordFactor = 2.0 * std::sin(del_theta / 2.0) / del_theta;
@@ -75,24 +80,24 @@ void Odometry::updatePose(void) {
 	double theta_mid = m_prevTheta + del_theta / 2.0;
     theta_mid = normalizeAngle(theta_mid);
 
-    // Compute change in x and y based on heading and local changes
+    /// Compute change in x and y based on heading and local changes
 	double del_x = std::cos(theta_mid) * dx_local - std::sin(theta_mid) * dy_local;
 	double del_y = std::sin(theta_mid) * dx_local + std::cos(theta_mid) * dy_local;
 
-	// Increment position and angle by calculated changes
+	/// Increment position and angle by calculated changes
 	m_mutex.take();
 	m_currentPosition.x += del_x;
 	m_currentPosition.y += del_y;
 	m_currentPosition.theta = theta_rad;
 	m_mutex.give();
 
-	// !IMPORTANT!: Likely not task safe
-	// print to the controller every 100 ms 
-	// static uint32_t lastPrintTime = 0;
-	// if (pros::millis() - lastPrintTime > 100) {
-	// 	controller.print(0, 0, "X:%.1f Y:%.1f", m_currentPosition.x, m_currentPosition.y);
-	// 	lastPrintTime = pros::millis();
-	// }
+	/// !IMPORTANT!: Likely not task safe
+	/// print to the controller every 100 ms 
+	/// static uint32_t lastPrintTime = 0;
+	/// if (pros::millis() - lastPrintTime > 100) {
+	/// 	controller.print(0, 0, "X:%.1f Y:%.1f", m_currentPosition.x, m_currentPosition.y);
+	/// 	lastPrintTime = pros::millis();
+	/// }
 
 	m_prevTheta = theta_rad;
 }
@@ -111,7 +116,7 @@ void Odometry::setPose(Pose pose) {
 	m_currentPosition.theta = pose.theta;
 	m_mutex.give();
 
-	// Reset sensor baselines so setting a pose does not create a false odometry delta.
+	/// Reset sensor baselines so setting a pose does not create a false odometry delta.
 	m_prevTheta = pose.theta;
 	m_prevParallel = parallelTrackingWheel.get_position();
 	m_prevPerpendicular = perpendicularTrackingWheel.get_position();
@@ -141,32 +146,32 @@ double Odometry::getPosY() {
 
 double Odometry::getYaw(void) {
 
-	// imu disconnected
+	/// imu disconnected
 	if (!imu.is_installed()) {
 		return -180.1;
 	}
 
-	// imu still calibrating
+	/// imu still calibrating
 	if (imu.is_calibrating()) {
 		return -180.2;
 	}
 
 	pros::quaternion_s_t qt = imu.get_quaternion();
 	
-	// If encounter IMU failure, and retry
+	/// If encounter IMU failure, and retry
 	if (std::isnan(qt.w) || qt.w == PROS_ERR_F) {
 		qt = imu.get_quaternion();
-		// pros comm error
+		/// pros comm error
 		if (std::isnan(qt.w) || qt.w == PROS_ERR_F) return -180.3;
 	}
 
-	// yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
+	/// yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
 	double yaw_rad = std::atan2(2 * ((qt.w * qt.z) + (qt.x * qt.y)), 1 - (2 * ((qt.y * qt.y) + (qt.z * qt.z))));
 
-	// convert to degrees
+	/// convert to degrees
 	double yaw_deg = yaw_rad * (180.0 / std::numbers::pi);
 
-	// angle is returned from -180 to 180
+	/// angle is returned from -180 to 180
 	return -yaw_deg;
 }
 
@@ -175,19 +180,19 @@ WheelLengths Odometry::getOdomWheelTravel(void) {
 		return {0, 0};
 	}
 
-    // Get current centidegree position of tracking wheels
+    /// Get current centidegree position of tracking wheels
 	double currParallel = parallelTrackingWheel.get_position();
 	double currPerpendicular = perpendicularTrackingWheel.get_position();
 
-    // Get delta between current and last frame 
+    /// Get delta between current and last frame 
 	double dTicksL = currParallel - m_prevParallel; 
 	double dTicksS = currPerpendicular - m_prevPerpendicular;
 
-	// Convert centidegrees to degrees and find distance travelled by wheel
+	/// Convert centidegrees to degrees and find distance travelled by wheel
 	double delParallel = (dTicksL / 36000.0) * m_config.parallelWheelDiameter * std::numbers::pi; 
 	double delPerpendicular = (dTicksS / 36000.0) * m_config.perpendicularWheelDiameter * std::numbers::pi; 
 
-    // Save current position as previous
+    /// Save current position as previous
 	m_prevParallel = currParallel;
 	m_prevPerpendicular = currPerpendicular;
 
@@ -220,7 +225,7 @@ double Odometry::getParallelVel() {
 	return (deg_s / 360.0) * m_config.parallelWheelDiameter * std::numbers::pi;
 }
 
-// could be used to do odom in background
+/// could be used to do odom in background
 void Odometry::odomTask() {
 	while (true) {
 		odom.updatePose();

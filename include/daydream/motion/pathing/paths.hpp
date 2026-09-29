@@ -1,3 +1,8 @@
+﻿/**
+ * @file paths.hpp
+ * @brief Project interface or implementation.
+ */
+
 #pragma once
 #include "daydream/motion/odometry.hpp"
 #include "daydream/motion/pathing/arclengthSplining.hpp"

@@ -1,10 +1,15 @@
+﻿/**
+ * @file display.hpp
+ * @brief Project interface or implementation.
+ */
+
 #ifndef DISPLAY_H
 #define DISPLAY_H
 
 
 #include "main.h"
 
-//Declares an integer and functions.
+///Declares an integer and functions.
 extern int selected_profile;
 void initialization_display();
 void run_selected_auto(void);

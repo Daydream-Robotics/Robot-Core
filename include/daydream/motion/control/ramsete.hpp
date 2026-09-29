@@ -1,3 +1,8 @@
+﻿/**
+ * @file ramsete.hpp
+ * @brief Project interface or implementation.
+ */
+
 #pragma once
 
 #include "daydream/motion/control/motionController.hpp"

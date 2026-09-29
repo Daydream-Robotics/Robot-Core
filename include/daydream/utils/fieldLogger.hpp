@@ -1,10 +1,15 @@
+﻿/**
+ * @file fieldLogger.hpp
+ * @brief Project interface or implementation.
+ */
+
 #pragma once
 #include "daydream/utils/sd_card_logging.hpp"
 #include "daydream/motion/pathing/arclengthSplining.hpp"
 #include <vector>
 #include <cmath>
 
-//logger type enum
+///logger type enum
 enum class LoggerType {
     PATH, //logs (target trajectory, actual trajectory, and error over time)
     VALUE //logs a value over time
@@ -13,18 +18,18 @@ enum class LoggerType {
 class FieldLogger: public Logger {
     public:
         FieldLogger(LoggerType type, const char* baseName, const char* label = nullptr, bool overwrite = true) {
-            //buffer for file paths
+            ///buffer for file paths
             char filename[64];
-            //store logging mode
+            ///store logging mode
             log_type = type;
-            //value used to reduce write overhead
+            ///value used to reduce write overhead
             flush_counter = 0;
 
 
             switch(log_type){
-                //path mode
+                ///path mode
                 case LoggerType::PATH:
-                //if overwrite is enabled delete old target, actual, and error .dat files with the same basenam
+                ///if overwrite is enabled delete old target, actual, and error .dat files with the same basenam
                     if (overwrite) {
                         snprintf(filename, sizeof(filename), "/usd/%s_target.dat", baseName);
                         remove(filename);
@@ -34,63 +39,63 @@ class FieldLogger: public Logger {
                         remove(filename);
                     }
 
-                    //open target path log
+                    ///open target path log
                     snprintf(filename, sizeof(filename), "/usd/%s_target.dat", baseName);
                     target_pos_file = fopen(filename, "w");
 
-                    //open actual path log
+                    ///open actual path log
                     snprintf(filename, sizeof(filename), "/usd/%s_actual.dat", baseName);
                     actual_pos_file = fopen(filename, "w");
 
-                    //open tracking error log
+                    ///open tracking error log
                     snprintf(filename, sizeof(filename), "/usd/%s_error.dat", baseName);
                     error_pos_file = fopen(filename, "w");
                     break;
                 
-                //value mode
+                ///value mode
                 case LoggerType::VALUE:
-                    //makes a fallback label
+                    ///makes a fallback label
                     const char* safe_label = label ? label : "value";
-                    //if overwrite is enabled delete old value .dat file of same name
+                    ///if overwrite is enabled delete old value .dat file of same name
                     if (overwrite) {
                         snprintf(filename, sizeof(filename), "/usd/%s_%s.dat", baseName, safe_label);
                         remove(filename);
                     }
 
-                    //open value log file
+                    ///open value log file
                     snprintf(filename, sizeof(filename), "/usd/%s_%s.dat", baseName, safe_label);
                     value_file = fopen(filename, "w");
 
-                    //header for plotting
+                    ///header for plotting
                     fprintf(value_file, "# t value\n");
 
-                    //ensure header is written immediatly
+                    ///ensure header is written immediatly
                     flush();
 
                     break;
             }
         }
 
-        //destructor
+        ///destructor
         ~FieldLogger() {
             close();
         }
 
-        //unified log function for LoggerType::PATH
+        ///unified log function for LoggerType::PATH
         void log(const Waypoint& target, const Waypoint& current, double t) {
             if (log_type == LoggerType::PATH) {
                 logPath(target, current, t);
             }
         }
 
-        //unified log function for LoggerType::VALUE
+        ///unified log function for LoggerType::VALUE
         void log(double value, double t) {
             if (log_type == LoggerType::VALUE) {
                 logValue(value, t);
             }
         }
 
-        //flush all open files
+        ///flush all open files
         void flush() {
             switch(log_type){
                 case LoggerType::PATH:
@@ -112,7 +117,7 @@ class FieldLogger: public Logger {
             }
         }
 
-        //close all files safely
+        ///close all files safely
         void close() {
             switch(log_type){
                 case LoggerType::PATH:
@@ -139,25 +144,25 @@ class FieldLogger: public Logger {
         }
 
         static Waypoint closestPointOnPath(const std::vector<Sample>& samples, std::size_t idx, const Position& p) {
-            // projects the current position onto a line segment and interpolates the velocity at that point
+            /// projects the current position onto a line segment and interpolates the velocity at that point
             auto project_on_segment = [&](const Sample& a, const Sample& b) {
-                // segment direction vector
+                /// segment direction vector
                 double ex = b.x - a.x, ey = b.y - a.y;
-                // squared segment length
+                /// squared segment length
                 double len_squared = ex * ex + ey * ey;
-                // projection parameter (clamped so it stays on the segment)
+                /// projection parameter (clamped so it stays on the segment)
                 double t = (len_squared < 1e-12)
                     ? 0.0
                     : std::clamp(((p.x - a.x) * ex + (p.y - a.y) * ey) / len_squared, 0.0, 1.0);
-                // return projected point with interpolated velocity
+                /// return projected point with interpolated velocity
                 return Waypoint{a.x + t * ex, a.y + t * ey, a.v + t * (b.v - a.v)};
             };
 
-            // initialize with the closest sampled waypoint
+            /// initialize with the closest sampled waypoint
             Waypoint best{samples[idx].x, samples[idx].y, samples[idx].v};
             double best_distance = std::hypot(p.x - best.x, p.y - best.y);
 
-            // check the segment after the closest sample
+            /// check the segment after the closest sample
             if (idx + 1 < samples.size()) {
                 Waypoint w = project_on_segment(samples[idx], samples[idx + 1]);
                 double d = std::hypot(p.x - w.x, p.y - w.y);
@@ -167,7 +172,7 @@ class FieldLogger: public Logger {
                 }
             }
 
-            // check the segment before the closest sample
+            /// check the segment before the closest sample
             if (idx > 0) {
                 Waypoint w = project_on_segment(samples[idx - 1], samples[idx]);
                 double d = std::hypot(p.x - w.x, p.y - w.y);
@@ -178,66 +183,66 @@ class FieldLogger: public Logger {
             return best;
         }
 
-        // prevent copying because file handles can't be duplicated
+        /// prevent copying because file handles can't be duplicated
         FieldLogger(const FieldLogger&) = delete;
         FieldLogger& operator=(const FieldLogger&) = delete;
     private:
-        //file handles for PATH mode
+        ///file handles for PATH mode
         FILE* target_pos_file = nullptr;
         FILE* actual_pos_file = nullptr;
         FILE* error_pos_file = nullptr;
 
-        //file handle for VALUE mode
+        ///file handle for VALUE mode
         FILE* value_file = nullptr;
 
-        //current logging mode
+        ///current logging mode
         LoggerType log_type;
-        //value used to reduce write overhead
+        ///value used to reduce write overhead
         int flush_counter;
 
-        //function to log target trajectory, actual trajectory, and error over time in .dat files
+        ///function to log target trajectory, actual trajectory, and error over time in .dat files
         void logPath(const Waypoint& target, const Waypoint& current, double time) {
-            //log type check
+            ///log type check
             if(log_type != LoggerType::PATH ) {
                 return;
             }
 
             if (target_pos_file) {
-                //log target position to sd card (time, x, y)
+                ///log target position to sd card (time, x, y)
                 fprintf(target_pos_file, "%.4f %.4f %.4f\n", time, target.x, target.y);
             }
             if (actual_pos_file) {
-                //log actual robot position to sd card (time, x, y)
+                ///log actual robot position to sd card (time, x, y)
                 fprintf(actual_pos_file, "%.4f %.4f %.4f\n", time, current.x, current.y);
             }
             
-            //get tracking error
+            ///get tracking error
             double dx = target.x - current.x;
             double dy = target.y - current.y;
             double error = std::hypot(dx, dy);
             if (error_pos_file) {
-                //log scalar error magnitude to sd card(time, error)
+                ///log scalar error magnitude to sd card(time, error)
                 fprintf(error_pos_file, "%.4f %.4f\n", time, error);
             }
             
-            //batch the flushes to reduce overhead
+            ///batch the flushes to reduce overhead
             if (++flush_counter >= 10) {
                 flush();
                 flush_counter = 0;
             }
         }
 
-        //valeu logging implementation
+        ///valeu logging implementation
         void logValue(double value, double time) {
-            //log type check, and check for valid file
+            ///log type check, and check for valid file
             if((log_type != LoggerType::VALUE) || !value_file) {
                 return;
             }
 
-            //log value to sd card(time, value)
+            ///log value to sd card(time, value)
             fprintf(value_file, "%.4f %.4f\n", time, value);
             
-            //batch the flushes to reduce overhead
+            ///batch the flushes to reduce overhead
             if (++flush_counter >= 10) {
                 flush();
                 flush_counter = 0;

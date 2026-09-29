@@ -1,4 +1,9 @@
-//Inclusions
+﻿/**
+ * @file rangeSensing.cpp
+ * @brief Project interface or implementation.
+ */
+
+///Inclusions
 #include "main.h"
 #include "daydream/utils/helpers.hpp"
 #include "daydream/motion/odometry.hpp"
@@ -7,22 +12,22 @@
 #include <cmath>
 #include <algorithm>
 
-//Odometry headings already use the math frame: +x forward, +y left, CCW positive.
+///Odometry headings already use the math frame: +x forward, +y left, CCW positive.
 float RangeSensing::fieldHeadingToMathHeading(float fieldHeadingRad) {
     return fieldHeadingRad;
 }
 
-//initializes lookup tables and precomputed data
-//call this ONCE at startup before using MCL
+///initializes lookup tables and precomputed data
+///call this ONCE at startup before using MCL
 void RangeSensing::initRangeSystem() {
-    //build sin/cos lookup tables (0.1 degree resolution)
+    ///build sin/cos lookup tables (0.1 degree resolution)
     for (int i = 0; i < ANGLE_LUT_SIZE; i++) {
         float angle = (i * 2.0f * M_PI) / ANGLE_LUT_SIZE;
         m_sinLut[i] = std::sin(angle);
         m_cosLut[i] = std::cos(angle);
     }
 
-    //precompute segment properties (walls + obstacles)
+    ///precompute segment properties (walls + obstacles)
     for (int i = 0; i < NUM_SEGMENTS; i++) {
         const LineSegment& seg = LINE_SEGMENTS[i];
         m_precomputedSegments[i].x1 = seg.x1;
@@ -32,17 +37,17 @@ void RangeSensing::initRangeSystem() {
     }
 }
 
-//fast sin/cos lookup using precomputed table
+///fast sin/cos lookup using precomputed table
 void RangeSensing::fastSincos(float theta, float& sinOut, float& cosOut) {
-    //normalize angle to [0, 2π)
+    ///normalize angle to [0, 2Ï€)
     float normalized = theta;
     while (normalized < 0.0f) normalized += 2.0f * M_PI;
     while (normalized >= 2.0f * M_PI) normalized -= 2.0f * M_PI;
 
-    //convert radians to lookup table index
+    ///convert radians to lookup table index
     int index = (int)((normalized * ANGLE_LUT_SIZE) / (2.0f * M_PI));
 
-    //clamp to valid range (safety check)
+    ///clamp to valid range (safety check)
     if (index >= ANGLE_LUT_SIZE) index = ANGLE_LUT_SIZE - 1;
     if (index < 0) index = 0;
 
@@ -50,25 +55,25 @@ void RangeSensing::fastSincos(float theta, float& sinOut, float& cosOut) {
     cosOut = m_cosLut[index];
 }
 
-//performs raycasting from particle position to find expected sensor readings
+///performs raycasting from particle position to find expected sensor readings
 RangeReadings RangeSensing::raycast(const mcl::Particle& particle) {
     RangeReadings expectedReadings;
 
-    //Use the odometry heading directly for rotation math.
+    ///Use the odometry heading directly for rotation math.
     float headingSin, headingCos;
     fastSincos(fieldHeadingToMathHeading(static_cast<float>(particle.theta)), headingSin, headingCos);
 
-    //raycast for each of the 4 distance sensors
+    ///raycast for each of the 4 distance sensors
     for (int sensorDir = 0; sensorDir < 4; sensorDir++) {
-        //calculate sensor position in global frame
-        //local frame uses +x = forward, +y = left
+        ///calculate sensor position in global frame
+        ///local frame uses +x = forward, +y = left
         const float sensorGlobalX = particle.x +
             (SENSOR_OFFSET_X[sensorDir] * headingCos + SENSOR_OFFSET_Y[sensorDir] * headingSin);
         const float sensorGlobalY = particle.y +
             (-SENSOR_OFFSET_X[sensorDir] * headingSin + SENSOR_OFFSET_Y[sensorDir] * headingCos);
 
-        //calculate sensor direction in global frame
-        //sensor basis uses +x = forward, +y = left
+        ///calculate sensor direction in global frame
+        ///sensor basis uses +x = forward, +y = left
         const float cosSensor =
             SIN_HEADINGS[sensorDir] * headingCos + COS_HEADINGS[sensorDir] * headingSin;
         const float sinSensor =
@@ -76,66 +81,66 @@ RangeReadings RangeSensing::raycast(const mcl::Particle& particle) {
 
         float minDistance = INFINITY;
 
-        //test ray against all wall segments
+        ///test ray against all wall segments
         for (int segmentIndex = 0; segmentIndex < NUM_SEGMENTS; segmentIndex++) {
             const PrecomputedSegment& segment = m_precomputedSegments[segmentIndex];
 
             const float xOffset = segment.x1 - sensorGlobalX;
             const float yOffset = segment.y1 - sensorGlobalY;
 
-            //calculate denominator for ray-line intersection
+            ///calculate denominator for ray-line intersection
             const float denominator = cosSensor * segment.dy - sinSensor * segment.dx;
 
-            //skip if ray is parallel to segment
+            ///skip if ray is parallel to segment
             if (denominator > -1e-9f && denominator < 1e-9f) {
                 continue;
             }
 
             const float invDenom = 1.0f / denominator;
 
-            //calculate intersection parameters
-            //t = distance along ray, u = position along segment
+            ///calculate intersection parameters
+            ///t = distance along ray, u = position along segment
             const float t = (xOffset * segment.dy - yOffset * segment.dx) * invDenom;
             const float u = (xOffset * sinSensor - yOffset * cosSensor) * invDenom;
 
-            //check if intersection is valid and in front of sensor
+            ///check if intersection is valid and in front of sensor
             if (t >= 0.0f && u >= 0.0f && u <= 1.0f) {
-                //update minimum distance
+                ///update minimum distance
                 if (t < minDistance) {
                     minDistance = t;
                 }
             }
         }
 
-        //store result (NAN if no intersection found)
+        ///store result (NAN if no intersection found)
         expectedReadings.direction[sensorDir] = (minDistance == INFINITY) ? NAN : minDistance;
     }
 
     return expectedReadings;
 }
 
-//optimized raycast for when all particles have same theta
-//precomputes sin/cos and sensor directions once, then only varies position
+///optimized raycast for when all particles have same theta
+///precomputes sin/cos and sensor directions once, then only varies position
 RangeReadings RangeSensing::raycastFixedTheta(const mcl::Particle& particle,
                                               float headingSin, float headingCos,
                                               const float cosSensors[4], const float sinSensors[4]) {
     RangeReadings expectedReadings;
 
-    //raycast for each of the 4 distance sensors
+    ///raycast for each of the 4 distance sensors
     for (int sensorDir = 0; sensorDir < 4; sensorDir++) {
-        //calculate sensor position in global frame
+        ///calculate sensor position in global frame
         const float sensorGlobalX = particle.x +
             (SENSOR_OFFSET_X[sensorDir] * headingCos + SENSOR_OFFSET_Y[sensorDir] * headingSin);
         const float sensorGlobalY = particle.y +
             (-SENSOR_OFFSET_X[sensorDir] * headingSin + SENSOR_OFFSET_Y[sensorDir] * headingCos);
 
-        //use precomputed sensor directions
+        ///use precomputed sensor directions
         const float cosSensor = cosSensors[sensorDir];
         const float sinSensor = sinSensors[sensorDir];
 
         float minDistance = INFINITY;
 
-        //test ray against all wall segments
+        ///test ray against all wall segments
         for (int segmentIndex = 0; segmentIndex < NUM_SEGMENTS; segmentIndex++) {
             const PrecomputedSegment& segment = m_precomputedSegments[segmentIndex];
 
@@ -144,7 +149,7 @@ RangeReadings RangeSensing::raycastFixedTheta(const mcl::Particle& particle,
 
             const float denominator = cosSensor * segment.dy - sinSensor * segment.dx;
 
-            //skip if ray is parallel to segment
+            ///skip if ray is parallel to segment
             if (denominator > -1e-9f && denominator < 1e-9f) {
                 continue;
             }
@@ -153,7 +158,7 @@ RangeReadings RangeSensing::raycastFixedTheta(const mcl::Particle& particle,
             const float t = (xOffset * segment.dy - yOffset * segment.dx) * invDenom;
             const float u = (xOffset * sinSensor - yOffset * cosSensor) * invDenom;
 
-            //check if intersection is valid and in front of sensor
+            ///check if intersection is valid and in front of sensor
             if (t >= 0.0f && u >= 0.0f && u <= 1.0f) {
                 if (t < minDistance) {
                     minDistance = t;
@@ -167,9 +172,9 @@ RangeReadings RangeSensing::raycastFixedTheta(const mcl::Particle& particle,
     return expectedReadings;
 }
 
-//prints estimated position from sensor readings
+///prints estimated position from sensor readings
 void RangeSensing::printPositionFromSensors() {
-    //update sensor readings first to get fresh data
+    ///update sensor readings first to get fresh data
     updateRangeSensors();
 
     RangeReadings readings = distanceReadings;
@@ -178,32 +183,32 @@ void RangeSensing::printPositionFromSensors() {
     double y = 0.0;
     int validCount = 0;
 
-    //calculate position from each sensor
-    //front sensor points in +x direction, measures distance to right wall
+    ///calculate position from each sensor
+    ///front sensor points in +x direction, measures distance to right wall
     if (!std::isnan(readings.front)) {
         x = X_MAX - readings.front + SENSOR_OFFSET_X[0];
         validCount++;
     }
 
-    //back sensor points in -x direction, measures distance to left wall
+    ///back sensor points in -x direction, measures distance to left wall
     if (!std::isnan(readings.back)) {
         x = X_MIN + readings.back + SENSOR_OFFSET_X[2];
         validCount++;
     }
 
-    //left sensor points in +y direction, measures distance to top wall
+    ///left sensor points in +y direction, measures distance to top wall
     if (!std::isnan(readings.left)) {
         y = Y_MAX - readings.left + SENSOR_OFFSET_Y[1];
         validCount++;
     }
 
-    //right sensor points in -y direction, measures distance to bottom wall
+    ///right sensor points in -y direction, measures distance to bottom wall
     if (!std::isnan(readings.right)) {
         y = Y_MIN + readings.right + SENSOR_OFFSET_Y[3];
         validCount++;
     }
 
-    //print results
+    ///print results
     if (validCount > 0) {
         printf("Estimated Position from Sensors (field center = 0,0):\n");
         printf("  x: %.2f\" (forward/back, +x = forward)\n", x);
@@ -216,9 +221,9 @@ void RangeSensing::printPositionFromSensors() {
     }
 }
 
-//calculates robot position using 1 or 2 sensors + IMU heading
+///calculates robot position using 1 or 2 sensors + IMU heading
 RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1Idx, int sensor2Idx, bool silent) {
-    //Get the current pose from odometry.
+    ///Get the current pose from odometry.
     Pose currentPose = odom.getPose();
 
     if (!silent) {
@@ -226,7 +231,7 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
                currentPose.x, currentPose.y, currentPose.theta);
     }
 
-    //initialize result with current pose
+    ///initialize result with current pose
     Position2d result = {
         currentPose.x,
         currentPose.y,
@@ -234,12 +239,12 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
         false
     };
 
-    //convert robot heading to math heading
+    ///convert robot heading to math heading
     double headingRad = currentPose.theta;
     double c = std::cos(headingRad);
     double s = std::sin(headingRad);
 
-    //update sensors and get readings
+    ///update sensors and get readings
     updateRangeSensors();
     RangeReadings readings = distanceReadings;
     double sensorVals[4] = {
@@ -249,21 +254,21 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
         readings.right
     };
 
-    //lambda function to process each sensor
+    ///lambda function to process each sensor
     auto applySensor = [&](int idx) {
         if (idx < 0 || idx > 3) return;
         double dist = sensorVals[idx];
         if (std::isnan(dist)) return;
 
-        //rotate sensor offset to field frame
+        ///rotate sensor offset to field frame
         double offX = SENSOR_OFFSET_X[idx] * c + SENSOR_OFFSET_Y[idx] * s;
         double offY = -SENSOR_OFFSET_X[idx] * s + SENSOR_OFFSET_Y[idx] * c;
 
-        //calculate sensor position in field frame
+        ///calculate sensor position in field frame
         double sx = currentPose.x + offX;
         double sy = currentPose.y + offY;
 
-        //rotate sensor direction to field frame
+        ///rotate sensor direction to field frame
         double dirXRobot = SIN_HEADINGS[idx];  //forward component
         double dirYRobot = COS_HEADINGS[idx];  //left component
 
@@ -277,13 +282,13 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
                    idx, sx, sy, dx, dy, dist);
         }
 
-        //calculate distances to walls
+        ///calculate distances to walls
         double tX = INFINITY;
         double tY = INFINITY;
         int whichXWall = 0;
         int whichYWall = 0;
 
-        //calculate distance to X walls
+        ///calculate distance to X walls
         if (std::abs(dx) > 1e-6) {
             if (dx > 0) {
                 tX = (X_MAX - sx) / dx;
@@ -294,7 +299,7 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
             }
         }
 
-        //calculate distance to Y walls
+        ///calculate distance to Y walls
         if (std::abs(dy) > 1e-6) {
             if (dy > 0) {
                 tY = (Y_MAX - sy) / dy;
@@ -309,7 +314,7 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
             printf("  Wall distances: t_x=%.2f, t_y=%.2f, sensor_dist=%.2f\n", tX, tY, dist);
         }
 
-        //check which wall is hit based on discrepancy
+        ///check which wall is hit based on discrepancy
         double xDiscrepancy = std::abs(tX - dist);
         double yDiscrepancy = std::abs(tY - dist);
 
@@ -317,7 +322,7 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
         bool hitXWall = (tX > 0) && (tX < tY) && (xDiscrepancy < tolerance);
         bool hitYWall = (tY > 0) && (tY < tX) && (yDiscrepancy < tolerance);
 
-        //update result based on which wall was hit
+        ///update result based on which wall was hit
         if (hitXWall) {
             double wallX = (whichXWall > 0) ? X_MAX : X_MIN;
             result.x = wallX - offX - dx * dist;
@@ -341,7 +346,7 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
         }
     };
 
-    //apply both sensors
+    ///apply both sensors
     applySensor(sensor1Idx);
     applySensor(sensor2Idx);
 
@@ -354,18 +359,18 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
 }
 
 
-//checks raycast accuracy at current position
+///checks raycast accuracy at current position
 void RangeSensing::checkRaycastAccuracy() {
     printf("=== RAYCAST ACCURACY CHECK ===\n");
 
-    //get current odometry position
+    ///get current odometry position
     const Pose currentPos = odom.getPose();
 
-    //get actual sensor readings
+    ///get actual sensor readings
     updateRangeSensors();
     RangeReadings actual = distanceReadings;
 
-    //create a particle at the current odometry position
+    ///create a particle at the current odometry position
     mcl::Particle testParticle;
     testParticle.x = currentPos.x;
     testParticle.y = currentPos.y;
@@ -374,20 +379,20 @@ void RangeSensing::checkRaycastAccuracy() {
     testParticle.normalizedWeight = 1.0;
     testParticle.logWeight = 0.0;
 
-    //raycast from this position
+    ///raycast from this position
     RangeReadings expected = raycast(testParticle);
 
-    //print comparison
+    ///print comparison
     printf("\nCurrent Odometry Position:\n");
     printf("  X:     %7.2f\"\n", currentPos.x);
     printf("  Y:     %7.2f\"\n", currentPos.y);
-    printf("  Theta: %7.2f° (%7.4f rad)\n", currentPos.theta * (180.0 / M_PI), currentPos.theta);
+    printf("  Theta: %7.2fÂ° (%7.4f rad)\n", currentPos.theta * (180.0 / M_PI), currentPos.theta);
 
     printf("\nSensor Readings vs Raycast Predictions:\n");
     printf("  Sensor    | Actual  | Expected | Error   | Status\n");
     printf("  ----------|---------|----------|---------|--------\n");
 
-    //lambda to check each sensor
+    ///lambda to check each sensor
     auto checkSensor = [](const char* name, double actual, double expected) {
         if (std::isnan(actual) || std::isnan(expected)) {
             printf("  %-9s | %7s | %8s | %7s | INVALID\n",
@@ -409,7 +414,7 @@ void RangeSensing::checkRaycastAccuracy() {
     checkSensor("Back", actual.back, expected.back);
     checkSensor("Right", actual.right, expected.right);
 
-    //calculate overall error
+    ///calculate overall error
     double totalError = 0.0;
     int validCount = 0;
 
@@ -430,17 +435,17 @@ void RangeSensing::checkRaycastAccuracy() {
         validCount++;
     }
 
-    //print average error and status
+    ///print average error and status
     if (validCount > 0) {
         double avgError = totalError / validCount;
         printf("\nAverage Error: %.2f\" (%d/%d sensors valid)\n", avgError, validCount, 4);
 
         if (avgError < 2.0) {
-            printf("Status: ✓ EXCELLENT - Odometry matches sensors well\n");
+            printf("Status: âœ“ EXCELLENT - Odometry matches sensors well\n");
         } else if (avgError < 5.0) {
-            printf("Status: ⚠ OK - Some drift, but acceptable\n");
+            printf("Status: âš  OK - Some drift, but acceptable\n");
         } else {
-            printf("Status: ✗ POOR - Large error, check odometry or sensor calibration\n");
+            printf("Status: âœ— POOR - Large error, check odometry or sensor calibration\n");
         }
     } else {
         printf("\nNo valid sensors to compare!\n");
@@ -449,9 +454,9 @@ void RangeSensing::checkRaycastAccuracy() {
     printf("==============================\n");
 }
 
-//prints sensor calibration factors for known distance
+///prints sensor calibration factors for known distance
 void RangeSensing::printSensorCalibration(double knownDistance) {
-    //update sensor readings first to get fresh data
+    ///update sensor readings first to get fresh data
     updateRangeSensors();
 
     RangeReadings readings = distanceReadings;
@@ -464,7 +469,7 @@ void RangeSensing::printSensorCalibration(double knownDistance) {
     printf("  Right raw: %ld mm\n", distanceSensors.right.get_distance());
     printf("\n");
 
-    //calculate and print calibration scale for each sensor
+    ///calculate and print calibration scale for each sensor
     if (!std::isnan(readings.front) && readings.front > 0.1) {
         printf("  Front: %.2f\" -> scale = %.4f\n",
                readings.front, knownDistance / readings.front);
@@ -491,17 +496,17 @@ void RangeSensing::printSensorCalibration(double knownDistance) {
     }
 }
 
-//measures and prints range sensor noise statistics
+///measures and prints range sensor noise statistics
 void RangeSensing::measureRangeNoise(int numSamples) {
     printf("Measuring range sensor noise (%d samples)...\n", numSamples);
     printf("Keep robot stationary!\n\n");
 
-    //accumulators for statistics
+    ///accumulators for statistics
     double sum[4] = {0, 0, 0, 0};
     double sumSq[4] = {0, 0, 0, 0};
     int count[4] = {0, 0, 0, 0};
 
-    //collect samples
+    ///collect samples
     for (int i = 0; i < numSamples; i++) {
         updateRangeSensors();
         RangeReadings readings = distanceReadings;
@@ -530,7 +535,7 @@ void RangeSensing::measureRangeNoise(int numSamples) {
         pros::delay(10);
     }
 
-    //calculate and print statistics
+    ///calculate and print statistics
     printf("Range Sensor Noise Statistics:\n");
     const char* names[4] = {"Front", "Left", "Back", "Right"};
 
