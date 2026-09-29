@@ -7,9 +7,11 @@
 // #include "gradient.c"
 #include <iostream>
 #include <fstream>
+#include <array>
 #include <string>
 #include <vector>
 #include <sstream>
+#include <cstring>
 
 
 //Definitions
@@ -80,7 +82,7 @@ static lv_obj_t* visual_screen = lv_obj_create(nullptr);
 static lv_obj_t* pid_screen = lv_obj_create(nullptr);
 
 //Creates tabviews
-lv_obj_t * motor_tabview = lv_tabview_create(debug_motor_screen, LV_DIR_LEFT, 80);
+lv_obj_t * motor_tabview = lv_tabview_create(debug_motor_screen);
 
 lv_obj_t * motor_tab_one = lv_tabview_add_tab(motor_tabview, "temp");
 lv_obj_t * motor_tab_two = lv_tabview_add_tab(motor_tabview, "temp");
@@ -108,12 +110,12 @@ lv_obj_t* kI_text_area = lv_textarea_create(pid_screen);
 lv_obj_t* kD_text_area = lv_textarea_create(pid_screen);
 
 //Creates Button Matrices
-lv_obj_t* btnmatrix_kP = lv_btnmatrix_create(pid_screen);
-lv_obj_t* btnmatrix_kI = lv_btnmatrix_create(pid_screen);
-lv_obj_t* btnmatrix_kD = lv_btnmatrix_create(pid_screen);
+lv_obj_t* btnmatrix_kP = lv_buttonmatrix_create(pid_screen);
+lv_obj_t* btnmatrix_kI = lv_buttonmatrix_create(pid_screen);
+lv_obj_t* btnmatrix_kD = lv_buttonmatrix_create(pid_screen);
 
 //Creates Buttons
-lv_obj_t* motor_info_screen_back_button = lv_btn_create(debug_motor_screen);
+lv_obj_t* motor_info_screen_back_button = lv_button_create(debug_motor_screen);
 
 //Creates Arcs
 lv_obj_t* drive_motor_temp_arc = lv_arc_create(debug_motor_screen);
@@ -129,7 +131,7 @@ static Gif gif_preview = Gif("/usd/SPSIntro.gif", gif_obj_gif);
 //Creates the action for when using the main dropdownlist
 static void drop_down_menuing_action(lv_event_t* event) { 
     //Gets the lvgl object from the event
-    lv_obj_t* dropdown = lv_event_get_target(event);
+    lv_obj_t* dropdown = lv_event_get_target_obj(event);
     // Gets the selected index of the dropdown list
     const uint16_t selected_index = lv_dropdown_get_selected(dropdown);
     //Loads different screens depending on the selected_index, as well as updating the other ddls to reflect this change
@@ -137,31 +139,31 @@ static void drop_down_menuing_action(lv_event_t* event) {
         
         case 0:
             // if first option selected loads auton screen and updates the ddl on the auton screen.
-            lv_scr_load(auton_screen);
+            lv_screen_load(auton_screen);
             lv_dropdown_set_selected(ddl_auton, 0);
             break;
 
         case 1:
             // if second option selected loads skills screen and updates the ddl on the skills screen.
-            lv_scr_load(skills_screen);
+            lv_screen_load(skills_screen);
             lv_dropdown_set_selected(ddl_skills, 1);
             break;
 
         case 2:
             // if third option selected loads profile screen and updates the ddl on the profile screen.
-            lv_scr_load(profile_screen);
+            lv_screen_load(profile_screen);
             lv_dropdown_set_selected(ddl_profile, 2);
             break;
 
         case 3:
         // if fourth option selected loads debug screen and updates the ddl on the debug screen.
-            lv_scr_load(debug_screen);
+            lv_screen_load(debug_screen);
             lv_dropdown_set_selected(ddl_debug, 3);
             break;
 
         case 4:
         // if fifth option selected loads Gif screen and updates the ddl on the gif screen.
-            lv_scr_load(visual_screen);
+            lv_screen_load(visual_screen);
             lv_dropdown_set_selected(ddl_vision,4);
             break;
 
@@ -175,7 +177,7 @@ static void drop_down_menuing_action(lv_event_t* event) {
 //Creates the action for when using the color selector ddl
 static void dropdown_color_selection_action(lv_event_t * event) { 
     //Gets the lvgl object from the event
-    lv_obj_t * dropdown = lv_event_get_target(event); 
+    lv_obj_t * dropdown = lv_event_get_target_obj(event);
     // Gets the selected index of the dropdown list
     const uint16_t selected_index = lv_dropdown_get_selected(dropdown);
     //Switches the auto type depending on the selectedA_index
@@ -206,7 +208,7 @@ static void dropdown_color_selection_action(lv_event_t * event) {
 //Creates the action for when using the auton selector ddl
 static void dropdown_auton_selector_action(lv_event_t * event) {
     //Gets the lvgl object from the event
-    lv_obj_t * dropdown = lv_event_get_target(event); 
+    lv_obj_t * dropdown = lv_event_get_target_obj(event);
     // Gets the selected index of the dropdown list
     const uint16_t selected_index = lv_dropdown_get_selected(dropdown);
     //switches the selected program depending on the selected_index, the default is program index 3 because that is the disabled program
@@ -275,7 +277,7 @@ static void dropdown_auton_selector_action(lv_event_t * event) {
 //Creates the action for when using the skills selector ddl
 static void dropdown_skill_selector_action(lv_event_t* event) {
     //Gets the lvgl object from the event
-    lv_obj_t* dropdown = lv_event_get_target(event);
+    lv_obj_t* dropdown = lv_event_get_target_obj(event);
     // Gets the selected index of the dropdown list
     const uint16_t selected_index = lv_dropdown_get_selected(dropdown);
     //switches the auto type and selected program for skills programs
@@ -306,7 +308,7 @@ static void dropdown_skill_selector_action(lv_event_t* event) {
 //Creates the action for when using the profile selector ddl
 static void dropdown_profile_selector_action(lv_event_t* event) {
     //Gets the lvgl object from the event
-    lv_obj_t* dropdown = lv_event_get_target(event);
+    lv_obj_t* dropdown = lv_event_get_target_obj(event);
     // Gets the selected index of the dropdown list
     const uint16_t selected_index = lv_dropdown_get_selected(dropdown);
     //switches the selected profile based of the selcted_index
@@ -335,7 +337,7 @@ static void dropdown_profile_selector_action(lv_event_t* event) {
 //Creates the action for when using the debug selector ddl
 static void dropdown_debug_option_selector_action (lv_event_t* event) {
     //Gets the lvgl object from the event
-    lv_obj_t* dropdown = lv_event_get_target(event);
+    lv_obj_t* dropdown = lv_event_get_target_obj(event);
     // Gets the selected index of the dropdown list
     const uint16_t selected_index = lv_dropdown_get_selected(dropdown);
     //switches the selcted debug option based off the selected_index
@@ -352,13 +354,13 @@ static void dropdown_debug_option_selector_action (lv_event_t* event) {
              /* If the third option is selected, it sets selected_debug_option to two and 
             loads the debug motor screen */
             selected_debug_option = 2;
-            lv_scr_load(debug_motor_screen);
+            lv_screen_load(debug_motor_screen);
             break;
         case 3:
              /* If the fourth option is selected, it sets selected_debug_option to the and 
             loads the debug electronics screen */
             selected_debug_option = 3;
-            lv_scr_load(debug_electronics_screen);
+            lv_screen_load(debug_electronics_screen);
             break;
         case 4:
             // If the third option is selected, it sets selected_debug_option to four and
@@ -374,7 +376,7 @@ static void dropdown_debug_option_selector_action (lv_event_t* event) {
 //Creates the action for when using the gif selector ddl
 static void dropdown_GIF_selector_action(lv_event_t* event) {
     //Gets the lvgl object from the event
-    lv_obj_t* dropdown = lv_event_get_target(event);
+    lv_obj_t* dropdown = lv_event_get_target_obj(event);
     // Gets the selected index of the dropdown list
     const uint16_t selected_index = lv_dropdown_get_selected(dropdown);
     //switches the selected gif based off the selected_index
@@ -389,7 +391,7 @@ static void dropdown_GIF_selector_action(lv_event_t* event) {
     // lv_obj_t* new_gif_obj = lv_obj_create(visual_screen);
     
     // // Setup new object
-    // lv_obj_clear_flag(new_gif_obj, LV_OBJ_FLAG_SCROLLABLE);
+    // lv_obj_remove_flag(new_gif_obj, LV_OBJ_FLAG_SCROLLABLE);
     // lv_obj_set_style_border_width(new_gif_obj, 0, LV_PART_MAIN);
     // lv_obj_set_size(new_gif_obj, 150, 113);
     // lv_obj_align(new_gif_obj, LV_ALIGN_CENTER, 150, -25);
@@ -418,11 +420,11 @@ static void dropdown_GIF_selector_action(lv_event_t* event) {
 //Creates the action for when a pid btnmatrix is pressed
 static void btn_matrix_PID_check_pressed(lv_event_t * event) { 
     //Gets the lvgl object from the event
-    lv_obj_t* btnmatrix = lv_event_get_target(event);
+    lv_obj_t* btnmatrix = lv_event_get_target_obj(event);
     //Gets which btn on the btnmatrix was selected
-    const uint32_t id = lv_btnmatrix_get_selected_btn(btnmatrix);
+    const uint32_t id = lv_buttonmatrix_get_selected_button(btnmatrix);
     //Gets the text on the btn and stores teh adress of that char
-    const char * TXT = lv_btnmatrix_get_btn_text(btnmatrix, id);
+    const char * TXT = lv_buttonmatrix_get_button_text(btnmatrix, id);
     //copies that pointer to a more public variable
     TXT_HOLD = TXT;
     pros::delay(10);
@@ -451,12 +453,12 @@ static void btn_matrix_PID_updater([[maybe_unused]] lv_obj_t* btnmatrix) {
             btnmatrix_kP_first = false;
         } 
         //else, if the back button was pressed, delete the last typed char in the ta
-        else if(strcmp(TXT_HOLD, "Back") == 0) {
-            lv_textarea_del_char(kP_text_area);
+        else if(std::strcmp(TXT_HOLD, "Back") == 0) {
+            lv_textarea_delete_char(kP_text_area);
             
         }
         //else, if the enter button was pressed assign the text in the ta to the kP variable
-        else if (strcmp(TXT_HOLD, "Enter") == 0) {
+        else if (std::strcmp(TXT_HOLD, "Enter") == 0) {
             *kP_ptr = atof(lv_textarea_get_text(kP_text_area));
         }
         // else, if a normal button was pressed, add the char on the button to the ta
@@ -475,11 +477,11 @@ static void btn_matrix_PID_updater([[maybe_unused]] lv_obj_t* btnmatrix) {
             btnmatrix_kI_first = false;
         }
         //else, if the back button was pressed, delete the last typed char in the ta
-        else if(strcmp(TXT_HOLD, "Back") == 0) {
-            lv_textarea_del_char(kI_text_area);
+        else if(std::strcmp(TXT_HOLD, "Back") == 0) {
+            lv_textarea_delete_char(kI_text_area);
         }
         //else, if the enter button was pressed assign the text in the ta to the kP variable
-        else if (strcmp(TXT_HOLD, "Enter") == 0) {
+        else if (std::strcmp(TXT_HOLD, "Enter") == 0) {
             *kI_ptr = atof(lv_textarea_get_text(kI_text_area));
             
         }
@@ -499,11 +501,11 @@ static void btn_matrix_PID_updater([[maybe_unused]] lv_obj_t* btnmatrix) {
             btnmatrix_kD_first=  false;
         }
         //else, if the back button was pressed, delete the last typed char in the ta
-        else if(strcmp(TXT_HOLD, "Back") == 0) {
-            lv_textarea_del_char(kD_text_area);
+        else if(std::strcmp(TXT_HOLD, "Back") == 0) {
+            lv_textarea_delete_char(kD_text_area);
         }
         //else, if the enter button was pressed assign the text in the ta to the kP variable
-        else if (strcmp(TXT_HOLD, "Enter") == 0) {
+        else if (std::strcmp(TXT_HOLD, "Enter") == 0) {
             *kD_ptr = atof(lv_textarea_get_text(kD_text_area));
         }
         // else, if a normal button was pressed, add the char on the button to the ta
@@ -518,18 +520,23 @@ static void btn_matrix_PID_updater([[maybe_unused]] lv_obj_t* btnmatrix) {
 //ACtion for when the back button on the debug motor info screen is pressed
 static void motor_info_screen_back_button_action([[maybe_unused]] lv_event_t* event){
     lv_dropdown_set_selected(ddl_debug_option_selector, 0);
-    lv_scr_load(debug_screen);
+    lv_screen_load(debug_screen);
 }
 
 //Main Code
 void initialization_display() {
+    lv_tabview_set_tab_bar_position(motor_tabview, LV_DIR_LEFT);
+    lv_tabview_set_tab_bar_size(motor_tabview, 80);
+
+    const std::array<int, 3> left_motor_ports = LEFT_DRIVE_WHEEL_PORTS;
+    const std::array<int, 3> right_motor_ports = RIGHT_DRIVE_WHEEL_PORTS;
     std::vector<std::string> motor_strings = {
-        "Port: " + std::to_string(abs(drive::left_motors.at(0))),
-        "Port: " + std::to_string(abs(drive::left_motors.at(1))),
-        "Port: " + std::to_string(abs(drive::left_motors.at(2))),
-        "Port: " + std::to_string(abs(drive::right_motors.at(0))),
-        "Port: " + std::to_string(abs(drive::right_motors.at(1))),
-        "Port: " + std::to_string(abs(drive::right_motors.at(2)))
+        "Port: " + std::to_string(abs(left_motor_ports.at(0))),
+        "Port: " + std::to_string(abs(left_motor_ports.at(1))),
+        "Port: " + std::to_string(abs(left_motor_ports.at(2))),
+        "Port: " + std::to_string(abs(right_motor_ports.at(0))),
+        "Port: " + std::to_string(abs(right_motor_ports.at(1))),
+        "Port: " + std::to_string(abs(right_motor_ports.at(2)))
     };
 
     const char* left_motor_one_text = motor_strings[0].c_str();
@@ -587,7 +594,7 @@ void initialization_display() {
     // Create LVGL object for the GIF
     lv_obj_t* gifObjAuton = lv_obj_create(auton_screen);
     // Remove borders and scrollbars
-    lv_obj_clear_flag(gifObjAuton, LV_OBJ_FLAG_SCROLLABLE);  // Remove scroll bars
+    lv_obj_remove_flag(gifObjAuton, LV_OBJ_FLAG_SCROLLABLE);  // Remove scroll bars
     lv_obj_set_style_border_width(gifObjAuton, 0, LV_PART_MAIN); // Remove border
 
     // Set size and make transparent
@@ -667,7 +674,7 @@ void initialization_display() {
     lv_style_init(&style_arc);
     lv_style_set_arc_rounded(&style_arc, false);
     lv_style_set_arc_width(&style_arc, 20);
-    // extern const lv_img_dsc_t gradient; 
+    // extern const lv_image_dsc_t gradient;
     // lv_style_set_arc_img_src(&style_arc, &gradient);  // Set the image source to your image array
     // lv_obj_add_style(drive_motor_temp_arc, &style_arc, LV_PART_INDICATOR);
 
@@ -707,7 +714,7 @@ void initialization_display() {
     lv_obj_align(ddl_GIF, LV_ALIGN_LEFT_MID, 5, -20);
     //sets up gif preview
     // Remove borders and scrollbars
-    lv_obj_clear_flag(gif_obj_gif, LV_OBJ_FLAG_SCROLLABLE);  // Remove scroll bars
+    lv_obj_remove_flag(gif_obj_gif, LV_OBJ_FLAG_SCROLLABLE);  // Remove scroll bars
     lv_obj_set_style_border_width(gif_obj_gif, 0, LV_PART_MAIN); // Remove border
 
     // Set size and make transparent
@@ -718,7 +725,7 @@ void initialization_display() {
     lv_obj_align(gif_obj_gif, LV_ALIGN_CENTER, 150, -25);
 
     // Load the auton screen
-    lv_scr_load(auton_screen);
+    lv_screen_load(auton_screen);
 }
 
 
@@ -764,7 +771,7 @@ void run_selected_GIF() {
     //Creates a container object on the screen to display the GIF
     lv_obj_t* gif_obj_main = lv_obj_create(GIF_screen);
     // Remove scroll bars
-    lv_obj_clear_flag(gif_obj_main, LV_OBJ_FLAG_SCROLLABLE); 
+    lv_obj_remove_flag(gif_obj_main, LV_OBJ_FLAG_SCROLLABLE);
     //removes border
     lv_obj_set_style_border_width(gif_obj_main, 0, LV_PART_MAIN); 
     //Sets the size of the container object
@@ -781,7 +788,7 @@ void run_selected_GIF() {
 
 
     //Loads the screen
-    lv_scr_load(GIF_screen);
+    lv_screen_load(GIF_screen);
 }
 
 
@@ -843,9 +850,9 @@ void pid_screen_display(float& kP, float& kI, float& kD) {
     lv_obj_set_size(btnmatrix_kI,150,150);
     lv_obj_set_size(btnmatrix_kD,150,150);
     //sets the btnmap to the btnmatrices
-    lv_btnmatrix_set_map(btnmatrix_kP, num_pad);
-    lv_btnmatrix_set_map(btnmatrix_kI, num_pad);
-    lv_btnmatrix_set_map(btnmatrix_kD, num_pad);
+    lv_buttonmatrix_set_map(btnmatrix_kP, num_pad);
+    lv_buttonmatrix_set_map(btnmatrix_kI, num_pad);
+    lv_buttonmatrix_set_map(btnmatrix_kD, num_pad);
     //sets the bg and btn styles to the btnmatrices
     lv_obj_add_style(btnmatrix_kP, &style_bg, 0);
     lv_obj_add_style(btnmatrix_kP, &style_btn, 0);
@@ -859,7 +866,7 @@ void pid_screen_display(float& kP, float& kI, float& kD) {
     lv_obj_align(btnmatrix_kD,LV_ALIGN_TOP_RIGHT,0,55);
 
     //loads the (pid) screen
-    lv_scr_load(pid_screen);
+    lv_screen_load(pid_screen);
 }
 
 
