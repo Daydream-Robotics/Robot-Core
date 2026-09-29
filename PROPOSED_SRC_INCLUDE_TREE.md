@@ -49,7 +49,9 @@ Robot-Core/
 |       |   |-- logging.cpp                 Robot-wide logging interface
 |       |   `-- pneumatics.cpp              Pneumatic actuator commands
 |       |-- utilities/display.cpp           Driver display and selection UI
-|       `-- utils/serialProtocol.cpp        Serial packet transport
+        |-- utilities/math.cpp
+        |-- utilities/random.cpp
+|       `-- utilities/serialProtocol.cpp        Serial packet transport
 |-- include/
 |   |-- api.h                               PROS API umbrella header
 |   |-- main.h                              PROS lifecycle declarations
@@ -271,4 +273,3 @@ autonomous routines, or define the final navigation/localization interface.
 Those are follow-on implementation tasks. New code should build on the shared
 interfaces rather than introducing parallel hardware ownership or additional
 mode-level tasks without a concrete concurrency need.
-
