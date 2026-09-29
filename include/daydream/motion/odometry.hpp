@@ -105,11 +105,6 @@ public:
     WheelLengths getOdomWheelTravel(void);
 
     /**
-     * @brief Returns struct of distances travelled by the drive motors when using internal encoders
-     */
-    WheelLengths getDriveEncoderTravel(void);
-    
-    /**
      * @brief gets the current velocity of the parallel tracking wheel or drive motors
      * @returns velocity in inches per second
      */
@@ -129,7 +124,12 @@ private:
 
     // ROTS mutex to keep data task safe
     pros::Mutex m_mutex;
-  
+
+    /**
+     * @brief Returns struct of distances travelled by the drive motors when using internal encoders
+     */
+    WheelLengths getDriveEncoderTravel();
+
     // previous state tracking
     double m_prevTheta = 0;
     double m_prevParallel = 0;
