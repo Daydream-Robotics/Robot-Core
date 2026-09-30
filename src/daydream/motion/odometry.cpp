@@ -10,10 +10,10 @@ Odometry::Odometry(OdomConfig config) : m_config(config) {}
 void Odometry::updatePose(void) {
 	const double yaw_deg = getYaw(); 
 	
-	if (yaw_deg < -180.0) {
-		pros::lcd::print(0, "[Update Pose] IMU Failure! %lf", yaw_deg);
-		return;
-	}
+	// if (yaw_deg < -180.0) {
+	//	pros::lcd::print(0, "[Update Pose] IMU Failure! %lf", yaw_deg);
+	//	return;
+	//}
 	
 	// Get orientation from IMU
 	double theta_rad = convertDegToRad(yaw_deg);
