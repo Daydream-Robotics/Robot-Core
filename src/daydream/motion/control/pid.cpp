@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-PID::PID(double p, double i, double d, double start_i) : kP(p), kI(i), kD(d), start_i(start_i) {
+PID::PID(double p, double i, double d, double integralStartThreshold) : kP(p), kI(i), kD(d), integralStartThreshold(integralStartThreshold) {
     reset();
 }
 
@@ -12,11 +12,11 @@ double PID::compute(double current, bool usesAngle) {
     using clock = std::chrono::steady_clock;
 
     // Determine time since last step
-    auto now = clock::now();
-    std::chrono::duration<double> dt_dur = now - lastTime;
-    double dt = dt_dur.count();
+    auto currentTime = clock::now();
+    std::chrono::duration<double> elapsedDuration = currentTime - lastComputeTime;
+    double dt = elapsedDuration.count();
     if (dt <= 0.0) dt = 1e-3;
-    lastTime = now;
+    lastComputeTime = currentTime;
 
     error = target - current;
     if (usesAngle) {
@@ -26,7 +26,7 @@ double PID::compute(double current, bool usesAngle) {
 
 
     // Integral
-    if (std::fabs(error) < start_i) {
+    if (std::fabs(error) < integralStartThreshold) {
         integral += error * dt;
     } else {
         integral = 0.0;
@@ -67,10 +67,10 @@ void PID::reset() {
 
     // Initialize start time
     startTime = std::chrono::steady_clock::now();
-    lastTime = startTime;
+    lastComputeTime = startTime;
 }
 
-void PID::exit_condition_set(
+void PID::setExitCondition(
     double smallError, int smallTime,
     double bigError, int bigTime,
     double velocityThreshold, int velocityTime, 
@@ -85,13 +85,13 @@ void PID::exit_condition_set(
     this->timeout = timeout;
 }
 
-PID::ExitState PID::exit_condition(double currentVelocity) {
+PID::ExitState PID::checkExitCondition(double currentVelocity) {
     using clock = std::chrono::steady_clock;
-    auto now = clock::now();
+    auto currentTime = clock::now();
 
     // Timeout
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now - startTime
+        currentTime - startTime
     ).count();
 
     if (timeout > 0 && elapsed_ms > timeout)

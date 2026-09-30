@@ -23,19 +23,19 @@ static double averageMotorGroupPosition(const pros::MotorGroup& group) {
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
 void Odometry::updatePose(void) {
-	const double yaw_deg = getYaw(); 
+	const double yawDeg = getYaw(); 
 	
-	if (yaw_deg < -180.0) {
-		pros::lcd::print(0, "[Update Pose] IMU Failure! %lf", yaw_deg);
+	if (yawDeg < -180.0) {
+		pros::lcd::print(0, "[Update Pose] IMU Failure! %lf", yawDeg);
 		return;
 	}
 	
 	// Get orientation from IMU
-	double theta_rad = convertDegToRad(yaw_deg);
-	theta_rad = normalizeAngle(theta_rad);
+	double thetaRad = convertDegToRad(yawDeg);
+	thetaRad = normalizeAngle(thetaRad);
 	
 	if (!m_initialized) {
-		m_prevTheta = theta_rad;
+		m_prevTheta = thetaRad;
 
 		if (m_config.useMotorEncoders) {
 			m_prevLeft = averageMotorGroupPosition(leftMotors);
@@ -58,32 +58,32 @@ void Odometry::updatePose(void) {
 	}
 	
 	// Determine change in heading 
-	double del_theta = normalizeAngle(theta_rad - m_prevTheta);
+	double delTheta = normalizeAngle(thetaRad - m_prevTheta);
 
 	// Determine change in local x and in local y
-	double dx_local = arcs.parallel - (del_theta * m_config.parallelTrackingWheelOffset);
-	double dy_local = arcs.perpendicular + (del_theta * m_config.perpendicularTrackingWheelOffset);
+	double dxLocal = arcs.parallel - (delTheta * m_config.parallelTrackingWheelOffset);
+	double dyLocal = arcs.perpendicular + (delTheta * m_config.perpendicularTrackingWheelOffset);
 
 	// Arc-length, chord-length correction
 	double chordFactor = 1.0;
-	if (std::abs(del_theta) > 1e-9) {
-		chordFactor = 2.0 * std::sin(del_theta / 2.0) / del_theta;
+	if (std::abs(delTheta) > 1e-9) {
+		chordFactor = 2.0 * std::sin(delTheta / 2.0) / delTheta;
 	}
-	dx_local *= chordFactor;
-	dy_local *= chordFactor;
+	dxLocal *= chordFactor;
+	dyLocal *= chordFactor;
 
-	double theta_mid = m_prevTheta + del_theta / 2.0;
-    theta_mid = normalizeAngle(theta_mid);
+	double thetaMid = m_prevTheta + delTheta / 2.0;
+    thetaMid = normalizeAngle(thetaMid);
 
     // Compute change in x and y based on heading and local changes
-	double del_x = std::cos(theta_mid) * dx_local - std::sin(theta_mid) * dy_local;
-	double del_y = std::sin(theta_mid) * dx_local + std::cos(theta_mid) * dy_local;
+	double delX = std::cos(thetaMid) * dxLocal - std::sin(thetaMid) * dyLocal;
+	double delY = std::sin(thetaMid) * dxLocal + std::cos(thetaMid) * dyLocal;
 
 	// Increment position and angle by calculated changes
 	m_mutex.take();
-	m_currentPosition.x += del_x;
-	m_currentPosition.y += del_y;
-	m_currentPosition.theta = theta_rad;
+	m_currentPosition.x += delX;
+	m_currentPosition.y += delY;
+	m_currentPosition.theta = thetaRad;
 	m_mutex.give();
 
 	// !IMPORTANT!: Likely not task safe
@@ -94,7 +94,7 @@ void Odometry::updatePose(void) {
 	// 	lastPrintTime = pros::millis();
 	// }
 
-	m_prevTheta = theta_rad;
+	m_prevTheta = thetaRad;
 }
 
 Pose Odometry::getPose() {
@@ -161,13 +161,13 @@ double Odometry::getYaw(void) {
 	}
 
 	// yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
-	double yaw_rad = std::atan2(2 * ((qt.w * qt.z) + (qt.x * qt.y)), 1 - (2 * ((qt.y * qt.y) + (qt.z * qt.z))));
+	double yawRad = std::atan2(2 * ((qt.w * qt.z) + (qt.x * qt.y)), 1 - (2 * ((qt.y * qt.y) + (qt.z * qt.z))));
 
 	// convert to degrees
-	double yaw_deg = yaw_rad * (180.0 / std::numbers::pi);
+	double yawDeg = yawRad * (180.0 / std::numbers::pi);
 
 	// angle is returned from -180 to 180
-	return -yaw_deg;
+	return -yawDeg;
 }
 
 WheelLengths Odometry::getOdomWheelTravel(void) {
@@ -216,10 +216,10 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
 }
 
 double Odometry::getParallelVel() {
-	double deg_s = parallelTrackingWheel.get_velocity() / 100.0;
-	return (deg_s / 360.0) * m_config.parallelWheelDiameter * std::numbers::pi;
+	double degS = parallelTrackingWheel.get_velocity() / 100.0;
+	return (degS / 360.0) * m_config.parallelWheelDiameter * std::numbers::pi;
 }
-
+	
 // could be used to do odom in background
 void Odometry::odomTask() {
 	while (true) {

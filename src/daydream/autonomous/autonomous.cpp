@@ -24,7 +24,7 @@ void Autonomous::turnTo(double targetHeading) {
 	// pros::lcd::print(0, "Turning to %lf degrees", targetHeading);
 
 	// TODO: Tune exit conditions
-    turnPID.exit_condition_set(
+    turnPID.setExitCondition(
         0.3, 75,     // small error (deg), time (ms)
         0.5, 100,     // big error (deg), time
        0.5 ,1000000,          // velocity settle time
@@ -36,7 +36,7 @@ void Autonomous::turnTo(double targetHeading) {
 
 		// Initialize clocking
 	using clock = std::chrono::steady_clock;
-    auto lastTime = clock::now();
+    auto lastComputeTime = clock::now();
 	double prevHeading = odom.getYaw();
 
 	while (true) {
@@ -51,11 +51,11 @@ void Autonomous::turnTo(double targetHeading) {
 		}
 
 		// Calculate angular velocity
-		auto now = clock::now();
-		std::chrono::duration<double> dt_dur = now - lastTime;
-		double dt = dt_dur.count();
+		auto currentTime = clock::now();
+		std::chrono::duration<double> elapsedDuration = currentTime - lastComputeTime;
+		double dt = elapsedDuration.count();
         if (dt < 0.001) dt = 0.001; // Prevent division by zero
-		lastTime = now;
+		lastComputeTime = currentTime;
 		
 		// Determine PID correction using smoothed heading
 		double filteredHeading = headingFilter.update(rawHeading);
@@ -75,7 +75,7 @@ void Autonomous::turnTo(double targetHeading) {
         rightMotors.move_velocity(-turnSpeed);
 		
 		double currentVelocity = (std::fabs(angleDiffDeg(targetHeading, filteredHeading)) < 1.0) ? angleDiffDeg(rawHeading, prevHeading) / dt : 999.0;
-		if (turnPID.exit_condition(currentVelocity) != PID::RUNNING)
+		if (turnPID.checkExitCondition(currentVelocity) != PID::RUNNING)
 			break;
 		prevHeading = rawHeading;
 		
@@ -104,7 +104,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
     };
 	// int count = 0;
     distancePID.setTarget(distance);
-    distancePID.exit_condition_set(
+    distancePID.setExitCondition(
         0.1, 10,
         0.4, 30,
         0.5, 200000000,
@@ -127,15 +127,15 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 
 	using clock = std::chrono::steady_clock;
     auto startTime = clock::now();
-	auto lastTime = clock::now();
+	auto lastComputeTime = clock::now();
 
     while (true) {
 		// get elapesed time since last loop
-		auto now = clock::now();
-		std::chrono::duration<double> dt_dur = now - lastTime;
-		double dt = dt_dur.count();
+		auto currentTime = clock::now();
+		std::chrono::duration<double> elapsedDuration = currentTime - lastComputeTime;
+		double dt = elapsedDuration.count();
         if (dt < 0.001) dt = 0.001; // Prevent division by zero
-		lastTime = now;
+		lastComputeTime = currentTime;
 
         odom.updatePose();
 		
@@ -193,9 +193,9 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 
 		// Exit if any exit condition is met.
 		// Ignore velocity exit for the first second to allow robot to accelerate
-		auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime).count();
+		auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count();
 		double currVel = (elapsed_ms > 1000) ? (traveled - prevDistance) / dt : 999.0;
-		PID::ExitState exitState = distancePID.exit_condition(currVel);
+		PID::ExitState exitState = distancePID.checkExitCondition(currVel);
         if (exitState != PID::RUNNING){
 			// print exit condition
 			pros::lcd::print(0,"Exit Condition Meet");
