@@ -1,11 +1,14 @@
 #pragma once
-#include "pros/rtos.hpp"
+
+#include "main.h"
 
 struct OdomConfig {
     double parallelWheelDiameter;
     double perpendicularWheelDiameter;
     double parallelTrackingWheelOffset;
     double perpendicularTrackingWheelOffset;
+    bool useMotorEncoders = false;
+    double driveWheelDiameter = 0.0;
 };
 
 struct WheelLengths {
@@ -90,8 +93,18 @@ public:
     double getYaw(void);
     
     /**
+<<<<<<< HEAD
      * @brief gets the current velocity of the parallel tracking wheel
      * @returns velocity of parallel tracking wheel in inches per second
+=======
+     * @brief Returns struct of distances travelled by Odometry Wheels
+     */
+    WheelLengths getOdomWheelTravel(void);
+
+    /**
+     * @brief gets the current velocity of the parallel tracking wheel or drive motors
+     * @returns velocity in inches per second
+>>>>>>> a940436dd71ec8dcf820d7c0bd138e547881538f
      */
     double getParallelVel();
     
@@ -111,6 +124,7 @@ private:
     pros::Mutex m_mutex;
 
     /**
+<<<<<<< HEAD
      * @brief Calculates and updates the robot's global pose
      * @note This function is safe to be called continuously in a background task
      * @warning In the case of an IMU failure this function stops updating the latest position
@@ -122,10 +136,18 @@ private:
      */
     WheelLengths getOdomWheelTravel(void);
   
+=======
+     * @brief Returns struct of distances travelled by the drive motors when using internal encoders
+     */
+    WheelLengths getDriveEncoderTravel();
+
+>>>>>>> a940436dd71ec8dcf820d7c0bd138e547881538f
     // previous state tracking
     double m_prevTheta = 0;
     double m_prevParallel = 0;
     double m_prevPerpendicular = 0;
+    double m_prevLeft = 0;
+    double m_prevRight = 0;
     bool m_initialized = false;
 };
 

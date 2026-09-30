@@ -2,7 +2,7 @@
 
 #include "daydream/motion/odometry.hpp" // Needed for the Position struct
 
-// Normalize angle between [-180, 180] 
+// Normalize angle between [-pi,pi] 
 double normalizeAngle(double a);
 
 // Return Euclidean distance btwn points p1 and p2
@@ -16,6 +16,9 @@ double convertRadToDeg(double rad);
 
 // Subtract angles with [-180, 180] wrapping
 double angleDiffDeg(double a, double b);
+
+// Subtract angles with [-pi, +pi] wrapping
+double angleDiffRad(double a, double b);
 
 // Determine deceleration speed scaling
 double computeDecelScale(double remaining, double totalDistance);
