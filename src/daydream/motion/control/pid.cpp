@@ -3,6 +3,7 @@
 #include "daydream/motion/control/pid.hpp"
 
 #include <cmath>
+#include <numbers>
 
 PID::PID(double p, double i, double d, double start_i) : kP(p), kI(i), kD(d), start_i(start_i) {
     reset();
@@ -20,8 +21,8 @@ double PID::compute(double current, bool usesAngle) {
 
     error = target - current;
     if (usesAngle) {
-        while (error > 180) error -= 360;
-        while (error < -180) error += 360;
+        while (error > std::numbers::pi) error -= (2 * std::numbers::pi);
+        while (error < -std::numbers::pi) error += (2 * std::numbers::pi);
     }
 
 

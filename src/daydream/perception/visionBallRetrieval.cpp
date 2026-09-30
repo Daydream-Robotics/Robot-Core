@@ -445,8 +445,8 @@ void trackingMode(GamePiece GamePiece) {
 
 double calcAngleDiff(double a, double b){
     double diff = b - a;
-    while(diff > 180) diff -= 360;
-    while(diff < -180) diff += 360;
+    while(diff > std::numbers::pi) diff -= (2 * std::numbers::pi);
+    while(diff < -std::numbers::pi) diff += (2 * std::numbers::pi);
     return diff;
 }
 

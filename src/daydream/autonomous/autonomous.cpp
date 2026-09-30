@@ -116,10 +116,9 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
     Position start = odom.getPosition();
     double direction = (distance >= 0.0) ? 1.0 : -1.0;
 
-	double headingRad = convertDegToRad(targetHeading);
 	Position headingUnit {
-		std::cos(headingRad),
-		std::sin(headingRad)
+		std::cos(targetHeading),
+		std::sin(targetHeading)
 	};
 
     double prevVelocity = 0.0;
