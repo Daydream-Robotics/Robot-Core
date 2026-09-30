@@ -157,11 +157,8 @@ double Odometry::getYaw(void) {
 	// yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
 	double yaw_rad = std::atan2(2 * ((qt.w * qt.z) + (qt.x * qt.y)), 1 - (2 * ((qt.y * qt.y) + (qt.z * qt.z))));
 
-	// convert to degrees
-	double yaw_deg = yaw_rad * (180.0 / std::numbers::pi);
-
-	// angle is returned from -180 to 180
-	return -yaw_deg;
+	// angle is returned from -pi to pi
+	return -yaw_rad;
 }
 
 WheelLengths Odometry::getOdomWheelTravel(void) {

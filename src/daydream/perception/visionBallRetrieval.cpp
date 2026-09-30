@@ -314,12 +314,12 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece)
             leftMotors.move_velocity(20);
             rightMotors.move_velocity(-20);
 
-            if (angleDiff >= 10.0) searched_right = true;
+            if (angleDiff >= (10.0 * std::numbers::pi / 180)) searched_right = true;
         } else { //look left for 30* from original angle
             leftMotors.move_velocity(-20);
             rightMotors.move_velocity(20);
 
-            if (angleDiff <= -10.0) {
+            if (angleDiff <= -(10.0 * std::numbers::pi / 180)) {
                 break;
             }
         }
