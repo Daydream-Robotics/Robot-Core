@@ -29,7 +29,6 @@ class PathFollower {
          */
         bool step();
 
-
     private:
         MotionController& m_controller;         /**< Reference to motion controller */
         ALS_Path* m_path = nullptr;             /**< Pointer to current path being tracked */
