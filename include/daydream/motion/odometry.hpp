@@ -51,13 +51,6 @@ public:
     Odometry(OdomConfig config);
 
     /**
-     * @brief Calculates and updates the robot's global pose
-     * @note This function is safe to be called continuously in a background task
-     * @warning In the case of an IMU failure this function stops updating the latest position
-     */
-    void updatePose(void);
-
-    /**
      * @brief Gets the robot's latest pose
      * @returns The latest Pose of the robot
      */
@@ -100,13 +93,8 @@ public:
     double getYaw(void);
     
     /**
-     * @brief Returns struct of distances travelled by Odometry Wheels
-     */
-    WheelLengths getOdomWheelTravel(void);
-
-    /**
-     * @brief gets the current velocity of the parallel tracking wheel or drive motors
-     * @returns velocity in inches per second
+     * @brief gets the current velocity of the parallel tracking wheel
+     * @returns velocity of parallel tracking wheel in inches per second
      */
     double getParallelVel();
     
@@ -126,10 +114,17 @@ private:
     pros::Mutex m_mutex;
 
     /**
-     * @brief Returns struct of distances travelled by the drive motors when using internal encoders
+     * @brief Calculates and updates the robot's global pose
+     * @note This function is safe to be called continuously in a background task
+     * @warning In the case of an IMU failure this function stops updating the latest position
      */
-    WheelLengths getDriveEncoderTravel();
+    void updatePose(void);
 
+    /**
+     * @brief Returns struct of distances travelled by Odometry Wheels
+     */
+    WheelLengths getOdomWheelTravel(void);
+  
     // previous state tracking
     double m_prevTheta = 0;
     double m_prevParallel = 0;
