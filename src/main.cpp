@@ -29,7 +29,7 @@ void initialize() {
     }
 
     odom.initialize();
-    pros::Task::create(
+    pros::Task::create( //dont use create in the future
         [] { odom.control(); },
         TASK_PRIORITY_DEFAULT + 1,
         TASK_STACK_DEPTH_DEFAULT,
