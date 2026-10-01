@@ -22,6 +22,17 @@ static double averageMotorGroupPosition(const pros::MotorGroup& group) {
 
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
+void Odometry::initialize() {
+	setPose({0.0, 0.0, 0.0});
+}
+
+void Odometry::control() {
+	while (true) {
+		updatePose();
+		pros::delay(10);
+	}
+}
+
 void Odometry::updatePose(void) {
 	const double yaw_deg = getYaw(); 
 	
@@ -29,6 +40,7 @@ void Odometry::updatePose(void) {
 		pros::lcd::print(0, "[Update Pose] IMU Failure! %lf", yaw_deg);
 		return;
 	}
+	m_mutex.take();
 	
 	// Get orientation from IMU
 	double theta_rad = convertDegToRad(yaw_deg);
@@ -46,6 +58,7 @@ void Odometry::updatePose(void) {
 		}
 		
 		m_initialized = true;
+		m_mutex.give();
 		return;
 	}
 
@@ -80,11 +93,9 @@ void Odometry::updatePose(void) {
 	double del_y = std::sin(theta_mid) * dx_local + std::cos(theta_mid) * dy_local;
 
 	// Increment position and angle by calculated changes
-	m_mutex.take();
 	m_currentPosition.x += del_x;
 	m_currentPosition.y += del_y;
 	m_currentPosition.theta = theta_rad;
-	m_mutex.give();
 
 	// !IMPORTANT!: Likely not task safe
 	// print to the controller every 100 ms 
@@ -95,6 +106,7 @@ void Odometry::updatePose(void) {
 	// }
 
 	m_prevTheta = theta_rad;
+	m_mutex.give();
 }
 
 Pose Odometry::getPose() {
@@ -109,13 +121,18 @@ void Odometry::setPose(Pose pose) {
 	m_currentPosition.x = pose.x;
 	m_currentPosition.y = pose.y;
 	m_currentPosition.theta = pose.theta;
-	m_mutex.give();
 
 	// Reset sensor baselines so setting a pose does not create a false odometry delta.
 	m_prevTheta = pose.theta;
-	m_prevParallel = parallelTrackingWheel.get_position();
-	m_prevPerpendicular = perpendicularTrackingWheel.get_position();
+	if (m_config.useMotorEncoders) {
+		m_prevLeft = averageMotorGroupPosition(leftMotors);
+		m_prevRight = averageMotorGroupPosition(rightMotors);
+	} else {
+		m_prevParallel = parallelTrackingWheel.get_position();
+		m_prevPerpendicular = perpendicularTrackingWheel.get_position();
+	}
 	m_initialized = true;
+	m_mutex.give();
 }
 
 Position Odometry::getPosition() {
@@ -220,7 +237,6 @@ double Odometry::getParallelVel() {
 	return (deg_s / 360.0) * m_config.parallelWheelDiameter * std::numbers::pi;
 }
 
-// could be used to do odom in background
 void Odometry::odomTask() {
 	while (true) {
 		odom.updatePose();

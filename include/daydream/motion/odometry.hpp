@@ -1,6 +1,7 @@
 #pragma once
 
 #include "main.h"
+#include "daydream/subsystems/subsystem.hpp"
 
 struct OdomConfig {
     double parallelWheelDiameter;
@@ -40,7 +41,7 @@ struct Pose {
  * @class Odometry
  * @brief Tracks robots global position and heading on the field
  */
-class Odometry {
+class Odometry : public daydream::Subsystem {
     
 public:
 
@@ -50,12 +51,17 @@ public:
      */
     Odometry(OdomConfig config);
 
+    void initialize() override;
+    void control() override;
+
     /**
-     * @brief Calculates and updates the robot's global pose
-     * @note This function is safe to be called continuously in a background task
-     * @warning In the case of an IMU failure this function stops updating the latest position
+     * @brief Calculates and updates the robot's global pose.
+     * @note This remains public for existing motion controllers.
      */
     void updatePose(void);
+
+    /** Background task entry point retained for existing MCL code. */
+    static void odomTask();
 
     /**
      * @brief Gets the robot's latest pose
@@ -115,11 +121,6 @@ public:
      */
     double getParallelVel();
     
-    /**
-     * @brief Background task entry point
-     */
-    static void odomTask();
-
 private:
     // the config for the robot
     OdomConfig m_config;
