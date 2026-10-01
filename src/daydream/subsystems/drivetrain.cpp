@@ -20,7 +20,8 @@ void Drivetrain::initialize() {
 }
 
 void Drivetrain::control() {
-    while (true) {
+    setBrakeMode(pros::E_MOTOR_BRAKE_COAST);
+    while (!pros::competition::is_disabled() && !pros::competition::is_autonomous()) {
         const int forward = m_controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         const int turn = m_controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
         const int left = forward + turn;
@@ -31,6 +32,22 @@ void Drivetrain::control() {
 
         pros::delay(20);
     }
+
+    stop();
+}
+
+void Drivetrain::setVelocity(double left, double right) {
+    m_leftMotors.move_velocity(left);
+    m_rightMotors.move_velocity(right);
+}
+
+void Drivetrain::setBrakeMode(pros::motor_brake_mode_e_t mode) {
+    m_leftMotors.set_brake_mode_all(mode);
+    m_rightMotors.set_brake_mode_all(mode);
+}
+
+void Drivetrain::stop() {
+    setVelocity(0.0, 0.0);
 }
 
 } // namespace daydream

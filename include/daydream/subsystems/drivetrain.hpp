@@ -16,6 +16,10 @@ public:
     void initialize() override;
     void control() override;
 
+    void setVelocity(double left, double right);
+    void setBrakeMode(pros::motor_brake_mode_e_t mode);
+    void stop();
+
 private:
     pros::Controller& m_controller;
     pros::MotorGroup& m_leftMotors;

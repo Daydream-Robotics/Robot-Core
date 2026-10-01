@@ -22,7 +22,7 @@ void Pneumatics::initialize() {
 }
 
 void Pneumatics::control() {
-    while (true) {
+    while (!pros::competition::is_disabled() && !pros::competition::is_autonomous()) {
         setBallBlocker(m_controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2));
         setMatchloader(m_controller.get_digital(pros::E_CONTROLLER_DIGITAL_Y));
         setDescorer(!m_controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1));

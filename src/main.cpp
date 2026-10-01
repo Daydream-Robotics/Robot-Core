@@ -27,17 +27,27 @@ void initialize() {
     while (imu.is_calibrating()) {
         pros::delay(20);
     }
+
+    odom.initialize();
+    pros::Task::create(
+        [] { odom.control(); },
+        TASK_PRIORITY_DEFAULT + 1,
+        TASK_STACK_DEPTH_DEFAULT,
+        "Odometry");
 }
 
-void disabled() {}
+void disabled() {
+    drivetrain.stop();
+}
 
 void competition_initialize() {}
 
 void autonomous() {
-    Autonomous auton;
-    pneumatics.setMatchloader(true);
-    auton.travel(24.0, 60.0, 0.0, 3.0);
-    pneumatics.setMatchloader(false);
+    drivetrain.stop();
+    odom.setPose({0.0, 0.0, 0.0});
+
+    Autonomous auton(drivetrain, odom, pneumatics);
+    auton.runExample();
 }
 
 void opcontrol() {
@@ -52,7 +62,7 @@ void opcontrol() {
         TASK_STACK_DEPTH_DEFAULT,
         "Pneumatics");
 
-    while (true) {
+    while (!pros::competition::is_disabled() && !pros::competition::is_autonomous()) {
         pros::delay(300);
     }
 }
