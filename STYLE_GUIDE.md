@@ -13,7 +13,7 @@ Consistent naming is critical for codebase navigation. Follow these rules for al
 | **Variables**          | `camelCase`        | `currentPose`, `targetSpeed`    | Standard local and parameter variables. |
 | **Functions**          | `camelCase`        | `getPose()`, `updateState()`    | All global and class member functions.  |
 | **Files**              | `camelCase`        | `pathFollower.cpp`, `utils.hpp` | Header and source files.                |
-| **Classes / Structs**  | `PascalCase`       | `Odometry`, `PidController`     | Custom data structures and objects.     |
+| **Classes / Structs**  | `PascalCase`       | `Odometry`, `PIDController`     | Custom data structures and objects.     |
 | **Constants / Macros** | `UPPER_SNAKE_CASE` | `TURN_KP`, `MAX_VOLTAGE`        | `constexpr` and `const` values.         |
 | **Class Members**      | `m_camelCase`      | `m_config`, `m_leftMotor`       | Private and protected class variables.  |
 
@@ -122,18 +122,18 @@ Organize class declarations logically with explicit access modifiers. Public int
 /**
  * @brief Handles closed-loop PID control calculations for robot motion.
  */
-class PidController {
+class PIDController {
 public:
     /**
-     * @brief Constructs a PidController with gains.
+     * @brief Constructs a PIDController with gains.
      *
      * @param kP Proportional gain coefficient.
      * @param kI Integral gain coefficient.
      * @param kD Derivative gain coefficient.
      */
-    explicit PidController(double kP, double kI = 0.0, double kD = 0.0);
+    explicit PIDController(double kP, double kI = 0.0, double kD = 0.0);
 
-    ~PidController() = default;
+    ~PIDController() = default;
 
     /**
      * @brief Calculates output command based on measured and target state.
@@ -169,7 +169,7 @@ Namespaces visually separate project subsystems (e.g., motion control, hardware 
 
 ### Guidelines
 
-- **Naming:** Use concise, all-lowercase names for namespaces (e.g., `daydream`, `motion`, `utils`). Avoid `CamelCase` or `UPPERCASE` namespace names.
+- **Naming:** Use concise, all-lowercase names for namespaces (e.g., `daydream`, `motion`, `utils`). Avoid `camelCase` or `UPPERCASE` namespace names.
 - **Nested Namespaces:** Prefer C++17 nested namespace syntax (`namespace daydream::motion { ... }`) over multi-level nested opening tags.
 - **No `using namespace` in Headers:** NEVER place `using namespace` or namespace aliases in header files (`.hpp`). This pollutes the global namespace for any file that includes the header.
 - **Scoped Usage in Source Files:** Avoid top-level `using namespace` even in `.cpp` files. Keep `using` directives localized inside specific functions where needed.
