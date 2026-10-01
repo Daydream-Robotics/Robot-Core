@@ -93,7 +93,6 @@ Robot-Core/
 |       |-- utilities/
 |       |   |-- display.hpp
 |       |   |-- math.hpp                    Shared math helpers
-|       |   |-- random.hpp                  Random-number helper
 |       |   |-- sdCardLogging.hpp            SD-card logging support
 |       |   `-- serialProtocol.hpp           Serial packet declarations
 `-- archives/
@@ -101,13 +100,14 @@ Robot-Core/
     |-- legacy_example_main.cpp
     |-- legacy_pneumatics.cpp
     |-- legacy_pneumatics.hpp
-    `-- perception/                          Inactive perception work
-        |-- include/
-        |   |-- object_handler.hpp
-        |   `-- vision_ball_retrieval.hpp
-        `-- src/
-            |-- object_handler.cpp
-            `-- vision_ball_retrieval.cpp
+    `-- include/                          Inactive perception work
+    |    |-- perception/
+    |    |   |-- object_handler.hpp
+    |    |   `-- vision_ball_retrieval.hpp
+    `-- src/
+          |-- perception/
+              |-- object_handler.cpp
+    |         `-- vision_ball_retrieval.cpp
 ```
 
 This is the target proposal. Some existing files still use older paths or names, including the current MCL, sensor-helper, and path-follower files; those are migration items. New files should follow this mirroring rule: a public header in
