@@ -37,21 +37,22 @@ Robot-Core/
 |       |   |   |-- ramsete.cpp             Ramsete controller
 |       |   |   `-- stanley.cpp              Stanley controller
 |       |   |-- pathing/
-|       |   |   |-- pathFollower.cpp        Path-following execution
 |       |   |   |-- arclengthSplining.cpp   Spline construction and sampling
+|       |   |   |-- pathFollower.cpp        Path-following execution
 |       |   |   `-- paths.cpp               Path loading and preparation
 |       |   `-- localization/
 |       |       |-- mcl.cpp                 Monte Carlo localization
-|       |       `-- rangeSensing.cpp         Range model and diagnostics
+|       |       |-- rangeSensing.cpp        Range model and diagnostics
+|       |       `-- sensors.cpp              Sensor sampling and conversion
 |       |-- subsystems/
 |       |   |-- drivetrain.cpp              Drivetrain commands
 |       |   |-- intake.cpp                  Intake commands
 |       |   |-- logging.cpp                 Robot-wide logging interface
 |       |   `-- pneumatics.cpp              Pneumatic actuator commands
-|       |-- utilities/display.cpp           Driver display and selection UI
-        |-- utilities/math.cpp
-        |-- utilities/random.cpp
-|       `-- utilities/serialProtocol.cpp        Serial packet transport
+|       |-- utilities/
+|       |   |-- display.cpp                  Driver display and selection UI
+|       |   |-- math.cpp                     Shared math helpers
+|       |   `-- serialProtocol.cpp           Serial packet transport
 |-- include/
 |   |-- api.h                               PROS API umbrella header
 |   |-- main.h                              PROS lifecycle declarations
@@ -76,12 +77,14 @@ Robot-Core/
 |       |   |   |-- ramsete.hpp
 |       |   |   `-- stanley.hpp
 |       |   |-- pathing/
-|       |   |   |-- pathFollower.hpp
 |       |   |   |-- arclengthSplining.hpp
-|       |   |   `-- paths.hpp
+|       |   |   |-- paths.hpp
+|       |   |   |-- pathFollower.hpp
+|       |   |   `-- fieldLogger.hpp           Path/controller data logging
 |       |   `-- localization/
 |       |       |-- mcl.hpp
-|       |       `-- rangeSensing.hpp
+|       |       |-- rangeSensing.hpp
+|       |       `-- sensors.hpp              Sensor readings and helpers
 |       |-- subsystems/
 |       |   |-- drivetrain.hpp              `daydream::Drivetrain`
 |       |   |-- intake.hpp                  `daydream::Intake`
@@ -89,12 +92,10 @@ Robot-Core/
 |       |   `-- pneumatics.hpp              `daydream::Pneumatics`
 |       |-- utilities/
 |       |   |-- display.hpp
-|       |   `-- math.hpp                    Header-only shared math helpers
-|       `-- utils/
-|           |-- fieldLogger.hpp              Path/controller data logging
-|           |-- rng.hpp                      Random-number helper
-|           |-- sd_card_logging.hpp          SD-card logging support
-|           `-- serialProtocol.hpp           Serial packet declarations
+|       |   |-- math.hpp                    Shared math helpers
+|       |   |-- random.hpp                  Random-number helper
+|       |   |-- sdCardLogging.hpp            SD-card logging support
+|       |   `-- serialProtocol.hpp           Serial packet declarations
 `-- archives/
     |-- legacy_path_follower_main.cpp
     |-- legacy_example_main.cpp
@@ -109,10 +110,12 @@ Robot-Core/
             `-- vision_ball_retrieval.cpp
 ```
 
-This is the target proposal. Some existing files still use older paths or names, including the current MCL, helper, and path-follower files; those are migration items. New files should follow this mirroring rule: a public header in
+This is the target proposal. Some existing files still use older paths or names, including the current MCL, sensor-helper, and path-follower files; those are migration items. New files should follow this mirroring rule: a public header in
 `include/daydream/<area>/` should have its implementation in the corresponding
 `src/daydream/<area>/` directory. Header-only helpers are an exception when
-their implementation is intentionally defined in the header.
+their implementation is intentionally defined in the header. In this proposal,
+`utilities/random.hpp`, `utilities/sdCardLogging.hpp`, and
+`motion/pathing/fieldLogger.hpp` are header-only.
 
 ## Runtime structure and PROS tasks
 
@@ -129,10 +132,10 @@ The current scaffold creates one instance each of `daydream::Drivetrain`,
 drivetrain and pneumatic subsystem wrappers receive references to the existing
 PROS device objects. Those declarations currently live in
 `config/subsystems.hpp`; the proposed name for that hardware configuration file
-is `config/hardware.hpp`. This avoids creating second PROS objects for the same
-physical ports. Function-local statics keep the subsystem objects alive across
-callback invocations while ensuring their construction is deferred until first
-use.
+is `config/hardware.hpp`. This includes configured sensor devices and avoids
+creating second PROS objects for the same physical ports. Function-local
+statics keep the subsystem objects alive across callback invocations while
+ensuring their construction is deferred until first use.
 
 ### Competition modes already run as PROS-managed tasks
 
@@ -209,32 +212,32 @@ operator-control loop, or create duplicate odometry workers.
 
 ### `motion/`
 
-Contains robot motion and pose-related algorithms. Keep PID directly in `motion/` because it is a reusable motion-control primitive, rather than giving it a separate top-level subsystem folder. `control/` contains algorithms that turn
-pose/path targets into drive commands. `pathing/` owns path representation,
-spline generation, path loading, and following a path. Odometry belongs directly
-under `motion/` because it estimates the robot's motion and pose.
+Contains robot motion and pose-related algorithms. `control/` contains PID and
+other algorithms that turn pose or path targets into drive commands.
+`pathing/` owns path representation, spline generation, path loading, path
+following, and trajectory-specific logging. Odometry belongs directly under
+`motion/` because it estimates the robot's motion and pose.
 
-Localization that depends on range sensors and a particle filter belongs under `motion/localization/`. This keeps it with pose-estimation and navigation concerns that consume its results. Inactive perception experiments remain under `archives/`.
+Localization that depends on range sensors and a particle filter belongs under `motion/localization/`. Sensor sampling, reading types, and sensor-specific conversion helpers live beside localization; configured PROS device objects live under `config/`. This keeps pose-estimation inputs and algorithms together without mixing hardware construction into the estimator. Inactive perception experiments remain under `archives/`.
 
-### `utilities/` and `utils/`
+### `utilities/`
 
-Use `utilities/` for shared tools such as the display and math helpers. Keep common math in `utilities/math.hpp`; a separate `math.cpp` is unnecessary while these helpers are small and header-only. Move sensor- and odometry-specific helpers next to localization or odometry instead of keeping them in a generic catch-all file. Use `utils/` for lower-level reusable pieces such as random-number generation, serial transport, and logging support.
+Use one `utilities/` folder for cross-cutting helpers that do not belong to a specific subsystem or motion feature: display support, shared math, random-number generation, serial transport, and general SD-card logging. Keep sensor- and odometry-specific helpers beside localization or odometry. Split the existing catch-all `helpers` module by responsibility so each helper has one clear home. The math module may use a `.cpp` when it has compiled implementation, while small inline-only helpers can remain in `math.hpp`.
 
 Logging has two related scopes. Robot-wide event or diagnostic logging belongs
-behind the `Logging` subsystem interface. Path-following or controller data
-that is specific to trajectory analysis belongs with the pathing/controller
-code (the current `FieldLogger` helper is in `utils/`). Keep the call-site
-interface straightforward and place implementation according to who owns the
-data and lifecycle.
+behind the `Logging` subsystem interface, which can use the shared SD-card
+logging utility. Path-following or controller data specific to trajectory
+analysis belongs in `motion/pathing/fieldLogger.hpp`, beside the path follower
+that owns its data and lifecycle.
 
 ### `config/`
 
 Contains robot-specific configuration: physical ports, dimensions, tuning
-constants, and the existing PROS device declarations. `constants.hpp` is the
-proposed shared constants filename; it should not grow a robot-prefixed name.
-`hardware.hpp` is the proposed home for configured PROS device objects. As the
-hardware setup evolves, keep the boundary clear between constant configuration
-and subsystem behavior.
+constants, and configured PROS device declarations.
+`constants.hpp` is the proposed shared constants filename; it should not grow a
+robot-prefixed name. `hardware.hpp` is the proposed home for configured PROS
+device objects. As the hardware setup evolves, keep the boundary clear between
+configuration and subsystem behavior.
 
 ### `archives/`
 
