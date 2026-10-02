@@ -28,7 +28,11 @@ bool StanleyController::step(int direction) {
 
     double x   = odom.getPosX();
     double y   = odom.getPosY();
-    double yaw = odom.getYaw(); 
+    YawResult yawResult = odom.getYaw(); 
+    if (yawResult.error != OdomError::NONE) {
+        return false;
+    }
+    double yaw = yawResult.yaw;
     printf("X: %.3f   Y: %.3f   Yaw: %.3f\n", x, y, yaw);
 
     //calls upon the closest point helper to find the closest point relivle to the robot's last upodated pose
@@ -60,7 +64,11 @@ bool StanleyController::step(int direction) {
     double ey  = nearest.y - y;
     double cte = direction * (-std::sin(effectivePathYaw) * ex + std::cos(effectivePathYaw) * ey);
 
-    double speed = std::abs(odom.getParallelVel()); 
+    VelocityResult velocityResult = odom.getParallelVel();
+    if (velocityResult.error != OdomError::NONE) {
+        return false;
+    }
+    double speed = std::abs(velocityResult.velocity);
     printf("Speed: %.3f\n", speed);
 
     double steer = headingError + std::atan2(STANLEY_K * cte, speed + STANLEY_K_SOFT);

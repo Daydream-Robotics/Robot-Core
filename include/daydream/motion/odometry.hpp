@@ -11,9 +11,48 @@ struct OdomConfig {
     double driveWheelDiameter = 0.0;
 };
 
+/**
+ * @enum OdomError
+ * @brief Represents errors that may be encountered by odometry system.
+ */
+enum class OdomError {
+    NONE,
+    IMU_DISCONNECTED,
+    IMU_CALIBRATING,
+    IMU_COMMUNICATION_ERROR,
+    TRACKING_WHEEL_ERROR
+};
+
+/**
+ * @struct YawResult
+ * @brief Stores yaw measurement and associated odometry error
+ */
+struct YawResult {
+    double yaw{0.0};
+    OdomError error{OdomError::NONE};
+};
+
 struct WheelLengths {
     double parallel;
     double perpendicular;
+};
+
+/**
+ * @struct WheelTravelResult
+ * @brief Stores tracking wheel travel mesurements and associated odometry error
+ */
+struct WheelTravelResult {
+    WheelLengths travel{0.0, 0.0};
+    OdomError error{OdomError::NONE};
+};
+
+/**
+ * @struct VelocityResult
+ * @brief Stores velocity measurement and associated odometry error
+ */
+struct VelocityResult {
+    double velocity{0.0};
+    OdomError error{OdomError::NONE};
 };
 
 struct Position {
@@ -92,23 +131,20 @@ public:
     /** 
      * @brief gets the yaw of the robot
      * @note Counter clockwise is positive
-     * @returns returns yaw/heading in degrees bounded by [-180, 180]
-     * @retval	-180.1	IMU disconnected
-     * @retval	-180.2	IMU calibrating
-     * @retval	-180.3	Pros communication failure
+     * @returns returns yaw/heading in degrees and error status
      */
-    double getYaw(void);
+    YawResult getYaw(void);
     
     /**
      * @brief Returns struct of distances travelled by Odometry Wheels
      */
-    WheelLengths getOdomWheelTravel(void);
-
+    WheelTravelResult getOdomWheelTravel(void);
+    
     /**
      * @brief gets the current velocity of the parallel tracking wheel or drive motors
      * @returns velocity in inches per second
      */
-    double getParallelVel();
+    VelocityResult getParallelVel();
     
     /**
      * @brief Background task entry point
