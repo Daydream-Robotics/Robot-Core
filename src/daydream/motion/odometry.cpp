@@ -4,6 +4,21 @@
 #include "daydream/utils/helpers.hpp"
 #include <cmath>
 #include <numbers>
+#include <vector>
+
+static double averageMotorGroupPosition(const pros::MotorGroup& group) {
+    std::vector<double> positions = group.get_position_all();
+    if (positions.empty()) {
+        return 0.0;
+    }
+
+    double sum = 0.0;
+    for (double pos : positions) {
+        sum += pos;
+    }
+
+    return sum / static_cast<double>(positions.size());
+}
 
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
@@ -23,24 +38,33 @@ void Odometry::updatePose(void) {
 	
 	if (!m_initialized) {
 		m_prevTheta = theta_rad;
-		
-		// get initial position of tracking wheels
-		m_prevParallel = parallelTrackingWheel.get_position();
-		m_prevPerpendicular = perpendicularTrackingWheel.get_position();
+
+		if (m_config.useMotorEncoders) {
+			m_prevLeft = averageMotorGroupPosition(leftMotors);
+			m_prevRight = averageMotorGroupPosition(rightMotors);
+		} else {
+			m_prevParallel = parallelTrackingWheel.get_position();
+			m_prevPerpendicular = perpendicularTrackingWheel.get_position();
+		}
 		
 		m_initialized = true;
 		return;
 	}
 
-	// Calculate distance travelled by each tracking wheel
-	WheelTravelResult wheelResult = getOdomWheelTravel();
+	// Calculate distance travelled by either drive encoders or tracking wheels
+	WheelLengths arcs;
+	if (m_config.useMotorEncoders) {
+		arcs = getDriveEncoderTravel();
+	} else {
+		WheelTravelResult wheelResult = getOdomWheelTravel();
 
-	if (wheelResult.error != OdomError::NONE) {
-		pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
-		return;
+		if (wheelResult.error != OdomError::NONE) {
+			pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
+			return;
+		}
+
+		arcs = wheelResult.travel;
 	}
-
-	WheelLengths arcs = wheelResult.travel;
 	
 	// Determine change in heading 
 	double del_theta = normalizeAngle(theta_rad - m_prevTheta);
@@ -142,11 +166,8 @@ YawResult Odometry::getYaw(void) {
 	// yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
 	double yaw_rad = std::atan2(2 * ((qt.w * qt.z) + (qt.x * qt.y)), 1 - (2 * ((qt.y * qt.y) + (qt.z * qt.z))));
 
-	// convert to degrees
-	double yaw_deg = yaw_rad * (180.0 / std::numbers::pi);
-
-	// angle is returned from -180 to 180
-	return {-yaw_deg, OdomError::NONE};
+	// angle is returned from -pi to pi
+	return {-yaw_rad, OdomError::NONE};
 }
 
 WheelTravelResult Odometry::getOdomWheelTravel(void) {
@@ -194,6 +215,27 @@ VelocityResult Odometry::getParallelVel() {
 	return {velocity, OdomError::NONE};
 }
 
+WheelLengths Odometry::getDriveEncoderTravel(void) {
+	if (!m_initialized) {
+		return {0, 0};
+	}
+
+    double currLeft = averageMotorGroupPosition(leftMotors);
+    double currRight = averageMotorGroupPosition(rightMotors);
+
+    double dLeft = currLeft - m_prevLeft;
+    double dRight = currRight - m_prevRight;
+
+    double leftInches = (dLeft / 360.0) * m_config.driveWheelDiameter * std::numbers::pi;
+    double rightInches = (dRight / 360.0) * m_config.driveWheelDiameter * std::numbers::pi;
+
+    m_prevLeft = currLeft;
+    m_prevRight = currRight;
+
+    double forwardInches = (leftInches + rightInches) / 2.0;
+    return {forwardInches, 0.0};
+}
+
 // could be used to do odom in background
 void Odometry::odomTask() {
 	while (true) {
@@ -206,5 +248,7 @@ Odometry odom({
 	PARALLEL_TRACKING_WHEEL_DIAMETER,
 	PERPENDICULAR_TRACKING_WHEEL_DIAMETER,
 	PARALLEL_TRACKING_WHEEL_OFFSET,
-	PERPINDICULAR_TRACKING_WHEEL_OFFSET	
+	PERPENDICULAR_TRACKING_WHEEL_OFFSET,
+	true,
+	DRIVE_WHEEL_DIAMETER_INCHES
 });
