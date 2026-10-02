@@ -73,7 +73,7 @@ WheelVelocities PurePursuitController::compute(const Pose& currentPose, const AL
     if (m_stepCounter % 10 == 0) {
         VelocityResult velocityResult = odom.getParallelVel();
         // Fail-safe for failed wheel velocity measurements
-        if (velocityResult.error != OdomError::None) {
+        if (velocityResult.error != OdomError::NONE) {
             return WheelVelocities{0.0, 0.0};
         }
         double current_vel = velocityResult.velocity;
@@ -126,7 +126,7 @@ Position PurePursuitController::convertPtToRobotFrame(Position targetPoint, cons
 double PurePursuitController::getLookaheadDist() {
     VelocityResult velocityResult = odom.getParallelVel();
     // Fail-safe for failed velocity sensors
-    if (velocityResult.error != OdomError::None) {
+    if (velocityResult.error != OdomError::NONE) {
         return MIN_LOOKAHEAD_DIST;
     }
     double vel = std::abs(velocityResult.velocity);

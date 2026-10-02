@@ -8,19 +8,25 @@ struct OdomConfig {
     double perpendicularTrackingWheelOffset;
 };
 
-// Custom error type vars
+/**
+ * @enum OdomError
+ * @brief Represents errors that may be encountered by odometry system.
+ */
 enum class OdomError {
-    None,
-    IMUDisconnected,
-    IMUCalibrating,
-    IMUCommunicationError,
-    TrackingWheelError
+    NONE,
+    IMU_DISCONNECTED,
+    IMU_CALIBRATING,
+    IMU_COMMUNICATION_ERROR,
+    TRACKING_WHEEL_ERROR
 };
 
-// New yaw parameters for decimal or error return
+/**
+ * @struct YawResult
+ * @brief Stores yaw measurement and associated odometry error
+ */
 struct YawResult {
-    double yaw;
-    OdomError error;
+    double yaw{0.0};
+    OdomError error{OdomError::NONE};
 };
 
 struct WheelLengths {
@@ -28,16 +34,22 @@ struct WheelLengths {
     double perpendicular;
 };
 
-// New wheel travel parameters for parallel/perpendicular travel and error
+/**
+ * @struct WheelTravelResult
+ * @brief Stores tracking wheel travel mesurements and associated odometry error
+ */
 struct WheelTravelResult {
-    WheelLengths travel;
-    OdomError error;
+    WheelLengths travel{0.0, 0.0};
+    OdomError error{OdomError::NONE};
 };
 
-// New velocity parameters to account for error
+/**
+ * @struct VelocityResult
+ * @brief Stores velocity measurement and associated odometry error
+ */
 struct VelocityResult {
-    double velocity;
-    OdomError error;
+    double velocity{0.0};
+    OdomError error{OdomError::NONE};
 };
 
 struct Position {

@@ -10,7 +10,7 @@ Odometry::Odometry(OdomConfig config) : m_config(config) {}
 void Odometry::updatePose(void) {
 	YawResult yawResult = getYaw(); 
 	
-	if (yawResult.error != OdomError::None) {
+	if (yawResult.error != OdomError::NONE) {
 		pros::lcd::print(0, "[Update Pose] IMU Failure!");
 		return;
 	}
@@ -35,7 +35,7 @@ void Odometry::updatePose(void) {
 	// Calculate distance travelled by each tracking wheel
 	WheelTravelResult wheelResult = getOdomWheelTravel();
 
-	if (wheelResult.error != OdomError::None) {
+	if (wheelResult.error != OdomError::NONE) {
 		pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
 		return;
 	}
@@ -122,12 +122,12 @@ YawResult Odometry::getYaw(void) {
 
 	// imu disconnected
 	if (!imu.is_installed()) {
-		return {0.0, OdomError::IMUDisconnected};
+		return {0.0, OdomError::IMU_DISCONNECTED};
 	}
 
 	// imu still calibrating
 	if (imu.is_calibrating()) {
-		return {0.0, OdomError::IMUCalibrating};
+		return {0.0, OdomError::IMU_CALIBRATING};
 	}
 
 	pros::quaternion_s_t qt = imu.get_quaternion();
@@ -136,7 +136,7 @@ YawResult Odometry::getYaw(void) {
 	if (std::isnan(qt.w) || qt.w == PROS_ERR_F) {
 		qt = imu.get_quaternion();
 		// pros comm error
-		if (std::isnan(qt.w) || qt.w == PROS_ERR_F) return {0.0, OdomError::IMUCommunicationError};
+		if (std::isnan(qt.w) || qt.w == PROS_ERR_F) return {0.0, OdomError::IMU_COMMUNICATION_ERROR};
 	}
 
 	// yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
@@ -146,12 +146,12 @@ YawResult Odometry::getYaw(void) {
 	double yaw_deg = yaw_rad * (180.0 / std::numbers::pi);
 
 	// angle is returned from -180 to 180
-	return {-yaw_deg, OdomError::None};
+	return {-yaw_deg, OdomError::NONE};
 }
 
 WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	if (!m_initialized) {
-		return {{0.0, 0.0}, OdomError::None};
+		return {{0.0, 0.0}, OdomError::NONE};
 	}
 
     // Get current centidegree position of tracking wheels
@@ -160,7 +160,7 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 
 	// Returns error for problem with either wheel
 	if (currParallel == PROS_ERR || currPerpendicular == PROS_ERR) {
-		return {{0.0, 0.0}, OdomError::TrackingWheelError};
+		return {{0.0, 0.0}, OdomError::TRACKING_WHEEL_ERROR};
 	}
 
     // Get delta between current and last frame 
@@ -175,14 +175,14 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	m_prevParallel = currParallel;
 	m_prevPerpendicular = currPerpendicular;
 
-	return {{delParallel, delPerpendicular}, OdomError::None};
+	return {{delParallel, delPerpendicular}, OdomError::NONE};
 }
 
 VelocityResult Odometry::getParallelVel() {
 	double initialVelocity = parallelTrackingWheel.get_velocity();
 
 	if (initialVelocity == PROS_ERR) {
-		return {0.0, OdomError::TrackingWheelError};
+		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
 	}
 
 	double deg_s = initialVelocity / 100.0;
@@ -191,7 +191,7 @@ VelocityResult Odometry::getParallelVel() {
 		* m_config.parallelWheelDiameter
 		* std::numbers::pi;
 
-	return {velocity, OdomError::None};
+	return {velocity, OdomError::NONE};
 }
 
 // could be used to do odom in background

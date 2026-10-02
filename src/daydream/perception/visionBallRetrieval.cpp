@@ -292,7 +292,7 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece)
 
     YawResult originalAngleResult = odom.getYaw();
 
-    if (originalAngleResult.error != OdomError::None) {
+    if (originalAngleResult.error != OdomError::NONE) {
         return std::nullopt;
     }
 
@@ -314,7 +314,7 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece)
 
         YawResult currentAngleResult = odom.getYaw();
 
-        if (currentAngleResult.error != OdomError::None) {
+        if (currentAngleResult.error != OdomError::NONE) {
             leftMotors.move_velocity(0);
             rightMotors.move_velocity(0);
             return std::nullopt;

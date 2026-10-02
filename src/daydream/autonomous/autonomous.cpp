@@ -39,7 +39,7 @@ void Autonomous::turnTo(double targetHeading) {
     auto lastTime = clock::now();
 	YawResult prevHeadingResult = odom.getYaw();
 
-	if (prevHeadingResult.error != OdomError::None) {
+	if (prevHeadingResult.error != OdomError::NONE) {
 		pros::lcd::print(0, "[TurnTo] IMU Failure!");
 		return;
 	}
@@ -49,7 +49,7 @@ void Autonomous::turnTo(double targetHeading) {
 	while(true) {
 		// Heading Calculation
 		YawResult rawHeadingResult = odom.getYaw();
-		if (rawHeadingResult.error != OdomError::None) {
+		if (rawHeadingResult.error != OdomError::NONE) {
 			pros::lcd::print(0, "[TurnTo] IMU Failure!");
 			return;
 		}
@@ -172,7 +172,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
         // Heading error
 		YawResult rawHeadingResult = odom.getYaw();
 
-		if (rawHeadingResult.error != OdomError::None) {
+		if (rawHeadingResult.error != OdomError::NONE) {
 			pros::lcd::print(0, "[Travel] IMU Failure!");
 			break;
 		}
