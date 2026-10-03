@@ -43,6 +43,10 @@ void Odometry::updatePose(void) {
 		} else {
 			m_prevParallel = parallelTrackingWheel.get_position();
 			m_prevPerpendicular = perpendicularTrackingWheel.get_position();
+
+			if (m_prevParallel == PROS_ERR || m_prevPerpendicular == PROS_ERR) {
+				return;
+			}
 		}
 		
 		m_initialized = true;
@@ -172,6 +176,10 @@ WheelLengths Odometry::getOdomWheelTravel(void) {
     // Get current centidegree position of tracking wheels
 	double currParallel = parallelTrackingWheel.get_position();
 	double currPerpendicular = perpendicularTrackingWheel.get_position();
+
+	if(currParallel == PROS_ERR || currPerpendicular == PROS_ERR) {
+		return {0,0};
+	}
 
     // Get delta between current and last frame 
 	double dTicksL = currParallel - m_prevParallel; 
