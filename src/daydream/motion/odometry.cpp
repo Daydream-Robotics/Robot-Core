@@ -25,8 +25,13 @@ Odometry::Odometry(OdomConfig config) : m_config(config) {}
 void Odometry::updatePose(void) {
 	YawResult yawResult = getYaw(); 
 	
-	if (yawResult.error != OdomError::NONE) {
-		pros::lcd::print(0, "[Update Pose] IMU Failure!");
+	if (yaw_deg < -180.0) {
+		static uint32_t lastImuFailurePrint = 0;
+		const uint32_t now = pros::millis();
+		if (now - lastImuFailurePrint >= 500) {
+			pros::lcd::print(0, "[Update Pose] IMU Failure! %lf", yaw_deg);
+			lastImuFailurePrint = now;
+		}
 		return;
 	}
 
