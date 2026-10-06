@@ -231,8 +231,8 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
     double dLeft = currLeft - m_prevLeft;
     double dRight = currRight - m_prevRight;
 
-    double leftInches = (dLeft / 360.0) * m_config.driveWheelDiameter * std::numbers::pi;
-    double rightInches = (dRight / 360.0) * m_config.driveWheelDiameter * std::numbers::pi;
+    double leftInches = (dLeft / 360.0) * DRIVE_GEAR_RATIO * m_config.driveWheelDiameter * std::numbers::pi;
+    double rightInches = (dRight / 360.0) * DRIVE_GEAR_RATIO * m_config.driveWheelDiameter * std::numbers::pi;
 
     m_prevLeft = currLeft;
     m_prevRight = currRight;
