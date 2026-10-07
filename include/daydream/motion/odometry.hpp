@@ -172,7 +172,10 @@ private:
     double m_prevPerpendicular = 0;
     double m_prevLeft = 0;
     double m_prevRight = 0;
+    double m_headingOffset = 0.0; //field heading = raw IMU heading + offset
+    double m_lastRawTheta = 0.0; //latest raw IMU heading, used by setPose()
     bool m_initialized = false;
+    
 };
 
 extern Odometry odom;

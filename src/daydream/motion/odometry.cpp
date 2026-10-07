@@ -43,6 +43,7 @@ void Odometry::updatePose(void) {
 	
 	if (!m_initialized) {
 		m_prevTheta = theta_rad;
+		m_lastRawTheta = theta_rad;
 
 		if (m_config.useMotorEncoders) {
 			m_prevLeft = averageMotorGroupPosition(leftMotors);
@@ -86,19 +87,22 @@ void Odometry::updatePose(void) {
 	dx_local *= chordFactor;
 	dy_local *= chordFactor;
 
-	double theta_mid = m_prevTheta + del_theta / 2.0;
-    theta_mid = normalizeAngle(theta_mid);
+
+
+	// Increment position and angle by calculated changes
+	m_mutex.take();
+	double theta_mid = normalizeAngle(m_prevTheta + m_headingOffset + del_theta / 2.0);
 
     // Compute change in x and y based on heading and local changes
 	double del_x = std::cos(theta_mid) * dx_local - std::sin(theta_mid) * dy_local;
 	double del_y = std::sin(theta_mid) * dx_local + std::cos(theta_mid) * dy_local;
-
-	// Increment position and angle by calculated changes
-	m_mutex.take();
 	m_currentPosition.x += del_x;
 	m_currentPosition.y += del_y;
-	m_currentPosition.theta = theta_rad;
+	m_currentPosition.theta = normalizeAngle(theta_rad + m_headingOffset);
+	m_lastRawTheta = theta_rad;
 	m_mutex.give();
+
+	m_prevTheta = theta_rad;
 
 	// !IMPORTANT!: Likely not task safe
 	// print to the controller every 100 ms 
@@ -122,7 +126,8 @@ void Odometry::setPose(Pose pose) {
 	m_mutex.take();
 	m_currentPosition.x = pose.x;
 	m_currentPosition.y = pose.y;
-	m_currentPosition.theta = pose.theta;
+	m_currentPosition.theta = normalizeAngle(pose.theta);
+    m_headingOffset = normalizeAngle(pose.theta - m_lastRawTheta);
 	m_mutex.give();
 }
 
