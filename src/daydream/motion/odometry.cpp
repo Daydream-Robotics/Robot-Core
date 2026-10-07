@@ -22,6 +22,42 @@ static double averageMotorGroupPosition(const pros::MotorGroup& group) {
 
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
+void Odometry::calculateTrackingWheelOffsets() {
+
+	// record starting tracking wheel positions 
+	double startParallel = parallelTrackingWheel.get_position(); 
+	double startPerpendicular = perpendicularTrackingWheel.get_position(); 
+
+	// Set up IMU rotation tracking
+	double previousYaw = getYaw(); 
+	double totalRotation = 0.0; 
+
+	// Calibration settings
+	const int turnSpeed = 40; 
+	const double targetRotation = 720.0; 
+
+	leftMotors.move_velocity(turnSpeed); 
+	rightMotors.move_velocity(-turnSpeed); 
+
+	while (std::abs(totalRotation) < targetRotation) {
+		double currentYaw = getYaw(); 
+
+		double deltaYaw = currentYaw - previousYaw; 
+
+		if (deltaYaw > 180.0) {
+			deltaYaw -= 360.0; 
+		} else if (deltaYaw < -180.0) {
+			deltaYaw += 360.0; 
+		}
+
+		totalRotation += deltaYaw; 
+		previousYaw = currentYaw;
+
+		pros::delay(10); 
+	}
+
+}
+
 void Odometry::updatePose(void) {
 	const double yaw_deg = getYaw(); 
 	

@@ -58,6 +58,11 @@ public:
     void updatePose(void);
 
     /**
+     * @brief Calculates tracking wheel offsets by rotating the robot 
+     */
+    void calculateTrackingWheelOffsets();
+
+    /**
      * @brief Gets the robot's latest pose
      * @returns The latest Pose of the robot
      */
