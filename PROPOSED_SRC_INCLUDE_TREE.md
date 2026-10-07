@@ -27,7 +27,7 @@ Robot-Core/
 |       |-- autonomous/
 |       |   |-- autonomous.cpp            Autonomous movement behavior
 |       |   |-- runner.cpp                 Autonomous sequencing entry point
-|       |   `-- routines/autons.cpp        Named autonomous and skills routines
+|       |   `-- routines.cpp               Named autonomous and skills routines
 |       |-- motion/
 |       |   |-- pid.cpp                    Reusable PID controller
 |       |   |-- odometry.cpp               Continuous pose tracking
