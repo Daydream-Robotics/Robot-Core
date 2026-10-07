@@ -38,11 +38,10 @@ constexpr double PERPENDICULAR_TRACKING_WHEEL_DIAMETER = 2.0425;
 constexpr double PARALLEL_TRACKING_WHEEL_OFFSET = 0.0; // positive is to the right of tracking center
 constexpr double PERPENDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behind tracking center
 
-constexpr double DRIVE_GEAR_RATIO = 450.0/600.0 //450 rpm wheel / 600 rpm cartridge
-
 /* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
 
 constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 3.25;
+constexpr double DRIVE_GEAR_RATIO = 450.0/600.0; //450 rpm wheel / 600 rpm cartridge
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 

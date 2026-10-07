@@ -52,8 +52,7 @@ void initialize() {
 		pros::lcd::print(1, "Trajectories Loaded");
 	}
 
-    // COMMENT OUT UNTIL TESTING IS APPROVED
-    //constexpr double GEAR_RATIO = 450.0/600.0;
+    
 
 
     MPCSerial::Params mpc_serial_params(0.02, DRIVE_GEAR_RATIO, 16.7211, 71.3105, 10.5, 60);
