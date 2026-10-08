@@ -23,9 +23,13 @@ static double averageMotorGroupPosition(const pros::MotorGroup& group) {
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
 void Odometry::updatePose(void) {
-	YawResult yawResult = getYaw(); 
-	
-	if (yawResult.yaw < -180.0) {
+	YawResult yawResult = getYaw();
+	 
+	if(yawResult.error != OdomError::NONE){
+		pros::lcd::print(0, "[Update Pose] Yaw Error!")
+	}
+
+	if (yawResult.yaw < -std::numbers::pi) {
 		static uint32_t lastImuFailurePrint = 0;
 		const uint32_t now = pros::millis();
 		if (now - lastImuFailurePrint >= 500) {
