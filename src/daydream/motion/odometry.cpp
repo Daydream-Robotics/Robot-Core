@@ -27,7 +27,7 @@ void Odometry::updatePose(void) {
 
 	if (yawResult.error != OdomError::NONE) {
 		static uint32_t lastImuFailurePrint = 0;
-		const uint32_t now = pros::millis()
+		const uint32_t now = pros::millis();
 		if (now - lastImuFailurePrint >= 500) {
 			pros::lcd::print(0, "[Update Pose] IMU Failure! %lf", yawResult.yaw);
 			lastImuFailurePrint = now;
