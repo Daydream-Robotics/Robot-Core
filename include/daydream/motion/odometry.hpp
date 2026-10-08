@@ -129,16 +129,16 @@ public:
     YawResult getYaw(void);
     
     /**
-     * @brief Returns struct of distances travelled by Odometry Wheels
-     */
-    WheelTravelResult getOdomWheelTravel(void);
-    
-    /**
      * @brief gets the current velocity of the parallel tracking wheel or drive motors
      * @returns velocity in inches per second
      */
     VelocityResult getParallelVel();
     
+    /**
+     * @brief Returns struct of distances travelled by drive encoders when using internal encoders
+     */
+    WheelLengths getDriveEncoderTravel(void);
+
     /**
      * @brief Background task entry point
      */
@@ -164,7 +164,7 @@ private:
     /**
      * @brief Returns struct of distances travelled by Odometry Wheels
      */
-    WheelLengths getOdomWheelTravel(void);
+    WheelTravelResult getOdomWheelTravel(void);
   
     // previous state tracking
     double m_prevTheta = 0;
