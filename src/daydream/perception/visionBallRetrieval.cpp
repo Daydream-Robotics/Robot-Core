@@ -290,7 +290,13 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece)
 
     bool searched_right = false;
 
-    double original_angle = odom.getYaw();
+    YawResult originalAngleResult = odom.getYaw();
+
+    if (originalAngleResult.error != OdomError::NONE) {
+        return std::nullopt;
+    }
+
+    double original_angle = originalAngleResult.yaw;
 
     while (not ball.has_value() and IsConnected())
     {
@@ -306,8 +312,16 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece)
             break;
         }
 
-        double angleDiff = calcAngleDiff(original_angle, odom.getYaw());
-        
+        YawResult currentAngleResult = odom.getYaw();
+
+        if (currentAngleResult.error != OdomError::NONE) {
+            leftMotors.move_velocity(0);
+            rightMotors.move_velocity(0);
+            return std::nullopt;
+        }
+
+        double angleDiff = calcAngleDiff(original_angle, currentAngleResult.yaw);
+                
         // Will turn right 30*, and then left 60* until it finds a ball, if it finds nothing, it will return a sentinel value and we will continue regular intructions
         pros::lcd::print(1,"Searching for Ball");
         if (!searched_right) { // look right for 30*
@@ -445,8 +459,8 @@ void trackingMode(GamePiece GamePiece) {
 
 double calcAngleDiff(double a, double b){
     double diff = b - a;
-    while(diff > 180) diff -= 360;
-    while(diff < -180) diff += 360;
+    while(diff > std::numbers::pi) diff -= (2 * std::numbers::pi);
+    while(diff < -std::numbers::pi) diff += (2 * std::numbers::pi);
     return diff;
 }
 

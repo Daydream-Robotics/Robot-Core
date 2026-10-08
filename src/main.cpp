@@ -52,9 +52,10 @@ void initialize() {
 		pros::lcd::print(1, "Trajectories Loaded");
 	}
 
+    
 
-    constexpr double GEAR_RATIO = 450.0/600.0;
-    MPCSerial::Params mpc_serial_params(0.02, GEAR_RATIO, 16.7211, 71.3105, 10.5, 60);
+
+    MPCSerial::Params mpc_serial_params(0.02, DRIVE_GEAR_RATIO, 16.7211, 71.3105, 10.5, 60);
     mpc_serial_controller = new MPCSerial(mpc_serial_params);
     pathFollower = new PathFollower(*mpc_serial_controller);
 
