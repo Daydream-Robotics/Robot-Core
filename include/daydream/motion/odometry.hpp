@@ -164,6 +164,13 @@ private:
      * @brief Returns struct of distances travelled by Odometry Wheels
      */
     WheelTravelResult getOdomWheelTravel(void);
+
+    /**
+     * @brief Averages the actual velocities of all motors in a motor group
+     * @param group The motor group to average
+     * @returns The average velocity in RPM, or PROS_ERR_F if any motor reports an error
+     */
+    static double averageMotorGroupVelocities(const pros::MotorGroup& group);
   
     // previous state tracking
     double m_prevTheta = 0;

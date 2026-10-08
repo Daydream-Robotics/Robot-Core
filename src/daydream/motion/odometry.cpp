@@ -258,15 +258,15 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
     return {forwardInches, 0.0};
 }
 
-static double averageMotorGroupVelocities(const pros::MotorGroup& group){
-	std::vector<double> velocities = group.get_actual_velocity_all;
+double Odometry::averageMotorGroupVelocities(const pros::MotorGroup& group){
+	std::vector<double> velocities = group.get_actual_velocity_all();
 	if(velocities.empty()){
 		return PROS_ERR_F;
 	}
 
 	double sum = 0.0;
 
-	for(vel : velocities){
+	for(auto vel : velocities){
 		if(vel == PROS_ERR_F){
 			return PROS_ERR_F;
 		}
