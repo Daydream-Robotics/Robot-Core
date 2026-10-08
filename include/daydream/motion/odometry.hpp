@@ -28,7 +28,7 @@ enum class OdomError {
  * @brief Stores yaw measurement and associated odometry error
  */
 struct YawResult {
-    double yaw{0.0}; /**< The yaw measurement in radians */
+    double yaw{0.0}; /**< The yaw measurement from the IMU in radians */
     OdomError error{OdomError::NONE}; /**< The IMU error status */
 };
 
