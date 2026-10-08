@@ -37,18 +37,25 @@ void Autonomous::turnTo(double targetHeading) {
 		// Initialize clocking
 	using clock = std::chrono::steady_clock;
     auto lastTime = clock::now();
-	double prevHeading = odom.getYaw();
+	YawResult prevHeadingResult = odom.getYaw();
 
-	while (true) {
-		// Heading calculation
-		double rawHeading = odom.getYaw();
-		odom.updatePose();
+	if (prevHeadingResult.error != OdomError::NONE) {
+		pros::lcd::print(0, "[TurnTo] IMU Failure!");
+		return;
+	}
 
-		if (rawHeading < -std::numbers::pi) {
-			pros::lcd::print(0, "[TurnTo] IMU Failure! YAW: %lf", rawHeading);
-			// TODO: Add more verbose error handling
+	double prevHeading = prevHeadingResult.yaw;
+
+	while(true) {
+		// Heading Calculation
+		YawResult rawHeadingResult = odom.getYaw();
+		if (rawHeadingResult.error != OdomError::NONE) {
+			pros::lcd::print(0, "[TurnTo] IMU Failure!");
 			return;
 		}
+
+		double rawHeading = rawHeadingResult.yaw;
+		odom.updatePose();
 
 		// Calculate angular velocity
 		auto now = clock::now();
@@ -162,11 +169,14 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
         prevVelocity = v;
 
         // Heading error
-        double rawHeading = odom.getYaw();
-        if (rawHeading < -std::numbers::pi) {
-            pros::lcd::print(0, "[Travel] IMU Failure!");
-            break;
-        }
+		YawResult rawHeadingResult = odom.getYaw();
+
+		if (rawHeadingResult.error != OdomError::NONE) {
+			pros::lcd::print(0, "[Travel] IMU Failure!");
+			break;
+		}
+
+		double rawHeading = rawHeadingResult.yaw;
 
         double headingError = normalizeDeg(targetHeading - rawHeading);
 
