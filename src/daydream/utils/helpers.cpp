@@ -89,7 +89,7 @@ double accelLimit(double prev, double target, double dt, double accel_limit) {
  * @param iterations Number of turns to average over (alternates direction each turn)
  * @returns Effective track width L in inches (0.0 on IMU failure)
  */
-double measure_track_width(int iterations){
+double measureTrackWidth(int iterations){
     //local instance of auton so we can use turnTo / turnPID
     Autonomous auton; 
 

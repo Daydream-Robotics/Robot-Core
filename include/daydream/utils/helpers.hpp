@@ -43,4 +43,4 @@ class HeadingFilter {
 double calcDistBetweenPoints(Position pt1, Position pt2);
 
 //measure effective drivetrain track width L (in) using IMEs + IMU
-double measure_track_width(int iterations = 10);
+double measureTrackWidth(int iterations = 10);
