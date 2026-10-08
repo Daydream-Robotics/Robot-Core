@@ -217,11 +217,14 @@ VelocityResult Odometry::getParallelVel() {
 		double leftVelocity = averageMotorGroupVelocities(leftMotors);
 		double rightVelocity = averageMotorGroupVelocities(rightMotors);
 
-		double averageVelocity = (leftVelocity + rightVelocity) / 2;
+		if (leftVelocity == PROS_ERR_F || rightVelocity == PROS_ERR_F) {
+			return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+		}
 
-		double centideg_s = averageVelocity / 100.0;
+		// motor velocities are in RPM
+		double averageRpm = (leftVelocity + rightVelocity) / 2;
 
-		double velocity  = (centideg_s) * DRIVE_GEAR_RATIO * (m_config.driveWheelDiameter / 2) * (2 * std::numbers::pi / 60);
+		double velocity  = averageRpm * DRIVE_GEAR_RATIO * (m_config.driveWheelDiameter / 2) * (2 * std::numbers::pi / 60);
 		
 		return {velocity, OdomError::NONE};
 	}
@@ -230,9 +233,10 @@ VelocityResult Odometry::getParallelVel() {
 		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
 	}
 
-	double centideg_s = initialVelocity / 100.0;
+	// rotation sensor velocity is in centidegrees per second
+	double deg_s = initialVelocity / 100.0;
 
-	double velocity = (centideg_s) * m_config.parallelWheelDiameter * (std::numbers::pi / 180);
+	double velocity = deg_s * (std::numbers::pi / 180) * (m_config.parallelWheelDiameter / 2);
 
 	return {velocity, OdomError::NONE};
 }
@@ -275,7 +279,8 @@ double Odometry::averageMotorGroupVelocities(const pros::MotorGroup& group){
 	return sum / static_cast<double>(velocities.size());
 }
 
-// could be used to do odom in background
+// Background odom loop, started once in initialize(). Runs every 10 ms on a fixed schedule
+// (delay_until), independent of PathFollower::step(), so pose stays current in every mode.
 void Odometry::odomTask() {
 	std::uint32_t now = pros::millis();
 	while (true) {
