@@ -19,6 +19,21 @@ static double averageMotorGroupPosition(const pros::MotorGroup& group) {
 
     return sum / static_cast<double>(positions.size());
 }
+#include <vector>
+
+static double averageMotorGroupPosition(const pros::MotorGroup& group) {
+    std::vector<double> positions = group.get_position_all();
+    if (positions.empty()) {
+        return 0.0;
+    }
+
+    double sum = 0.0;
+    for (double pos : positions) {
+        sum += pos;
+    }
+
+    return sum / static_cast<double>(positions.size());
+}
 
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
@@ -207,6 +222,27 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	m_prevPerpendicular = currPerpendicular;
 
 	return {{delParallel, delPerpendicular}, OdomError::NONE};
+}
+
+WheelLengths Odometry::getDriveEncoderTravel(void) {
+	if (!m_initialized) {
+		return {0, 0};
+	}
+
+    double currLeft = averageMotorGroupPosition(leftMotors);
+    double currRight = averageMotorGroupPosition(rightMotors);
+
+    double dLeft = currLeft - m_prevLeft;
+    double dRight = currRight - m_prevRight;
+
+    double leftInches = (dLeft / 360.0) * m_config.driveWheelDiameter * std::numbers::pi;
+    double rightInches = (dRight / 360.0) * m_config.driveWheelDiameter * std::numbers::pi;
+
+    m_prevLeft = currLeft;
+    m_prevRight = currRight;
+
+    double forwardInches = (leftInches + rightInches) / 2.0;
+    return {forwardInches, 0.0};
 }
 
 VelocityResult Odometry::getParallelVel() {
