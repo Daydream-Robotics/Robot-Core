@@ -201,17 +201,14 @@ double Odometry::getPosY() {
 }
 
 YawResult Odometry::getYaw(void) {
-YawResult Odometry::getYaw(void) {
 
 	// imu disconnected
 	if (!imu.is_installed()) {
-		return {0.0, OdomError::IMU_DISCONNECTED};
 		return {0.0, OdomError::IMU_DISCONNECTED};
 	}
 
 	// imu still calibrating
 	if (imu.is_calibrating()) {
-		return {0.0, OdomError::IMU_CALIBRATING};
 		return {0.0, OdomError::IMU_CALIBRATING};
 	}
 
@@ -222,7 +219,6 @@ YawResult Odometry::getYaw(void) {
 		qt = imu.get_quaternion();
 		// pros comm error
 		if (std::isnan(qt.w) || qt.w == PROS_ERR_F) return {0.0, OdomError::IMU_COMMUNICATION_ERROR};
-		if (std::isnan(qt.w) || qt.w == PROS_ERR_F) return {0.0, OdomError::IMU_COMMUNICATION_ERROR};
 	}
 
 	// yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
@@ -230,13 +226,10 @@ YawResult Odometry::getYaw(void) {
 
 	// angle is returned from -pi to pi
 	return {-yaw_rad, OdomError::NONE};
-	return {-yaw_rad, OdomError::NONE};
 }
 
 WheelTravelResult Odometry::getOdomWheelTravel(void) {
-WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	if (!m_initialized) {
-		return {{0.0, 0.0}, OdomError::NONE};
 		return {{0.0, 0.0}, OdomError::NONE};
 	}
 
