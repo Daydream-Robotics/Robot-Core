@@ -212,33 +212,27 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 VelocityResult Odometry::getParallelVel() {
 	double initialVelocity = parallelTrackingWheel.get_velocity();
 
-	if (initialVelocity == PROS_ERR) {
-		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
-	}
 	if (m_config.useMotorEncoders){
 
-		double leftVelocity = leftMotors.get_velocity() * DRIVE_GEAR_RATIO;
-		double rightVelocity = rightMotors.get_velocity() * DRIVE_GEAR_RATIO;
+		double leftVelocity = averageMotorGroupVelocities(leftMotors);
+		double rightVelocity = averageMotorGroupVelocities(rightMotors);
 
-		if (leftVelocity == PROS_ERR || rightVelocity == PROS_ERR){
-			return{0.0, OdomError::TRACKING_WHEEL_ERROR};
-		}
+		double averageVelocity = (leftVelocity + rightVelocity) / 2;
 
-		double averageVelocity = (leftVelocity + rightVelocity) / 2.0;
+		double centideg_s = averageVelocity / 100.0;
 
-		double deg_s = averageVelocity / 100.0;
-
-		double velocity  = (deg_s / std::numbers::pi)
-			* m_config.parallelWheelDiameter
-			* std::numbers::pi;
+		double velocity  = (centideg_s) * DRIVE_GEAR_RATIO * (m_config.driveWheelDiameter / 2) * (2 * std::numbers::pi / 60);
 		
 		return {velocity, OdomError::NONE};
 	}
-	double deg_s = initialVelocity / 100.0;
 
-	double velocity = (deg_s / std::numbers::pi)
-		* m_config.parallelWheelDiameter
-		* std::numbers::pi;
+	if (initialVelocity == PROS_ERR) {
+		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+	}
+
+	double centideg_s = initialVelocity / 100.0;
+
+	double velocity = (centideg_s) * m_config.parallelWheelDiameter * (std::numbers::pi / 180);
 
 	return {velocity, OdomError::NONE};
 }
@@ -262,6 +256,23 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
 
     double forwardInches = (leftInches + rightInches) / 2.0;
     return {forwardInches, 0.0};
+}
+
+static double averageMotorGroupVelocities(const pros::MotorGroup& group){
+	std::vector<double> velocities = group.get_actual_velocity_all;
+	if(velocities.empty()){
+		return PROS_ERR_F;
+	}
+
+	double sum = 0.0;
+
+	for(vel : velocities){
+		if(vel == PROS_ERR_F){
+			return PROS_ERR_F;
+		}
+		sum += vel;
+	}
+	return sum / static_cast<double>(velocities.size());
 }
 
 // could be used to do odom in background
