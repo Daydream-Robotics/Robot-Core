@@ -277,9 +277,10 @@ double Odometry::averageMotorGroupVelocities(const pros::MotorGroup& group){
 
 // could be used to do odom in background
 void Odometry::odomTask() {
+	std::uint32_t now = pros::millis();
 	while (true) {
 		odom.updatePose();
-		pros::delay(10);
+		pros::Task::delay_until(&now, 10);
 	}
 }
 
