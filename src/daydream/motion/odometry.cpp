@@ -215,10 +215,28 @@ VelocityResult Odometry::getParallelVel() {
 	if (initialVelocity == PROS_ERR) {
 		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
 	}
+	if (m_config.useMotorEncoders){
 
+		double leftVelocity = leftMotors.get_velocity() * DRIVE_GEAR_RATIO;
+		double rightVelocity = rightMotors.get_velocity() * DRIVE_GEAR_RATIO;
+
+		if (leftVelocity == PROS_ERR || rightVelocity == PROS_ERR){
+			return{0.0, OdomError::TRACKING_WHEEL_ERROR};
+		}
+
+		double averageVelocity = (leftVelocity + rightVelocity) / 2.0;
+
+		double deg_s = averageVelocity / 100.0;
+
+		double velocity  = (deg_s / std::numbers::pi)
+			* m_config.parallelWheelDiameter
+			* std::numbers::pi;
+		
+		return {velocity, OdomError::NONE};
+	}
 	double deg_s = initialVelocity / 100.0;
 
-	double velocity = (deg_s / 360.0)
+	double velocity = (deg_s / std::numbers::pi)
 		* m_config.parallelWheelDiameter
 		* std::numbers::pi;
 
@@ -236,7 +254,7 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
     double dLeft = currLeft - m_prevLeft;
     double dRight = currRight - m_prevRight;
 
-    double leftInches = (dLeft / 360.0) * DRIVE_GEAR_RATIO * m_config.driveWheelDiameter * std::numbers::pi;
+    double leftInches = (dLeft / 360.0) *DRIVE_GEAR_RATIO  * m_config.driveWheelDiameter * std::numbers::pi;
     double rightInches = (dRight / 360.0) * DRIVE_GEAR_RATIO * m_config.driveWheelDiameter * std::numbers::pi;
 
     m_prevLeft = currLeft;
