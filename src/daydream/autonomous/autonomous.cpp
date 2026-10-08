@@ -55,7 +55,6 @@ void Autonomous::turnTo(double targetHeading) {
 		}
 
 		double rawHeading = rawHeadingResult.yaw;
-		odom.updatePose();
 
 		// Calculate angular velocity
 		auto now = clock::now();
@@ -142,8 +141,6 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 		double dt = dt_dur.count();
         if (dt < 0.001) dt = 0.001; // Prevent division by zero
 		lastTime = now;
-
-        odom.updatePose();
 		
 		// if (pos_x < -1) {
 		// 	pros::lcd::print(7, "OUT OF BOUNDS!");
@@ -224,7 +221,6 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 }
 
 bool Autonomous::travelToPoint(double targetX, double targetY, double maxSpeed, bool reverse, int timer) {
-	odom.updatePose();
 	Position start = odom.getPosition();
 	double dx = targetX - start.x;
 	double dy = targetY - start.y;

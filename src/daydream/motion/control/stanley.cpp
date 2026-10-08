@@ -21,9 +21,6 @@ bool StanleyController::step(int direction) {
         return true;
     }
 
-    odom.updatePose();
-
-
     //sets the pose of the robot to a variable
 
     double x   = odom.getPosX();
