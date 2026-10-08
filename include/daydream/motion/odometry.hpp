@@ -28,13 +28,13 @@ enum class OdomError {
  * @brief Stores yaw measurement and associated odometry error
  */
 struct YawResult {
-    double yaw{0.0};
-    OdomError error{OdomError::NONE};
+    double yaw{0.0}; /**< The yaw measurement from the IMU in radians */
+    OdomError error{OdomError::NONE}; /**< The IMU error status */
 };
 
 struct WheelLengths {
-    double parallel;
-    double perpendicular;
+    double parallel; /**< The distance traveled by the parallel tracking wheel in inches */
+    double perpendicular; /**< The distance traveled by the perpendicular tracking wheel in inches */
 };
 
 /**
@@ -42,8 +42,8 @@ struct WheelLengths {
  * @brief Stores tracking wheel travel mesurements and associated odometry error
  */
 struct WheelTravelResult {
-    WheelLengths travel{0.0, 0.0};
-    OdomError error{OdomError::NONE};
+    WheelLengths travel{0.0, 0.0}; /**< The distances traveled by the parallel and perpendicular tracking wheels in inches */
+    OdomError error{OdomError::NONE}; /**< The tracking wheel error status */
 };
 
 /**
@@ -51,13 +51,17 @@ struct WheelTravelResult {
  * @brief Stores velocity measurement and associated odometry error
  */
 struct VelocityResult {
-    double velocity{0.0};
-    OdomError error{OdomError::NONE};
+    double velocity{0.0}; /**< The velocity measurement in inches per second */
+    OdomError error{OdomError::NONE}; /**< The velocity error status */
 };
 
+/**
+ * @struct Position
+ * @brief Stores the global position of the robot
+ */
 struct Position {
-    double x;
-    double y;
+    double x; /**< The x-position of the robot in inches */
+    double y; /**< The y-position of the robot in inches */
 };
 
 /**
@@ -65,14 +69,9 @@ struct Position {
  * @note Made for the frame: +X forward, +Y left, CCW positive
  */
 struct Pose {
-    // x-position of bot (inches)
-    double x;
-
-    // y-position of bot (inches)
-    double y;
-
-    // Heading of bot (rads)
-    double theta;
+    double x; /**< The x-position of the robot in inches */
+    double y; /**< The y-position of the robot in inches */
+    double theta; /**< The heading of the robot in radians */
 };
 
 /**
@@ -129,16 +128,16 @@ public:
     YawResult getYaw(void);
     
     /**
-     * @brief Returns struct of distances travelled by Odometry Wheels
-     */
-    WheelTravelResult getOdomWheelTravel(void);
-    
-    /**
      * @brief gets the current velocity of the parallel tracking wheel or drive motors
      * @returns velocity in inches per second
      */
     VelocityResult getParallelVel();
     
+    /**
+     * @brief Returns struct of distances travelled by drive encoders when using internal encoders
+     */
+    WheelLengths getDriveEncoderTravel(void);
+
     /**
      * @brief Background task entry point
      */
@@ -164,7 +163,7 @@ private:
     /**
      * @brief Returns struct of distances travelled by Odometry Wheels
      */
-    WheelLengths getOdomWheelTravel(void);
+    WheelTravelResult getOdomWheelTravel(void);
   
     // previous state tracking
     double m_prevTheta = 0;
