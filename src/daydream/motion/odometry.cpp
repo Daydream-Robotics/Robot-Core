@@ -24,19 +24,7 @@ Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
 void Odometry::updatePose(void) {
 	YawResult yawResult = getYaw(); 
-	YawResult yawResult = getYaw(); 
 	
-	if (yawResult.yaw < -180.0) {
-		static uint32_t lastImuFailurePrint = 0;
-		const uint32_t now = pros::millis();
-		if (now - lastImuFailurePrint >= 500) {
-			pros::lcd::print(0, "[Update Pose] IMU Failure! %lf", yawResult.yaw);
-			lastImuFailurePrint = now;
-		}
-		return;
-	}
-
-	const double yaw_deg = yawResult.yaw;
 	if (yawResult.yaw < -180.0) {
 		static uint32_t lastImuFailurePrint = 0;
 		const uint32_t now = pros::millis();
@@ -51,12 +39,10 @@ void Odometry::updatePose(void) {
 	
 	// Get orientation from IMU
 	double theta_rad = yaw_deg;
-	double theta_rad = yaw_deg;
 	theta_rad = normalizeAngle(theta_rad);
 	
 	if (!m_initialized) {
 		m_prevTheta = theta_rad;
-		m_lastRawTheta = theta_rad;
 		m_lastRawTheta = theta_rad;
 
 		if (m_config.useMotorEncoders) {
@@ -76,14 +62,6 @@ void Odometry::updatePose(void) {
 	if (m_config.useMotorEncoders) {
 		arcs = getDriveEncoderTravel();
 	} else {
-		WheelTravelResult wheelResult = getOdomWheelTravel();
-
-		if (wheelResult.error != OdomError::NONE) {
-			pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
-			return;
-		}
-
-		arcs = wheelResult.travel;
 		WheelTravelResult wheelResult = getOdomWheelTravel();
 
 		if (wheelResult.error != OdomError::NONE) {
@@ -115,11 +93,6 @@ void Odometry::updatePose(void) {
 	m_mutex.take();
 	double theta_mid = normalizeAngle(m_prevTheta + m_headingOffset + del_theta / 2.0);
 
-
-	// Increment position and angle by calculated changes
-	m_mutex.take();
-	double theta_mid = normalizeAngle(m_prevTheta + m_headingOffset + del_theta / 2.0);
-
     // Compute change in x and y based on heading and local changes
 	double del_x = std::cos(theta_mid) * dx_local - std::sin(theta_mid) * dy_local;
 	double del_y = std::sin(theta_mid) * dx_local + std::cos(theta_mid) * dy_local;
@@ -127,11 +100,7 @@ void Odometry::updatePose(void) {
 	m_currentPosition.y += del_y;
 	m_currentPosition.theta = normalizeAngle(theta_rad + m_headingOffset);
 	m_lastRawTheta = theta_rad;
-	m_currentPosition.theta = normalizeAngle(theta_rad + m_headingOffset);
-	m_lastRawTheta = theta_rad;
 	m_mutex.give();
-
-	m_prevTheta = theta_rad;
 
 	m_prevTheta = theta_rad;
 
@@ -157,8 +126,6 @@ void Odometry::setPose(Pose pose) {
 	m_mutex.take();
 	m_currentPosition.x = pose.x;
 	m_currentPosition.y = pose.y;
-	m_currentPosition.theta = normalizeAngle(pose.theta);
-    m_headingOffset = normalizeAngle(pose.theta - m_lastRawTheta);
 	m_currentPosition.theta = normalizeAngle(pose.theta);
     m_headingOffset = normalizeAngle(pose.theta - m_lastRawTheta);
 	m_mutex.give();
@@ -221,11 +188,6 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
     // Get current centidegree position of tracking wheels
 	double currParallel = parallelTrackingWheel.get_position();
 	double currPerpendicular = perpendicularTrackingWheel.get_position();
-
-	// Returns error for problem with either wheel
-	if (currParallel == PROS_ERR || currPerpendicular == PROS_ERR) {
-		return {{0.0, 0.0}, OdomError::TRACKING_WHEEL_ERROR};
-	}
 
 	// Returns error for problem with either wheel
 	if (currParallel == PROS_ERR || currPerpendicular == PROS_ERR) {
