@@ -263,7 +263,8 @@ VelocityResult Odometry::getParallelVel() {
 
 	return {velocity, OdomError::NONE};
 }
-// could be used to do odom in background
+// Background odom loop, started once in initialize(). Runs every 10 ms on a fixed schedule
+// (delay_until), independent of PathFollower::step(), so pose stays current in every mode.
 void Odometry::odomTask() {
 	std::uint32_t now = pros::millis();
 	while (true) {
