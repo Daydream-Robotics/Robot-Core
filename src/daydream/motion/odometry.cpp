@@ -209,6 +209,38 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	return {{delParallel, delPerpendicular}, OdomError::NONE};
 }
 
+VelocityResult Odometry::getParallelVel() {
+	double initialVelocity = parallelTrackingWheel.get_velocity();
+
+	if (m_config.useMotorEncoders){
+
+		double leftVelocity = averageMotorGroupVelocities(leftMotors);
+		double rightVelocity = averageMotorGroupVelocities(rightMotors);
+
+		if (leftVelocity == PROS_ERR_F || rightVelocity == PROS_ERR_F) {
+			return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+		}
+
+		// motor velocities are in RPM
+		double averageRpm = (leftVelocity + rightVelocity) / 2;
+
+		double velocity  = averageRpm * DRIVE_GEAR_RATIO * (m_config.driveWheelDiameter / 2) * (2 * std::numbers::pi / 60);
+		
+		return {velocity, OdomError::NONE};
+	}
+
+	if (initialVelocity == PROS_ERR) {
+		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+	}
+
+	// rotation sensor velocity is in centidegrees per second
+	double deg_s = initialVelocity / 100.0;
+
+	double velocity = deg_s * (std::numbers::pi / 180) * (m_config.parallelWheelDiameter / 2);
+
+	return {velocity, OdomError::NONE};
+}
+
 WheelLengths Odometry::getDriveEncoderTravel(void) {
 	if (!m_initialized) {
 		return {0, 0};
@@ -220,7 +252,7 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
     double dLeft = currLeft - m_prevLeft;
     double dRight = currRight - m_prevRight;
 
-    double leftInches = (dLeft / 360.0) * DRIVE_GEAR_RATIO * m_config.driveWheelDiameter * std::numbers::pi;
+    double leftInches = (dLeft / 360.0) *DRIVE_GEAR_RATIO  * m_config.driveWheelDiameter * std::numbers::pi;
     double rightInches = (dRight / 360.0) * DRIVE_GEAR_RATIO * m_config.driveWheelDiameter * std::numbers::pi;
 
     m_prevLeft = currLeft;
@@ -230,39 +262,23 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
     return {forwardInches, 0.0};
 }
 
-VelocityResult Odometry::getParallelVel() {
-	double initialVelocity = parallelTrackingWheel.get_velocity();
-
-	if (initialVelocity == PROS_ERR) {
-		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+double Odometry::averageMotorGroupVelocities(const pros::MotorGroup& group){
+	std::vector<double> velocities = group.get_actual_velocity_all();
+	if(velocities.empty()){
+		return PROS_ERR_F;
 	}
-	if (m_config.useMotorEncoders){
 
-		double leftVelocity = leftMotors.get_velocity() * DRIVE_GEAR_RATIO;
-		double rightVelocity = rightMotors.get_velocity() * DRIVE_GEAR_RATIO;
+	double sum = 0.0;
 
-		if (leftVelocity == PROS_ERR || rightVelocity == PROS_ERR){
-			return{0.0, OdomError::TRACKING_WHEEL_ERROR};
+	for(auto vel : velocities){
+		if(vel == PROS_ERR_F){
+			return PROS_ERR_F;
 		}
-
-		double averageVelocity = (leftVelocity + rightVelocity) / 2.0;
-
-		double deg_s = averageVelocity / 100.0;
-
-		double velocity  = (deg_s / std::numbers::pi)
-			* m_config.parallelWheelDiameter
-			* std::numbers::pi;
-		
-		return {velocity, OdomError::NONE};
+		sum += vel;
 	}
-	double deg_s = initialVelocity / 100.0;
-
-	double velocity = (deg_s / std::numbers::pi)
-		* m_config.parallelWheelDiameter
-		* std::numbers::pi;
-
-	return {velocity, OdomError::NONE};
+	return sum / static_cast<double>(velocities.size());
 }
+
 // Background odom loop, started once in initialize(). Runs every 10 ms on a fixed schedule
 // (delay_until), independent of PathFollower::step(), so pose stays current in every mode.
 void Odometry::odomTask() {
