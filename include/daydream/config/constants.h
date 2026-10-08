@@ -6,7 +6,6 @@
 
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
- #include <stdio.h>
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
@@ -42,6 +41,7 @@ constexpr double PERPENDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behin
 
 constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 3.25;
 constexpr double DRIVE_GEAR_RATIO = 450.0/600.0; //450 rpm wheel / 600 rpm cartridge
+constexpr double TRACK_WIDTH = 2;
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
