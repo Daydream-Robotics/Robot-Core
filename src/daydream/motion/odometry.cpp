@@ -38,7 +38,7 @@ void Odometry::updatePose(void) {
 	const double yaw_deg = yawResult.yaw;
 	
 	// Get orientation from IMU
-	double theta_rad = convertDegToRad(yaw_deg);
+	double theta_rad = yaw_deg;
 	theta_rad = normalizeAngle(theta_rad);
 	
 	if (!m_initialized) {

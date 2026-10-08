@@ -61,6 +61,7 @@ void initialize() {
 
     // object handler setup
 	// pros::Task frame_task(UpdateFrame_task_fn, (void*)"PROS_Task_Param", TASK_PRIORITY_DEFAULT, TASK_STACK_DEPTH_DEFAULT, "Vision Frame Update");
+	// odom in background
 	printf("[MAIN] Initialize complete\n");
 }
 
