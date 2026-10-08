@@ -209,22 +209,6 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	return {{delParallel, delPerpendicular}, OdomError::NONE};
 }
 
-VelocityResult Odometry::getParallelVel() {
-	double initialVelocity = parallelTrackingWheel.get_velocity();
-
-	if (initialVelocity == PROS_ERR) {
-		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
-	}
-
-	double deg_s = initialVelocity / 100.0;
-
-	double velocity = (deg_s / 360.0)
-		* m_config.parallelWheelDiameter
-		* std::numbers::pi;
-
-	return {velocity, OdomError::NONE};
-}
-
 WheelLengths Odometry::getDriveEncoderTravel(void) {
 	if (!m_initialized) {
 		return {0, 0};
@@ -246,11 +230,46 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
     return {forwardInches, 0.0};
 }
 
-// could be used to do odom in background
+VelocityResult Odometry::getParallelVel() {
+	double initialVelocity = parallelTrackingWheel.get_velocity();
+
+	if (initialVelocity == PROS_ERR) {
+		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+	}
+	if (m_config.useMotorEncoders){
+
+		double leftVelocity = leftMotors.get_velocity() * DRIVE_GEAR_RATIO;
+		double rightVelocity = rightMotors.get_velocity() * DRIVE_GEAR_RATIO;
+
+		if (leftVelocity == PROS_ERR || rightVelocity == PROS_ERR){
+			return{0.0, OdomError::TRACKING_WHEEL_ERROR};
+		}
+
+		double averageVelocity = (leftVelocity + rightVelocity) / 2.0;
+
+		double deg_s = averageVelocity / 100.0;
+
+		double velocity  = (deg_s / std::numbers::pi)
+			* m_config.parallelWheelDiameter
+			* std::numbers::pi;
+		
+		return {velocity, OdomError::NONE};
+	}
+	double deg_s = initialVelocity / 100.0;
+
+	double velocity = (deg_s / std::numbers::pi)
+		* m_config.parallelWheelDiameter
+		* std::numbers::pi;
+
+	return {velocity, OdomError::NONE};
+}
+// Background odom loop, started once in initialize(). Runs every 10 ms on a fixed schedule
+// (delay_until), independent of PathFollower::step(), so pose stays current in every mode.
 void Odometry::odomTask() {
+	std::uint32_t now = pros::millis();
 	while (true) {
 		odom.updatePose();
-		pros::delay(10);
+		pros::Task::delay_until(&now, 10);
 	}
 }
 
