@@ -53,6 +53,9 @@ void Odometry::updatePose(void) {
 			m_prevPerpendicular = perpendicularTrackingWheel.get_position();
 
 			if (m_prevParallel == PROS_ERR || m_prevPerpendicular == PROS_ERR) {
+                // TODO: Handle error for tracking wheel initialization failure
+                // FIX: add file wide error variable to track odom errors and display on controller
+                // The file wide error variable should be accessible to other files through a public getter
 				return;
 			}
 		}
