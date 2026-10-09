@@ -11,14 +11,57 @@ struct OdomConfig {
     double driveWheelDiameter = 0.0;
 };
 
-struct WheelLengths {
-    double parallel;
-    double perpendicular;
+/**
+ * @enum OdomError
+ * @brief Represents errors that may be encountered by odometry system.
+ */
+enum class OdomError {
+    NONE,
+    IMU_DISCONNECTED,
+    IMU_CALIBRATING,
+    IMU_COMMUNICATION_ERROR,
+    TRACKING_WHEEL_ERROR
 };
 
+/**
+ * @struct YawResult
+ * @brief Stores yaw measurement and associated odometry error
+ */
+struct YawResult {
+    double yaw{0.0}; /**< The yaw measurement from the IMU in radians */
+    OdomError error{OdomError::NONE}; /**< The IMU error status */
+};
+
+struct WheelLengths {
+    double parallel; /**< The distance traveled by the parallel tracking wheel in inches */
+    double perpendicular; /**< The distance traveled by the perpendicular tracking wheel in inches */
+};
+
+/**
+ * @struct WheelTravelResult
+ * @brief Stores tracking wheel travel mesurements and associated odometry error
+ */
+struct WheelTravelResult {
+    WheelLengths travel{0.0, 0.0}; /**< The distances traveled by the parallel and perpendicular tracking wheels in inches */
+    OdomError error{OdomError::NONE}; /**< The tracking wheel error status */
+};
+
+/**
+ * @struct VelocityResult
+ * @brief Stores velocity measurement and associated odometry error
+ */
+struct VelocityResult {
+    double velocity{0.0}; /**< The velocity measurement in inches per second */
+    OdomError error{OdomError::NONE}; /**< The velocity error status */
+};
+
+/**
+ * @struct Position
+ * @brief Stores the global position of the robot
+ */
 struct Position {
-    double x;
-    double y;
+    double x; /**< The x-position of the robot in inches */
+    double y; /**< The y-position of the robot in inches */
 };
 
 /**
@@ -26,14 +69,9 @@ struct Position {
  * @note Made for the frame: +X forward, +Y left, CCW positive
  */
 struct Pose {
-    // x-position of bot (inches)
-    double x;
-
-    // y-position of bot (inches)
-    double y;
-
-    // Heading of bot (rads)
-    double theta;
+    double x; /**< The x-position of the robot in inches */
+    double y; /**< The y-position of the robot in inches */
+    double theta; /**< The heading of the robot in radians */
 };
 
 /**
@@ -49,13 +87,6 @@ public:
      * @param config The physical odometry dimensions of the robot
      */
     Odometry(OdomConfig config);
-
-    /**
-     * @brief Calculates and updates the robot's global pose
-     * @note This function is safe to be called continuously in a background task
-     * @warning In the case of an IMU failure this function stops updating the latest position
-     */
-    void updatePose(void);
 
     /**
      * @brief Gets the robot's latest pose
@@ -92,29 +123,21 @@ public:
     /** 
      * @brief gets the yaw of the robot
      * @note Counter clockwise is positive
-     * @returns returns yaw/heading in degrees bounded by [-180, 180]
-     * @retval	-180.1	IMU disconnected
-     * @retval	-180.2	IMU calibrating
-     * @retval	-180.3	Pros communication failure
+     * @returns returns yaw/heading in degrees and error status
      */
-    double getYaw(void);
-    
-    /**
-     * @brief Returns struct of distances travelled by Odometry Wheels
-     */
-    WheelLengths getOdomWheelTravel(void);
-
-    /**
-     * @brief Returns struct of distances travelled by the drive motors when using internal encoders
-     */
-    WheelLengths getDriveEncoderTravel(void);
+    YawResult getYaw(void);
     
     /**
      * @brief gets the current velocity of the parallel tracking wheel or drive motors
      * @returns velocity in inches per second
      */
-    double getParallelVel();
+    VelocityResult getParallelVel();
     
+    /**
+     * @brief Returns struct of distances travelled by drive encoders when using internal encoders
+     */
+    WheelLengths getDriveEncoderTravel(void);
+
     /**
      * @brief Background task entry point
      */
@@ -129,6 +152,18 @@ private:
 
     // ROTS mutex to keep data task safe
     pros::Mutex m_mutex;
+
+    /**
+     * @brief Calculates and updates the robot's global pose
+     * @note This function is safe to be called continuously in a background task
+     * @warning In the case of an IMU failure this function stops updating the latest position
+     */
+    void updatePose(void);
+
+    /**
+     * @brief Returns struct of distances travelled by Odometry Wheels
+     */
+    WheelTravelResult getOdomWheelTravel(void);
   
     // previous state tracking
     double m_prevTheta = 0;
@@ -136,7 +171,10 @@ private:
     double m_prevPerpendicular = 0;
     double m_prevLeft = 0;
     double m_prevRight = 0;
+    double m_headingOffset = 0.0; //field heading = raw IMU heading + offset
+    double m_lastRawTheta = 0.0; //latest raw IMU heading, used by setPose()
     bool m_initialized = false;
+    
 };
 
 extern Odometry odom;
