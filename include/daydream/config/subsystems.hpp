@@ -4,6 +4,8 @@
 #include "main.h"
 #include "daydream/motion/odometry.hpp"
 #include "daydream/config/constants.h"
+#include "daydream/subsystems/drivetrain.hpp"
+#include "daydream/subsystems/pneumatics.hpp"
 
 inline pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
@@ -22,3 +24,7 @@ inline pros::adi::Pneumatics ballBlocker(BALL_BLOCKER_PORT, false);
 inline pros::adi::Pneumatics scoringLifter(SCORING_LIFTER, false);
 inline pros::adi::Pneumatics matchloader(MATCHLOADER_PORT, false);
 inline pros::adi::Pneumatics descorer(DESCORE_PORT, false);
+
+inline daydream::Drivetrain drivetrain(controller, leftMotors, rightMotors);
+inline daydream::Pneumatics pneumatics(
+    controller, ballBlocker, scoringLifter, matchloader, descorer);
