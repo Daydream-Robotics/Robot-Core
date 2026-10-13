@@ -2,18 +2,16 @@
 
 #include "daydream/autonomous/autonomous.hpp"
 #include "daydream/config/subsystems.hpp"
+#include "daydream/motion/control/mpcSerial.hpp"
+#include "daydream/motion/pathFollower.hpp"
+#include "daydream/motion/pathing/paths.hpp"
 #include "daydream/subsystems/drivetrain.hpp"
 #include "daydream/subsystems/pneumatics.hpp"
 
 namespace {
 
-daydream::Drivetrain drivetrain(controller, leftMotors, rightMotors);
-daydream::Pneumatics pneumatics(
-    controller,
-    ballBlocker,
-    scoringLifter,
-    matchloader,
-    descorer);
+MPCSerial* mpc_serial_controller = nullptr;
+PathFollower* pathFollower = nullptr;
 
 } // namespace
 
@@ -28,12 +26,31 @@ void initialize() {
         pros::delay(20);
     }
 
-    odom.initialize();
-    pros::Task::create( //dont use create in the future
-        [] { odom.control(); },
-        TASK_PRIORITY_DEFAULT + 1,
-        TASK_STACK_DEPTH_DEFAULT,
-        "Odometry");
+    printf("[MAIN] Loading paths...\n");
+	paths = Path::buildAllPathsFromJerryIO("/usd/path.jerryio.txt");
+	printf("[MAIN] Paths loaded: %zu\n", paths.size());
+
+	if (paths.size() != PathName::COUNT) {
+		printf("[MAIN] ERROR: Path count mismatch\n");
+		pros::lcd::print(1, "EsRROR: Path count mismatch");
+		pros::lcd::print(2, "Expected: %d, Actual: %zu", PathName::COUNT, paths.size());
+	} else {
+		printf("[MAIN] Trajectories Loaded successfully\n");
+		pros::lcd::print(1, "Trajectories Loaded");
+	}
+
+    
+
+
+    MPCSerial::Params mpc_serial_params(0.02, DRIVE_GEAR_RATIO, 16.7211, 71.3105, 10.5, 60);
+    mpc_serial_controller = new MPCSerial(mpc_serial_params);
+    pathFollower = new PathFollower(*mpc_serial_controller);
+
+    // object handler setup
+	// pros::Task frame_task(UpdateFrame_task_fn, (void*)"PROS_Task_Param", TASK_PRIORITY_DEFAULT, TASK_STACK_DEPTH_DEFAULT, "Vision Frame Update");
+	// odom in background 
+	pros::Task odom_task(Odometry::odomTask, TASK_PRIORITY_DEFAULT + 1, TASK_STACK_DEPTH_DEFAULT, "Odom Task");
+	printf("[MAIN] Initialize complete\n");
 }
 
 void disabled() {

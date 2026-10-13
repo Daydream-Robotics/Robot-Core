@@ -1,11 +1,38 @@
 //Inclusions
+
 #include "main.h"
+
 #include "daydream/utils/helpers.hpp"
 #include "daydream/motion/odometry.hpp"
 #include "daydream/mcl/mcl.hpp"
 #include "daydream/mcl/rangeSensing.hpp"
 #include <cmath>
 #include <algorithm>
+
+RangeSensors distanceSensors = {
+    pros::Distance(3),
+    pros::Distance(2),
+    pros::Distance(8),
+    pros::Distance(9)
+};
+RangeReadings distanceReadings;
+
+namespace {
+constexpr double calibration[4] = {0.9896, 0.9896, 0.9896, 0.9816};
+
+double calibratedDistance(pros::Distance& sensor, double scale) {
+    const auto raw = sensor.get_distance();
+    return (raw == 9999 || raw == PROS_ERR)
+        ? NAN : static_cast<double>(raw) * MM_TO_IN * scale;
+}
+} // namespace
+
+void updateRangeSensors() {
+    distanceReadings.front = calibratedDistance(distanceSensors.front, calibration[0]);
+    distanceReadings.left = calibratedDistance(distanceSensors.left, calibration[1]);
+    distanceReadings.back = calibratedDistance(distanceSensors.back, calibration[2]);
+    distanceReadings.right = calibratedDistance(distanceSensors.right, calibration[3]);
+}
 
 //Odometry headings already use the math frame: +x forward, +y left, CCW positive.
 float RangeSensing::fieldHeadingToMathHeading(float fieldHeadingRad) {
@@ -108,7 +135,22 @@ RangeReadings RangeSensing::raycast(const mcl::Particle& particle) {
         }
 
         //store result (NAN if no intersection found)
-        expectedReadings.direction[sensorDir] = (minDistance == INFINITY) ? NAN : minDistance;
+
+        switch (sensorDir) {
+            case 0:
+                expectedReadings.front = (minDistance == INFINITY) ? NAN : minDistance;
+                break;
+            case 1:
+                expectedReadings.left = (minDistance == INFINITY) ? NAN : minDistance;
+                break;
+            case 2:
+                expectedReadings.back = (minDistance == INFINITY) ? NAN : minDistance;
+                break;
+            case 3:
+                expectedReadings.right = (minDistance == INFINITY) ? NAN : minDistance;
+                break;
+        }
+
     }
 
     return expectedReadings;
@@ -161,7 +203,20 @@ RangeReadings RangeSensing::raycastFixedTheta(const mcl::Particle& particle,
             }
         }
 
-        expectedReadings.direction[sensorDir] = (minDistance == INFINITY) ? NAN : minDistance;
+        switch (sensorDir) {
+            case 0:
+                expectedReadings.front = (minDistance == INFINITY) ? NAN : minDistance;
+                break;
+            case 1:
+                expectedReadings.left = (minDistance == INFINITY) ? NAN : minDistance;
+                break;
+            case 2:
+                expectedReadings.back = (minDistance == INFINITY) ? NAN : minDistance;
+                break;
+            case 3:
+                expectedReadings.right = (minDistance == INFINITY) ? NAN : minDistance;
+                break;
+        }
     }
 
     return expectedReadings;
