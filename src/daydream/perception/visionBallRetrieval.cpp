@@ -55,7 +55,7 @@ void move(int x)
 void collect(GamePiece gamePiece, int isLoading)
 {
     using namespace std::chrono;   
-    Autonomous auton = Autonomous();
+    Autonomous auton(drivetrain, odom, pneumatics);
     int count = 0;
 
 
@@ -281,7 +281,7 @@ void collect(GamePiece gamePiece, int isLoading)
 
 std::optional<GamePieceData> findBall(GamePiece gamePiece)
 {
-    Autonomous auton = Autonomous();
+    Autonomous auton(drivetrain, odom, pneumatics);
     std::optional<GamePieceData> ball;
 
     // DEBUG
@@ -360,7 +360,7 @@ std::optional<GamePieceData> findBall(GamePiece gamePiece)
 //
 void matchload(bool isFar)
 {
-    Autonomous auton = Autonomous();
+    Autonomous auton(drivetrain, odom, pneumatics);
     GamePiece gamePiece;
 
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "main.h"
-#include "daydream/subsystems/subsystem.hpp"
 
 struct OdomConfig {
     double parallelWheelDiameter;
@@ -79,7 +78,7 @@ struct Pose {
  * @class Odometry
  * @brief Tracks robots global position and heading on the field
  */
-class Odometry : public daydream::Subsystem {
+class Odometry {
     
 public:
 

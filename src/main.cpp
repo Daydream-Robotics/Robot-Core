@@ -2,18 +2,16 @@
 
 #include "daydream/autonomous/autonomous.hpp"
 #include "daydream/config/subsystems.hpp"
+#include "daydream/motion/control/mpcSerial.hpp"
+#include "daydream/motion/pathFollower.hpp"
+#include "daydream/motion/pathing/paths.hpp"
 #include "daydream/subsystems/drivetrain.hpp"
 #include "daydream/subsystems/pneumatics.hpp"
 
 namespace {
 
-daydream::Drivetrain drivetrain(controller, leftMotors, rightMotors);
-daydream::Pneumatics pneumatics(
-    controller,
-    ballBlocker,
-    scoringLifter,
-    matchloader,
-    descorer);
+MPCSerial* mpc_serial_controller = nullptr;
+PathFollower* pathFollower = nullptr;
 
 } // namespace
 
@@ -35,7 +33,7 @@ void initialize() {
 	if (paths.size() != PathName::COUNT) {
 		printf("[MAIN] ERROR: Path count mismatch\n");
 		pros::lcd::print(1, "EsRROR: Path count mismatch");
-		pros::lcd::print(2, "Expected: %d, Actual: %d", PathName::COUNT, paths.size());
+		pros::lcd::print(2, "Expected: %d, Actual: %zu", PathName::COUNT, paths.size());
 	} else {
 		printf("[MAIN] Trajectories Loaded successfully\n");
 		pros::lcd::print(1, "Trajectories Loaded");

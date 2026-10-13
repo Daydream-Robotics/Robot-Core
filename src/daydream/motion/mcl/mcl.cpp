@@ -262,12 +262,12 @@ namespace mcl {
                     printf("MCL NaN log_w at particle %zu pos=(%.2f, %.2f, %.4f)\n",
                            i, particles[i].x, particles[i].y, particles[i].theta);
                     printf("  actual  = [%.3f, %.3f, %.3f, %.3f]\n",
-                           distanceReadings.front,
-                           distanceReadings.left,
-                           distanceReadings.back,
-                           distanceReadings.right);
+                           distanceReadings.direction[0],
+                           distanceReadings.direction[1],
+                           distanceReadings.direction[2],
+                           distanceReadings.direction[3]);
                     printf("  expected= [%.3f, %.3f, %.3f, %.3f]\n",
-                           expected.front, expected.left, expected.back, expected.right);
+                           expected.direction[0], expected.direction[1], expected.direction[2], expected.direction[3]);
                     nanDebugPrints++;
                 }
                 logSum = 0.0;
@@ -313,10 +313,10 @@ namespace mcl {
                      currentPose.y,
                      currentPose.theta);
             printf("  current range=[%.3f, %.3f, %.3f, %.3f]\n",
-                   distanceReadings.front,
-                   distanceReadings.left,
-                   distanceReadings.back,
-                   distanceReadings.right);
+                   distanceReadings.direction[0],
+                   distanceReadings.direction[1],
+                   distanceReadings.direction[2],
+                   distanceReadings.direction[3]);
             nanDebugPrints++;
         }
 

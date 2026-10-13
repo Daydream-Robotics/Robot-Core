@@ -1,11 +1,38 @@
 //Inclusions
+
 #include "main.h"
+
 #include "daydream/utils/helpers.hpp"
 #include "daydream/motion/odometry.hpp"
 #include "daydream/mcl/mcl.hpp"
 #include "daydream/mcl/rangeSensing.hpp"
 #include <cmath>
 #include <algorithm>
+
+RangeSensors distanceSensors = {
+    pros::Distance(3),
+    pros::Distance(2),
+    pros::Distance(8),
+    pros::Distance(9)
+};
+RangeReadings distanceReadings;
+
+namespace {
+constexpr double calibration[4] = {0.9896, 0.9896, 0.9896, 0.9816};
+
+double calibratedDistance(pros::Distance& sensor, double scale) {
+    const auto raw = sensor.get_distance();
+    return (raw == 9999 || raw == PROS_ERR)
+        ? NAN : static_cast<double>(raw) * MM_TO_IN * scale;
+}
+} // namespace
+
+void updateRangeSensors() {
+    distanceReadings.direction[0] = calibratedDistance(distanceSensors.front, calibration[0]);
+    distanceReadings.direction[1] = calibratedDistance(distanceSensors.left, calibration[1]);
+    distanceReadings.direction[2] = calibratedDistance(distanceSensors.back, calibration[2]);
+    distanceReadings.direction[3] = calibratedDistance(distanceSensors.right, calibration[3]);
+}
 
 //Odometry headings already use the math frame: +x forward, +y left, CCW positive.
 float RangeSensing::fieldHeadingToMathHeading(float fieldHeadingRad) {
@@ -180,26 +207,26 @@ void RangeSensing::printPositionFromSensors() {
 
     //calculate position from each sensor
     //front sensor points in +x direction, measures distance to right wall
-    if (!std::isnan(readings.front)) {
-        x = X_MAX - readings.front + SENSOR_OFFSET_X[0];
+    if (!std::isnan(readings.direction[0])) {
+        x = X_MAX - readings.direction[0] + SENSOR_OFFSET_X[0];
         validCount++;
     }
 
     //back sensor points in -x direction, measures distance to left wall
-    if (!std::isnan(readings.back)) {
-        x = X_MIN + readings.back + SENSOR_OFFSET_X[2];
+    if (!std::isnan(readings.direction[2])) {
+        x = X_MIN + readings.direction[2] + SENSOR_OFFSET_X[2];
         validCount++;
     }
 
     //left sensor points in +y direction, measures distance to top wall
-    if (!std::isnan(readings.left)) {
-        y = Y_MAX - readings.left + SENSOR_OFFSET_Y[1];
+    if (!std::isnan(readings.direction[1])) {
+        y = Y_MAX - readings.direction[1] + SENSOR_OFFSET_Y[1];
         validCount++;
     }
 
     //right sensor points in -y direction, measures distance to bottom wall
-    if (!std::isnan(readings.right)) {
-        y = Y_MIN + readings.right + SENSOR_OFFSET_Y[3];
+    if (!std::isnan(readings.direction[3])) {
+        y = Y_MIN + readings.direction[3] + SENSOR_OFFSET_Y[3];
         validCount++;
     }
 
@@ -210,7 +237,7 @@ void RangeSensing::printPositionFromSensors() {
         printf("  y: %.2f\" (left/right, +y = left)\n", y);
         printf("  Valid sensors: %d/4\n", validCount);
         printf("  Readings - F:%.1f\" L:%.1f\" B:%.1f\" R:%.1f\"\n",
-               readings.front, readings.left, readings.back, readings.right);
+               readings.direction[0], readings.direction[1], readings.direction[2], readings.direction[3]);
     } else {
         printf("No valid sensor readings available\n");
     }
@@ -243,10 +270,10 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
     updateRangeSensors();
     RangeReadings readings = distanceReadings;
     double sensorVals[4] = {
-        readings.front,
-        readings.left,
-        readings.back,
-        readings.right
+        readings.direction[0],
+        readings.direction[1],
+        readings.direction[2],
+        readings.direction[3]
     };
 
     //lambda function to process each sensor
@@ -404,29 +431,29 @@ void RangeSensing::checkRaycastAccuracy() {
                name, actual, expected, error, status);
     };
 
-    checkSensor("Front", actual.front, expected.front);
-    checkSensor("Left", actual.left, expected.left);
-    checkSensor("Back", actual.back, expected.back);
-    checkSensor("Right", actual.right, expected.right);
+    checkSensor("Front", actual.direction[0], expected.direction[0]);
+    checkSensor("Left", actual.direction[1], expected.direction[1]);
+    checkSensor("Back", actual.direction[2], expected.direction[2]);
+    checkSensor("Right", actual.direction[3], expected.direction[3]);
 
     //calculate overall error
     double totalError = 0.0;
     int validCount = 0;
 
-    if (!std::isnan(actual.front) && !std::isnan(expected.front)) {
-        totalError += fabs(actual.front - expected.front);
+    if (!std::isnan(actual.direction[0]) && !std::isnan(expected.direction[0])) {
+        totalError += fabs(actual.direction[0] - expected.direction[0]);
         validCount++;
     }
-    if (!std::isnan(actual.left) && !std::isnan(expected.left)) {
-        totalError += fabs(actual.left - expected.left);
+    if (!std::isnan(actual.direction[1]) && !std::isnan(expected.direction[1])) {
+        totalError += fabs(actual.direction[1] - expected.direction[1]);
         validCount++;
     }
-    if (!std::isnan(actual.back) && !std::isnan(expected.back)) {
-        totalError += fabs(actual.back - expected.back);
+    if (!std::isnan(actual.direction[2]) && !std::isnan(expected.direction[2])) {
+        totalError += fabs(actual.direction[2] - expected.direction[2]);
         validCount++;
     }
-    if (!std::isnan(actual.right) && !std::isnan(expected.right)) {
-        totalError += fabs(actual.right - expected.right);
+    if (!std::isnan(actual.direction[3]) && !std::isnan(expected.direction[3])) {
+        totalError += fabs(actual.direction[3] - expected.direction[3]);
         validCount++;
     }
 
@@ -465,27 +492,27 @@ void RangeSensing::printSensorCalibration(double knownDistance) {
     printf("\n");
 
     //calculate and print calibration scale for each sensor
-    if (!std::isnan(readings.front) && readings.front > 0.1) {
+    if (!std::isnan(readings.direction[0]) && readings.direction[0] > 0.1) {
         printf("  Front: %.2f\" -> scale = %.4f\n",
-               readings.front, knownDistance / readings.front);
+               readings.direction[0], knownDistance / readings.direction[0]);
     } else {
         printf("  Front: sensor error or not connected\n");
     }
-    if (!std::isnan(readings.left) && readings.left > 0.1) {
+    if (!std::isnan(readings.direction[1]) && readings.direction[1] > 0.1) {
         printf("  Left:  %.2f\" -> scale = %.4f\n",
-               readings.left, knownDistance / readings.left);
+               readings.direction[1], knownDistance / readings.direction[1]);
     } else {
         printf("  Left: sensor error or not connected\n");
     }
-    if (!std::isnan(readings.back) && readings.back > 0.1) {
+    if (!std::isnan(readings.direction[2]) && readings.direction[2] > 0.1) {
         printf("  Back:  %.2f\" -> scale = %.4f\n",
-               readings.back, knownDistance / readings.back);
+               readings.direction[2], knownDistance / readings.direction[2]);
     } else {
         printf("  Back: sensor error or not connected\n");
     }
-    if (!std::isnan(readings.right) && readings.right > 0.1) {
+    if (!std::isnan(readings.direction[3]) && readings.direction[3] > 0.1) {
         printf("  Right: %.2f\" -> scale = %.4f\n",
-               readings.right, knownDistance / readings.right);
+               readings.direction[3], knownDistance / readings.direction[3]);
     } else {
         printf("  Right: sensor error or not connected\n");
     }
@@ -506,24 +533,24 @@ void RangeSensing::measureRangeNoise(int numSamples) {
         updateRangeSensors();
         RangeReadings readings = distanceReadings;
 
-        if (!std::isnan(readings.front)) {
-            sum[0] += readings.front;
-            sumSq[0] += readings.front * readings.front;
+        if (!std::isnan(readings.direction[0])) {
+            sum[0] += readings.direction[0];
+            sumSq[0] += readings.direction[0] * readings.direction[0];
             count[0]++;
         }
-        if (!std::isnan(readings.left)) {
-            sum[1] += readings.left;
-            sumSq[1] += readings.left * readings.left;
+        if (!std::isnan(readings.direction[1])) {
+            sum[1] += readings.direction[1];
+            sumSq[1] += readings.direction[1] * readings.direction[1];
             count[1]++;
         }
-        if (!std::isnan(readings.back)) {
-            sum[2] += readings.back;
-            sumSq[2] += readings.back * readings.back;
+        if (!std::isnan(readings.direction[2])) {
+            sum[2] += readings.direction[2];
+            sumSq[2] += readings.direction[2] * readings.direction[2];
             count[2]++;
         }
-        if (!std::isnan(readings.right)) {
-            sum[3] += readings.right;
-            sumSq[3] += readings.right * readings.right;
+        if (!std::isnan(readings.direction[3])) {
+            sum[3] += readings.direction[3];
+            sumSq[3] += readings.direction[3] * readings.direction[3];
             count[3]++;
         }
 

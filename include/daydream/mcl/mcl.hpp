@@ -1,5 +1,5 @@
-#ifndef _MCL_HPP_
-#define _MCL_HPP_
+
+#pragma once
 
 //Inclusions
 #include "daydream/motion/odometry.hpp"
@@ -49,5 +49,6 @@ namespace mcl {
     extern pros::Mutex posUpdateMutex;
 
 }
-#endif
+
+
 
