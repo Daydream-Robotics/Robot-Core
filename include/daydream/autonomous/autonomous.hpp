@@ -17,8 +17,6 @@ class Autonomous {
             Odometry& odometry,
             daydream::Pneumatics& pneumatics);
 
-        Autonomous();
-
         void runExample();
 
         // Turn to a target_heading [-180, 180]

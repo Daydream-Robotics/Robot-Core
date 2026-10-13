@@ -4,7 +4,6 @@
 #include <cmath>
 #include <numbers>
 
-Autonomous::Autonomous() {}
 
 // TODO: Tune PID parameters
 Autonomous::Autonomous(

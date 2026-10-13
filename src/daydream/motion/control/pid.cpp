@@ -5,6 +5,8 @@
 #include <cmath>
 #include <numbers>
 
+PID::PID() {}
+
 PID::PID(double p, double i, double d, double start_i) : kP(p), kI(i), kD(d), start_i(start_i) {
     reset();
 }
