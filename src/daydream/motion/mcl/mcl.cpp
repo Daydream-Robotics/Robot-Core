@@ -178,8 +178,8 @@ namespace mcl {
         int validSensorCount = 0;
 
         for (int i = 0; i < 4; i++) {
-            const double actual = distanceReadings.direction[i];
-            const double predicted = expected.direction[i];
+            const double actual = distanceReadings.direction(i);
+            const double predicted = expected.direction(i);
 
             //ignore a sensor direction when either reading is invalid.
             if (!std::isfinite(actual) || !std::isfinite(predicted)) continue;
@@ -241,8 +241,8 @@ namespace mcl {
             double logSum = 0.0;
             int validMeasurements = 0;
             for (int m = 0; m < 4; m++) {
-                const double actual = distanceReadings.direction[m];
-                const double predicted = expected.direction[m];
+                const double actual = distanceReadings.direction(m);
+                const double predicted = expected.direction(m);
 
                 if (!std::isfinite(actual) || !std::isfinite(predicted)) {
                     continue;
@@ -262,12 +262,12 @@ namespace mcl {
                     printf("MCL NaN log_w at particle %zu pos=(%.2f, %.2f, %.4f)\n",
                            i, particles[i].x, particles[i].y, particles[i].theta);
                     printf("  actual  = [%.3f, %.3f, %.3f, %.3f]\n",
-                           distanceReadings.direction[0],
-                           distanceReadings.direction[1],
-                           distanceReadings.direction[2],
-                           distanceReadings.direction[3]);
+                           distanceReadings.front,
+                           distanceReadings.left,
+                           distanceReadings.back,
+                           distanceReadings.right);
                     printf("  expected= [%.3f, %.3f, %.3f, %.3f]\n",
-                           expected.direction[0], expected.direction[1], expected.direction[2], expected.direction[3]);
+                           expected.front, expected.left, expected.back, expected.right);
                     nanDebugPrints++;
                 }
                 logSum = 0.0;
@@ -313,10 +313,10 @@ namespace mcl {
                      currentPose.y,
                      currentPose.theta);
             printf("  current range=[%.3f, %.3f, %.3f, %.3f]\n",
-                   distanceReadings.direction[0],
-                   distanceReadings.direction[1],
-                   distanceReadings.direction[2],
-                   distanceReadings.direction[3]);
+                   distanceReadings.front,
+                   distanceReadings.left,
+                   distanceReadings.back,
+                   distanceReadings.right);
             nanDebugPrints++;
         }
 
