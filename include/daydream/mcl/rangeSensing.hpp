@@ -10,7 +10,10 @@ namespace mcl {
 }
 
 struct RangeReadings {
-    double direction[4] = {NAN, NAN, NAN, NAN};
+    double front = NAN;
+    double left = NAN;
+    double back = NAN;
+    double right = NAN;
 };
 
 struct RangeSensors {
