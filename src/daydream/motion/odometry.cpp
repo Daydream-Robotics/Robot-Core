@@ -61,6 +61,7 @@ void Odometry::updatePose(void) {
 		}
 		
 		m_initialized = true;
+		m_mutex.give();
 		return;
 	}
 
@@ -120,6 +121,7 @@ void Odometry::updatePose(void) {
 	// }
 
 	m_prevTheta = theta_rad;
+	m_mutex.give();
 }
 
 Pose Odometry::getPose() {
@@ -295,12 +297,3 @@ void Odometry::odomTask() {
 		pros::Task::delay_until(&now, 10);
 	}
 }
-
-Odometry odom({
-	PARALLEL_TRACKING_WHEEL_DIAMETER,
-	PERPENDICULAR_TRACKING_WHEEL_DIAMETER,
-	PARALLEL_TRACKING_WHEEL_OFFSET,
-	PERPENDICULAR_TRACKING_WHEEL_OFFSET,
-	true,
-	DRIVE_WHEEL_DIAMETER_INCHES
-});

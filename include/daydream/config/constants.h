@@ -54,6 +54,7 @@ constexpr int HIGH_VOLTAGE = 100;
 constexpr int MID_VOLTAGE = 60;
 constexpr int LOW_VOLTAGE = 40;
 constexpr int STOP = 0;
+constexpr double MM_TO_IN = 1.0 / 25.4;
 
 /* - - - - - - - - - - - - - - [PIDS] - - - - - - - - - - - - - - */
 

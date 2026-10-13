@@ -1,6 +1,7 @@
 #pragma once
 
 #include "daydream/motion/odometry.hpp" // Needed for the Position struct
+#include "main.h"
 
 // Normalize angle between [-pi,pi] 
 double normalizeAngle(double a);
@@ -24,14 +25,14 @@ double angleDiffRad(double a, double b);
 double computeDecelScale(double remaining, double totalDistance);
 
 // Limit acceleration takeoff
-double accelLimit(double prev, double target, double dt, double accel_limit);
+double accelLimit(double prev, double target, double dt, double maxAccel);
 
 // Utility class for smoothing heading changes
 class HeadingFilter {
 	private:
-		double alpha;
-		double heading = 0.0;
-		bool initialized = false;
+		double m_alpha;
+		double m_heading = 0.0;
+		bool m_initialized = false;
 
 	public:
 		HeadingFilter(double alpha);
