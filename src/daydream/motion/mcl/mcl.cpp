@@ -178,8 +178,8 @@ namespace mcl {
         int validSensorCount = 0;
 
         for (int i = 0; i < 4; i++) {
-            const double actual = distanceReadings.direction[i];
-            const double predicted = expected.direction[i];
+            const double actual = distanceReadings.direction(i);
+            const double predicted = expected.direction(i);
 
             //ignore a sensor direction when either reading is invalid.
             if (!std::isfinite(actual) || !std::isfinite(predicted)) continue;
@@ -241,8 +241,8 @@ namespace mcl {
             double logSum = 0.0;
             int validMeasurements = 0;
             for (int m = 0; m < 4; m++) {
-                const double actual = distanceReadings.direction[m];
-                const double predicted = expected.direction[m];
+                const double actual = distanceReadings.direction(m);
+                const double predicted = expected.direction(m);
 
                 if (!std::isfinite(actual) || !std::isfinite(predicted)) {
                     continue;

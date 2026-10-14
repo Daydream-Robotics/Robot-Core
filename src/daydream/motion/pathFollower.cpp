@@ -33,8 +33,6 @@ bool PathFollower::step() {
         return true;
     }
 
-
-    odom.updatePose();
     Pose currentPose = odom.getPose();
 
     // std::size_t searchWindowEnd = m_currentSampleIdx + MAX_VIEWABLE_INDEX_AHEAD;
