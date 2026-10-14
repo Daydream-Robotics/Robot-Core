@@ -4,6 +4,7 @@
 #include <cmath>
 #include <numbers>
 
+
 // TODO: Tune PID parameters
 Autonomous::Autonomous(
     daydream::Drivetrain& drivetrain,
@@ -44,17 +45,24 @@ void Autonomous::turnTo(double targetHeading) {
 		// Initialize clocking
 	using clock = std::chrono::steady_clock;
     auto lastTime = clock::now();
-	double prevHeading = m_odometry.getYaw();
+	YawResult prevHeadingResult = odom.getYaw();
 
-	while (true) {
-		// Heading calculation
-		double rawHeading = m_odometry.getYaw();
+	if (prevHeadingResult.error != OdomError::NONE) {
+		pros::lcd::print(0, "[TurnTo] IMU Failure!");
+		return;
+	}
 
-		if (rawHeading < 180.0) {
-			pros::lcd::print(0, "[TurnTo] IMU Failure! YAW: %lf", rawHeading);
-			// TODO: Add more verbose error handling
+	double prevHeading = prevHeadingResult.yaw;
+
+	while(true) {
+		// Heading Calculation
+		YawResult rawHeadingResult = odom.getYaw();
+		if (rawHeadingResult.error != OdomError::NONE) {
+			pros::lcd::print(0, "[TurnTo] IMU Failure!");
 			return;
 		}
+
+		double rawHeading = rawHeadingResult.yaw;
 
 		// Calculate angular velocity
 		auto now = clock::now();
@@ -79,7 +87,7 @@ void Autonomous::turnTo(double targetHeading) {
 		
 		m_drivetrain.setVelocity(turnSpeed, -turnSpeed);
 		
-		double currentVelocity = (std::fabs(angleDiffDeg(targetHeading, filteredHeading)) < 1.0) ? angleDiffDeg(rawHeading, prevHeading) / dt : 999.0;
+		double currentVelocity = (std::fabs(angleDiffDeg(targetHeading, filteredHeading)) < (1.0 * std::numbers::pi / 180)) ? angleDiffDeg(rawHeading, prevHeading) / dt : 999.0;
 		if (turnPID.exit_condition(currentVelocity) != PID::RUNNING)
 			break;
 		prevHeading = rawHeading;
@@ -102,8 +110,8 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
     };
 
     auto normalizeDeg = [](double a) {
-        while (a >= 180.0) a -= 360.0;
-        while (a < -180.0) a += 360.0;
+        while (a >= std::numbers::pi) a -= (2 * std::numbers::pi);
+        while (a < -std::numbers::pi) a += (2 * std::numbers::pi);
         return a;
     };
 	// int count = 0;
@@ -120,10 +128,9 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
     Position start = m_odometry.getPosition();
     double direction = (distance >= 0.0) ? 1.0 : -1.0;
 
-	double headingRad = convertDegToRad(targetHeading);
 	Position headingUnit {
-		std::cos(headingRad),
-		std::sin(headingRad)
+		std::cos(targetHeading),
+		std::sin(targetHeading)
 	};
 
     double prevVelocity = 0.0;
@@ -140,7 +147,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 		double dt = dt_dur.count();
         if (dt < 0.001) dt = 0.001; // Prevent division by zero
 		lastTime = now;
-
+		
 		// if (pos_x < -1) {
 		// 	pros::lcd::print(7, "OUT OF BOUNDS!");
 		// 	break;
@@ -164,11 +171,14 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
         prevVelocity = v;
 
         // Heading error
-        double rawHeading = m_odometry.getYaw();
-        if (rawHeading < 180.0) {
-            pros::lcd::print(0, "[Travel] IMU Failure!");
-            break;
-        }
+		YawResult rawHeadingResult = odom.getYaw();
+
+		if (rawHeadingResult.error != OdomError::NONE) {
+			pros::lcd::print(0, "[Travel] IMU Failure!");
+			break;
+		}
+
+		double rawHeading = rawHeadingResult.yaw;
 
         double headingError = normalizeDeg(targetHeading - rawHeading);
 
@@ -214,16 +224,16 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 }
 
 bool Autonomous::travelToPoint(double targetX, double targetY, double maxSpeed, bool reverse, int timer) {
-	Position start = m_odometry.getPosition();
+	Position start = odom.getPosition();
 	double dx = targetX - start.x;
 	double dy = targetY - start.y;
 	
 	double distance = std::hypot(dx, dy); //euclidean distance from start to end point	
-	double targetHeading = std::atan2(dy, dx) * 180.0  / std::numbers::pi;
+	double targetHeading = std::atan2(dy, dx);
 	
 	if (reverse) {
-		targetHeading += 180;
-		if (targetHeading > 180) targetHeading -= 360;
+		targetHeading += std::numbers::pi;
+		if (targetHeading > std::numbers::pi) targetHeading -= (2 * std::numbers::pi);
 		
 		distance = -distance;
 	}

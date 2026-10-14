@@ -9,7 +9,38 @@ namespace mcl {
     struct Particle;
 }
 
-struct RangeReadings;
+struct RangeReadings {
+    double front = NAN;
+    double left = NAN;
+    double back = NAN;
+    double right = NAN;
+
+    const double direction(int idx) const {
+        switch (idx) {
+            case 1:
+                return front;
+            case 2:
+                return left;
+            case 3:
+                return back;
+            case 4:
+                return right;
+        }
+        return NAN;
+    };
+};
+
+struct RangeSensors {
+    pros::Distance front;
+    pros::Distance left;
+    pros::Distance back;
+    pros::Distance right;
+};
+
+extern RangeSensors distanceSensors;
+extern RangeReadings distanceReadings;
+
+void updateRangeSensors();
 
 //Created class RangeSensing
 class RangeSensing {
