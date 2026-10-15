@@ -11,6 +11,10 @@ sudo apt install -y \
   screen \
   minicom
 
+# apt's cmake on the Nano (Ubuntu 18.04) is 3.10; OSQP needs >= 3.18
+pip3 install --user cmake
+# check with: cmake --version   (if it still says 3.10, add ~/.local/bin to PATH)
+
 
 ## Set-up Serial:
 sudo usermod -a -G dialout $USER
@@ -18,24 +22,20 @@ stty -F /dev/ttyACM1 raw -echo -onlcr
 sudo reboot
 
 
-## Make and run program
-copy the microcontroller directory onto the microcontroller
+## Get OSQP source (once per clone)
+OSQP v1.0.0 and QDLDL v0.1.8 are pinned git submodules in third_party/.
+git submodule update --init --recursive
+(if copying the microcontroller directory onto the Nano instead of cloning, run this before copying)
+
+
+## Build and run program
 cd microcontroller
-make clean && make
-./MPCController
+cmake -B build
+cmake --build build -j4
+./build/MPCController
 
-
-
-
-
-### If the OSQP library in firmware/ doesn't work run this and replace the curr with the new one
-git clone https://github.com/osqp/osqp.git
-cd osqp
-mkdir build
-cd build
-cmake ..
-make -j
-find build/out/libosqpstatic.a
+Only rebuild after code changes; the program stays in build/.
+For a clean rebuild: rm -rf build
 
 
 
