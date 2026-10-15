@@ -55,10 +55,7 @@ void Odometry::updatePose(void) {
 		m_prevRight = currRight;
 
 		if (!m_config.useMotorEncoders) {
-
-			m_prevLeft = averageMotorGroupPosition(leftMotors);
-			m_prevRight = averageMotorGroupPosition(rightMotors);
-
+			
 			if (m_prevParallel == PROS_ERR || m_prevPerpendicular == PROS_ERR) {
                 // TODO: Handle error for tracking wheel initialization failure
                 // FIX: add file wide error variable to track odom errors and display on controller
