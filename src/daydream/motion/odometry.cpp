@@ -40,17 +40,24 @@ void Odometry::updatePose(void) {
 	// Get orientation from IMU
 	double theta_rad = yaw_deg;
 	theta_rad = normalizeAngle(theta_rad);
-	
+	// Read current positions by default on every cycle
+	double currLeft = averageMotorGroupPosition(leftMotors);
+	double currRight = averageMotorGroupPosition(rightMotors);
+
+	double currParallel = parallelTrackingWheel.get_position();
+	double currPerpendicular = perpendicularTrackingWheel.get_position();
+
 	if (!m_initialized) {
 		m_prevTheta = theta_rad;
 		m_lastRawTheta = theta_rad;
 
-		if (m_config.useMotorEncoders) {
+		m_prevLeft = currLeft;
+		m_prevRight = currRight;
+
+		if (!m_config.useMotorEncoders) {
+
 			m_prevLeft = averageMotorGroupPosition(leftMotors);
 			m_prevRight = averageMotorGroupPosition(rightMotors);
-		} else {
-			m_prevParallel = parallelTrackingWheel.get_position();
-			m_prevPerpendicular = perpendicularTrackingWheel.get_position();
 
 			if (m_prevParallel == PROS_ERR || m_prevPerpendicular == PROS_ERR) {
                 // TODO: Handle error for tracking wheel initialization failure
@@ -58,6 +65,9 @@ void Odometry::updatePose(void) {
                 // The file wide error variable should be accessible to other files through a public getter
 				return;
 			}
+
+			m_prevParallel = currParallel;
+			m_prevPerpendicular = currPerpendicular;
 		}
 		
 		m_initialized = true;
