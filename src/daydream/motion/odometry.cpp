@@ -72,6 +72,10 @@ void Odometry::updatePose(void) {
 		WheelTravelResult wheelResult = getOdomWheelTravel();
 
 		if (wheelResult.error != OdomError::NONE) {
+			m_config.useMotorEncoders = true;
+			return;
+		} else {
+			m_config.useMotorEncoders = false;
 			pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
 			return;
 		}
@@ -197,8 +201,16 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	double currPerpendicular = perpendicularTrackingWheel.get_position();
 
 	// Returns error for problem with either wheel
-	if (currParallel == PROS_ERR || currPerpendicular == PROS_ERR) {
-		return {{0.0, 0.0}, OdomError::TRACKING_WHEEL_ERROR};
+	// On parallel failure, use IME's for forward distance only
+	if (currParallel == PROS_ERR){
+		WheelLengths imeTravel = getDriveEncoderTravel();
+		double sidewaysInches = (currPerpendicular / 360.0) * m_config.perpendicularWheelDiameter * std::numbers::pi;
+		return {{imeTravel, sidewaysInches}, OdomError::PARALLEL_WHEEL_ERROR};
+	}
+	// On perpendicular failure, Keep using parallel wheel for forward
+	if(currPerpendicular == PROS_ERR) {
+		WheelLengths parallelForward = getDriveEncoderTravel();
+		return {{parallelForward, 0.0}, OdomError::PERPENDICULAR_WHEEL_ERROR};
 	}
 
     // Get delta between current and last frame 
@@ -225,7 +237,7 @@ VelocityResult Odometry::getParallelVel() {
 		double rightVelocity = averageMotorGroupVelocities(rightMotors);
 
 		if (leftVelocity == PROS_ERR_F || rightVelocity == PROS_ERR_F) {
-			return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+			return {0.0, OdomError::PARALLEL_WHEEL_ERROR};
 		}
 
 		// motor velocities are in RPM
@@ -237,7 +249,7 @@ VelocityResult Odometry::getParallelVel() {
 	}
 
 	if (initialVelocity == PROS_ERR) {
-		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+		return {0.0, OdomError::PARALLEL_WHEEL_ERROR};
 	}
 
 	// rotation sensor velocity is in centidegrees per second
