@@ -1,11 +1,16 @@
 #include <iomanip>
 #include <iostream>
 #include "mpc.hpp"
-#define EIGEN_STACK_ALLOCATION_LIMIT 1048576 
 #include <unsupported/Eigen/MatrixFunctions>
 #include <cmath>
 #include <algorithm>
 #include <fstream>
+#include <array>
+#include <vector>
+#include <stdexcept>
+
+//M_PI isn't standard C++ (MSVC needs _USE_MATH_DEFINES), so define it locally
+static constexpr double PI = 3.14159265358979323846;
 
 template<std::size_t V, std::size_t F>
 MPCController<V, F>::Params::Params(
@@ -175,8 +180,8 @@ MPCController<V, F>::MPCController(const Params& params)
 
 //w_rap angle to (-pi, pi]
 inline double wrapAngle(double angle) {
-    while (angle >  M_PI) angle -= 2.0 * M_PI;
-    while (angle < -M_PI) angle += 2.0 * M_PI;
+    while (angle >  PI) angle -= 2.0 * PI;
+    while (angle < -PI) angle += 2.0 * PI;
     return angle;
 }
 
@@ -514,14 +519,14 @@ void MPCController<V, F>::solveQP() {
     m_u_prev << m_u_left, m_u_right;
 
     //warm start next solve: shift solution one stage left and repeat last stage
-    static std::vector<OSQPFloat> x_ws(N_VARS);
+    m_x_ws.resize(N_VARS);
     for (int i = 0; i + m_inputs < N_VARS; i++) {
-        x_ws[i] = m_solver->solution->x[i + m_inputs];
+        m_x_ws[i] = m_solver->solution->x[i + m_inputs];
     }
     for (int i = N_VARS - m_inputs; i < N_VARS; i++) {
-        x_ws[i] = m_solver->solution->x[i];
+        m_x_ws[i] = m_solver->solution->x[i];
     }
-    osqp_warm_start(m_solver, x_ws.data(), OSQP_NULL);
+    osqp_warm_start(m_solver, m_x_ws.data(), OSQP_NULL);
 }
 
 //outputs wheel voltages using MPC, taking in info from MPCUpdatePacket
@@ -566,59 +571,6 @@ void MPCController<V, F>::reset() {
     m_u_prev.setZero();
 }
 
-
-//unpack z_desired from float array
-template<std::size_t V, std::size_t F>
-auto MPCController<V, F>::unpackZDesired(const float* z_raw) {
-    Eigen::Matrix<double, r_states * (F + 1), 1> z;
-    for (std::size_t i = 0; i < F + 1; i++) {
-        const std::size_t base = i * 3;
-        z(base + 0) = static_cast<double>(z_raw[base + 0]);
-        z(base + 1) = static_cast<double>(z_raw[base + 1]);
-        z(base + 2) = static_cast<double>(z_raw[base + 2]);
-    }
-    return z;
-}
-
-//function to recieve update packet: compute voltages: send control packet
-template<std::size_t V, std::size_t F>
-void MPCController<V, F>::MPCControl(SerialProtocol& serial, MPCController& mpc) {
-    //wait for state packet from vex brain
-std::optional<MPCUpdatePacket> packet_opt = serial.receive<MPCUpdatePacket>(SerialProtocol::PacketType::MPC_UPDATE);
-    //timeout or bad packet
-    if(!packet_opt.has_value()) {
-        return;
-    }
-
-    const MPCUpdatePacket& packet = *packet_opt;
-
-    //unpack pose
-    Pose pose{
-        packet.pose_x,
-        packet.pose_y,
-        packet.pose_theta
-    };
-
-    //unpack reference trajectory
-    auto z_desired = unpackZDesired(packet.z_desired);
-
-    //initialize MPCControlPacket with default failsafe of 0V
-    MPCControlPacket response{0.0f, 0.0f};
-    //run MPC optimization with exception safety
-    try {
-        WheelVelocities out = mpc.compute(pose, z_desired, packet.omega_L, packet.omega_R, packet.V_battery, packet.I_total);
-    //pack optimal voltages on success
-    response.V_left = static_cast<float>(out.left);
-    response.V_right = static_cast<float>(out.right);
-    }
-    catch (const std::exception& e){
-        //MPC failed: log error and send zero volts
-        std::cerr << "MPC ERROR: " << e.what() << ", sending zero volts\n";
-    }
-    //send optimal voltages
-    serial.send(SerialProtocol::PacketType::MPC_CONTROL, response);
-    std::cerr << "sent V_L=" << response.V_left << " V_R=" << response.V_right<<  std::endl;
-}
 
 template<std::size_t V, std::size_t F>
 MPCController<V, F>::~MPCController() {

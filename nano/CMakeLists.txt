@@ -37,6 +37,7 @@ add_subdirectory(${THIRD_PARTY}/osqp ${CMAKE_CURRENT_BINARY_DIR}/osqp EXCLUDE_FR
 add_library(robotcore_mpc STATIC
     src/mpc.cpp
     src/arclengthSplining.cpp
+    src/mpcReference.cpp
 )
 target_include_directories(robotcore_mpc PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include

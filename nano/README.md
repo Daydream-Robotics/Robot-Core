@@ -25,11 +25,11 @@ sudo reboot
 ## Get OSQP source (once per clone)
 OSQP v1.0.0 and QDLDL v0.1.8 are pinned git submodules in third_party/.
 git submodule update --init --recursive
-(if copying the microcontroller directory onto the Nano instead of cloning, run this before copying)
+(if copying the nano directory onto the Nano instead of cloning, run this before copying)
 
 
 ## Build and run program
-cd microcontroller
+cd nano
 cmake -B build
 cmake --build build -j4
 ./build/MPCController
