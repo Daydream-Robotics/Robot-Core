@@ -75,7 +75,7 @@ class MPCController : public MotionController {
         explicit MPCController(const Params& params);
         //frees the OSQP workspace
         ~MPCController() override;
-        //clears dynamic state for a new path
+        //full reset to just-constructed state for a new path (u_prev, OSQP warm start)
         void reset() override;
 
         //! Unused base-class override (always returns 0V)

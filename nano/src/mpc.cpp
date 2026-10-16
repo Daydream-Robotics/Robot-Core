@@ -537,12 +537,21 @@ WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, const Eige
     m_z_desired = z_ref;
     m_x_hat << currentPose.x, currentPose.y, currentPose.theta, omega_L, omega_R;
 
-    buildReferenceStates();
-    buildStageModels();
-    buildPredictionMatrices();
-    assembleConstraints(V_battery, I_total, m_u_prev);
-    assembleQP();
-    solveQP();
+    try {
+        buildReferenceStates();
+        buildStageModels();
+        buildPredictionMatrices();
+        assembleConstraints(V_battery, I_total, m_u_prev);
+        assembleQP();
+        solveQP();
+    }
+    catch (...) {
+        //failed solve: caller sends 0V (failsafe), so record 0V as applied for the next delta-u limit
+        m_u_left = 0.0;
+        m_u_right = 0.0;
+        m_u_prev.setZero();
+        throw;
+    }
     return WheelVelocities{m_u_left, m_u_right, ControlMode::INPUT_VOLTAGE};
 }
 
@@ -568,7 +577,13 @@ void MPCController<V, F>::reset() {
     m_b_z_omega.setZero();
     m_u_left = 0.0;
     m_u_right = 0.0;
-    m_u_prev.setZero();
+    //back to the constructor's starting voltages
+    m_u_prev << m_params.V_left_applied, m_params.V_right_applied;
+    //drop the OSQP workspace (warm start, adapted rho) so the next solve sets up fresh
+    if (m_solver) {
+        osqp_cleanup(m_solver);
+        m_solver = nullptr;
+    }
 }
 
 
