@@ -69,9 +69,15 @@ struct Position {
  * @note Made for the frame: +X forward, +Y left, CCW positive
  */
 struct Pose {
-    double x; /**< The x-position of the robot in inches */
-    double y; /**< The y-position of the robot in inches */
-    double theta; /**< The heading of the robot in radians */
+    // x-position of bot (inches)
+    double x;
+
+    // y-position of bot (inches)
+    double y;
+
+    // Heading of bot (rads)
+    double theta;
+
 };
 
 /**
