@@ -1,0 +1,6 @@
+[submodule "microcontroller/third_party/osqp"]
+	path = nano/third_party/osqp
+	url = https://github.com/osqp/osqp.git
+[submodule "microcontroller/third_party/qdldl"]
+	path = nano/third_party/qdldl
+	url = https://github.com/osqp/qdldl.git

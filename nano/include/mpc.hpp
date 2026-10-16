@@ -4,12 +4,15 @@
 #include "motionController.hpp"
 #include "odometry.hpp"
 #include "arclengthSplining.hpp"
-#include "serialProtocol.hpp"
 #include "osqp.h"
-#define EIGEN_STACK_ALLOCATION_LIMIT 1048576 
+
+#include <cstddef>
+#include <array>
+#include <vector>
+
+#define EIGEN_STACK_ALLOCATION_LIMIT 1048576
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-#include <cstddef>
 
 //LTV MPC controller: V = control horizon, F = prediction horizon
 template<std::size_t V, std::size_t F>
@@ -72,10 +75,8 @@ class MPCController : public MotionController {
         explicit MPCController(const Params& params);
         //frees the OSQP workspace
         ~MPCController() override;
-        //clears dynamic state for a new path
+        //full reset to just-constructed state for a new path (u_prev, OSQP warm start)
         void reset() override;
-        //serial loop body where we receive update packet, run MPC, send control packet
-        static void MPCControl(SerialProtocol& serial, MPCController& mpc);
 
         //! Unused base-class override (always returns 0V)
         WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) override;
@@ -101,27 +102,6 @@ class MPCController : public MotionController {
                 double omega_L;
                 double omega_R;
             };
-            #pragma pack(push, 1)
-
-            struct MPCUpdatePacket {
-                float pose_x;
-                float pose_y;
-                float pose_theta;
-                float omega_L;
-                float omega_R;
-                float V_battery;
-                float I_total;
-                //F+1 reference poses (x, y, theta)
-                float z_desired[(F + 1) * 3];
-            };
-            #pragma pack(pop)
-
-            #pragma pack(push, 1)
-            struct MPCControlPacket {
-                float V_left;
-                float V_right;
-            };
-            #pragma pack(pop)
 
             //interpolated path sample (pose + speed) at an arbitrary arc length
             struct InterpSample {
@@ -234,6 +214,8 @@ class MPCController : public MotionController {
             CscStorage  m_P_csc;
             CscStorage  m_A_full_csc;
             std::vector<OSQPFloat> m_q_v, m_l_v, m_u_v;
+            //shifted previous solution used to warm start the next solve (per instance)
+            std::vector<OSQPFloat> m_x_ws;
 
             
             //linearize and discretize about each ref state (per-stage LTV models)
@@ -261,9 +243,6 @@ class MPCController : public MotionController {
         
             //solve the QP cost with OSQP
             void solveQP();
-            
-            //convert the packet's float ref array to a double Eigen matrix
-            static auto unpackZDesired(const float* z_raw);
 };
 #endif
 

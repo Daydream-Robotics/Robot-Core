@@ -1,7 +1,7 @@
 #pragma once
 #include <stdio.h>
 #include <vector>
-#include "daydream/motion/odometry.hpp"
+#include "odometry.hpp"
 
 struct Sample {
     double t = 0.0; // where in spline param
@@ -32,6 +32,15 @@ struct Waypoint {
     double x;
     double y;
     double v;
+};
+
+// point on the path at an arbitrary arc length (interpolated between samples)
+struct InterpSample {
+    double s = 0.0; // arc length along path (in)
+    double x = 0.0; // x position (in)
+    double y = 0.0; // y position (in)
+    double theta = 0.0; // heading (rad)
+    double v = 0.0; // path velocity (in/s)
 };
 
 
@@ -73,6 +82,10 @@ class ALS_Path {
         
         // moved to public to support other controllers
         Waypoint getPointAtArcLength(double sQuery) const;
+
+        // pose + speed at arc length sQuery: linear interp between samples, clamped to path ends
+        // (moved from MPCSerial so the MPC reference can be built off-brain)
+        InterpSample sampleAtArcLength(double sQuery) const;
 
         // Main build function, computes paramterization, fit, and sample table
         bool buildFromPoints(const std::vector<Waypoint>& points, double sampleSpacing = 0.25);
