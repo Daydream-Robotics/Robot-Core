@@ -113,7 +113,6 @@ namespace packets {
                                         ///< a rotation sensor keeps its last good reading
     }
 
-    // Wire structs: packed, sizes checked by the static_asserts below.
     #pragma pack(push, 1)
 
     /// @brief CONFIG fixed part (14 bytes). Followed by GroupCfg[n_groups] and RotationCfg[n_rotations].
@@ -197,4 +196,47 @@ namespace packets {
         float value; ///< see GroupMode
     };
     #pragma pack(pop)
+
+    // layout checks: fail the build if packing or a field type changes a wire size
+    static_assert(sizeof(ConfigFixed) == 14 && sizeof(GroupCfg) == 11 && sizeof(RotationCfg) == 2);
+    static_assert(sizeof(StateFixed) == 30 && sizeof(GroupState) == 9 && sizeof(RotationState) == 5);
+    static_assert(sizeof(CommandFixed) == 17 && sizeof(GroupCmd) == 7);
+    static_assert(sizeof(float) == 4, "float fields must be IEEE-754 binary32");
+
+    /**
+     * @brief Payload size of a CONFIG with the given device counts.
+     *
+     * @param g Number of motor groups.
+     * @param r Number of rotation sensors.
+     * @return size_t Payload bytes: fixed part + g GroupCfg + r RotationCfg.
+     */
+    constexpr size_t configSize(size_t g, size_t r) {
+        return sizeof(ConfigFixed) + g * sizeof(GroupCfg) + r * sizeof(RotationCfg);
+    }
+
+     /**
+     * @brief Payload size of a STATE with the given device counts.
+     *
+     * @param g Number of motor groups.
+     * @param r Number of rotation sensors.
+     * @return size_t Payload bytes: fixed part + g GroupState + r RotationState.
+     */
+    constexpr size_t stateSize(size_t g, size_t r) {
+        return sizeof(StateFixed) + g * sizeof(GroupState) + r * sizeof(RotationState);
+    }
+
+    /**
+     * @brief Payload size of a COMMAND for the given group count.
+     *
+     * @param g Number of motor groups in the applied config.
+     * @return size_t Payload bytes: fixed part + g GroupCmd.
+     */
+    constexpr size_t commandSize(size_t g) { 
+        return sizeof(CommandFixed) + g * sizeof(GroupCmd); 
+    }
+
+    // the largest possible CONFIG and STATE must still fit in one frame
+    static_assert(configSize(MAX_GROUPS, MAX_ROTATIONS) <= MAX_PAYLOAD);
+    static_assert(stateSize(MAX_GROUPS, MAX_ROTATIONS) <= MAX_PAYLOAD);
+    static_assert(commandSize(MAX_GROUPS) <= MAX_PAYLOAD);
 }
