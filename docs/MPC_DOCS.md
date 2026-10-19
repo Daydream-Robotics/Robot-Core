@@ -1,11 +1,15 @@
 ## Steps
-1. Run MPCSerial::identifyMotorModel() in opcontrol to get the a and b values used by `jetson-nano/src/main.cpp`.
-2. Set the other parameters in `jetson-nano/src/main.cpp`, specifically r, L, and omega_motor_max.
-3. If wanted change p_x, p_y, p_theta, q_u, q_zero_mult, q_final_mult, p_final_mult, delta_u_max, delta_u_min (tuning steps below)
-4. Read `jetson-nano/README.md` to set up the Jetson Nano.
-5. Copy `jetson-nano/` onto the Jetson Nano.
-6. Run `./MPCController` on the Nano after building (see `jetson-nano/README.md`).
+1. Run MPCSerial::identifyMotorModel() in opcontrol to get the a and b values, then set MOTOR_A and MOTOR_B in shared/include/mpc/mpcConfig.hpp
+2. set the other shared parameters in shared/include/mpc/mpcConfig.hpp, specifically WHEEL_RADIUS (the brain and the Nano both read this file, so they can't disagree). Set TRACK_WIDTH in v5-brain/include/config/constants.h; the brain sends it to the Nano in every update packet. omega_motor_max and the tuning weights are in jetson-nano/src/main.cpp
+3. If wanted change p_x, p_y, p_theta, q_u, q_zero_mult, q_final_mult, p_final_mult, delta_u_max, delta_u_min in jetson-nano/src/main.cpp (tuning steps below)
+4. read over jetson-nano/README.md to set up the Nano
+5. copy over jetson-nano/ and shared/ to the Nano (or clone the repo there)
+6. run ./build/MPCController on the Nano after building (look at jetson-nano/README.md)
 7. run this program on the brain
+
+The brain and the Nano must be updated together: the serial packet layout lives in shared/include/mpc/mpcPackets.hpp, and a mismatched build gets every packet rejected (the robot sits at 0 V). Bump MPC_PROTOCOL_VERSION in that file whenever a packet changes: a mismatch is then logged on the Nano's console (and on the brain's screen when the packet sizes still match).
+
+PathFollower::setPath() calls MPCSerial::reset(), which sets the reset flag in the update packet; the Nano resets its controller when it sees the flag. Every update packet also carries the voltage the brain is applying, which the Nano's delta-u limit starts from, so a reset while moving doesn't dip the voltage.
 
 
 ## Tuning:
@@ -61,8 +65,8 @@ SerialProtocol::setUpVexSerial();
 	}
 
 
-    constexpr double GEAR_RATIO = 450.0 / 600.0;
-    MPCSerial::Params mpc_serial_params(0.02, GEAR_RATIO);
+    // track width from config/constants.h, everything else (except the gear ratio) from shared/include/mpc/mpcConfig.hpp
+    MPCSerial::Params mpc_serial_params(DRIVE_GEAR_RATIO, TRACK_WIDTH);
     mpc_serial_controller = new MPCSerial(mpc_serial_params);
     pathFollower = new PathFollower(*mpc_serial_controller);
 

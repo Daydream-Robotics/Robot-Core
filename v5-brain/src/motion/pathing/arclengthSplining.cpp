@@ -599,3 +599,72 @@ const CubicSpline& ALS_Path::getYSpline() const {
 const CubicSpline& ALS_Path::getVSpline() const {
     return m_splineV;
 }
+
+//wrap angle to (-pi, pi]
+static inline double wrapAngleALS(double a) {
+    constexpr double PI = 3.14159265358979323846;
+    while (a > PI) a -= 2.0 * PI;
+    while (a < -PI) a += 2.0 * PI;
+    return a;
+}
+
+//find point on path for given arc length (linear interp between samples)
+InterpSample ALS_Path::sampleAtArcLength(double sQuery) const {
+    const std::vector<Sample>& samples = m_samples;
+    InterpSample result;
+    //if empty path: return zeros
+    if (samples.empty()) {
+        return result;
+    }
+
+    //clamp to start
+    if (sQuery <= samples.front().s) {
+        result.x = samples.front().x;
+        result.y = samples.front().y;
+        result.theta = samples.front().heading;
+        result.v = samples.front().v;
+        result.s = samples.front().s;
+        return result;
+    }
+    //clamp to end
+    if (sQuery >= samples.back().s) {
+        result.x = samples.back().x;
+        result.y = samples.back().y;
+        result.theta = samples.back().heading;
+        result.v = samples.back().v;
+        result.s = samples.back().s;
+        return result;
+    }
+
+    // binary search for bracket [left, right]
+    std::size_t left = 0;
+    std::size_t right = samples.size() - 1;
+    while (left + 1 < right) {
+        std::size_t mid = left + (right - left) / 2;
+        if (samples[mid].s <= sQuery) {
+            left = mid;
+        } else {
+            right = mid;
+        }
+    }
+
+    //linearly interpolate between bracketing samples a & b
+    const Sample& a = samples[left];
+    const Sample& b = samples[right];
+    //arc length gap btwn samples
+    double ds = b.s - a.s;
+    //normalized interpolation
+    double alpha = (std::abs(ds) < 1e-12) ? 0.0 : (sQuery - a.s) / ds;
+    //shortest angle diff
+    double dtheta = wrapAngleALS(b.heading - a.heading);
+
+    //interpolate x, y and theta
+    result.x = a.x + alpha * (b.x - a.x);
+    result.y = a.y + alpha * (b.y - a.y);
+    result.theta = wrapAngleALS(a.heading + alpha * dtheta);
+    // interpolated reference speed and arc length
+    result.v = a.v + alpha * (b.v - a.v);
+    result.s = a.s + alpha * ds;
+
+    return result;
+}

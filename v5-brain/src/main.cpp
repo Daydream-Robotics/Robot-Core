@@ -42,7 +42,8 @@ void initialize() {
     
 
 
-    MPCSerial::Params mpc_serial_params(0.02, DRIVE_GEAR_RATIO, 16.7211, 71.3105, 10.5, 60);
+    // period, motor a/b, a_max come from shared/include/mpc/mpcConfig.hpp (shared with the Nano); track width from config/constants.h
+    MPCSerial::Params mpc_serial_params(DRIVE_GEAR_RATIO, TRACK_WIDTH);
     mpc_serial_controller = new MPCSerial(mpc_serial_params);
     pathFollower = new PathFollower(*mpc_serial_controller);
 

@@ -11,6 +11,10 @@ sudo apt install -y \
   screen \
   minicom
 
+# apt's cmake on the Nano (Ubuntu 18.04) is 3.10; OSQP needs >= 3.18
+pip3 install --user cmake
+# check with: cmake --version   (if it still says 3.10, add ~/.local/bin to PATH)
+
 
 ## Set-up Serial:
 sudo usermod -a -G dialout $USER
@@ -18,24 +22,20 @@ stty -F /dev/ttyACM1 raw -echo -onlcr
 sudo reboot
 
 
-## Make and run program
-copy the `jetson-nano` directory onto the Jetson Nano
+## Get OSQP source (once per clone)
+OSQP v1.0.0 and QDLDL v0.1.8 are pinned git submodules in external/ (Eigen is vendored in external/eigen).
+git submodule update --init --recursive
+(if copying onto the Nano instead of cloning, run this first, then copy both jetson-nano/ and shared/ keeping them side by side)
+
+
+## Build and run program
 cd jetson-nano
-make clean && make
-./MPCController
+cmake -B build
+cmake --build build -j4
+./build/MPCController
 
-
-
-
-
-### If the OSQP library in external/osqp/lib/ doesn't work, rebuild it and replace the current library
-git clone https://github.com/osqp/osqp.git
-cd osqp
-mkdir build
-cd build
-cmake ..
-make -j
-find build/out/libosqpstatic.a
+Only rebuild after code changes; the program stays in build/.
+For a clean rebuild: rm -rf build
 
 
 

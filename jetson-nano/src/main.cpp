@@ -4,20 +4,109 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <memory>
+#include <cmath>
 #include "motion/control/mpc.hpp"
 #include "link/serialProtocol.hpp"
+#include "mpc/mpcConfig.hpp"
+#include "mpc/mpcPackets.hpp"
+
+//unpack z_desired from float array
+template<std::size_t V, std::size_t F>
+auto unpackZDesired(const float* z_raw) {
+    Eigen::Matrix<double, MPCController<V, F>::r_states * (F + 1), 1> z;
+    for (std::size_t i = 0; i < F + 1; i++) {
+        const std::size_t base = i * 3;
+        z(base + 0) = static_cast<double>(z_raw[base + 0]);
+        z(base + 1) = static_cast<double>(z_raw[base + 1]);
+        z(base + 2) = static_cast<double>(z_raw[base + 2]);
+    }
+    return z;
+}
+
+//function to recieve update packet: compute voltages: send control packet
+//mpc is (re)built from the track width in the packet (the brain's TRACK_WIDTH), so it is null until the first packet
+template<std::size_t V, std::size_t F>
+void MPCControl(SerialProtocol& serial, std::unique_ptr<MPCController<V, F>>& mpc, typename MPCController<V, F>::Params params) {
+    static_assert(F == mpc_config::F, "MPCUpdatePacket is sized for mpc_config::F");
+    //wait for state packet from vex brain
+    std::optional<MPCUpdatePacket> packet_opt = serial.receive<MPCUpdatePacket>(SerialProtocol::PacketType::MPC_UPDATE);
+    //timeout or bad packet
+    if(!packet_opt.has_value()) {
+        return;
+    }
+
+    const MPCUpdatePacket& packet = *packet_opt;
+
+    //initialize MPCControlPacket with default failsafe of 0V
+    MPCControlPacket response{};
+    response.protocol_version = MPC_PROTOCOL_VERSION;
+
+    //brain built from a different packet version: the fields can't be trusted, so log and send 0V
+    if (packet.protocol_version != MPC_PROTOCOL_VERSION) {
+        std::cerr << "MPC ERROR: protocol mismatch (brain v" << int(packet.protocol_version) << ", Nano v" << int(MPC_PROTOCOL_VERSION) << "), sending zero volts\n";
+        serial.send(SerialProtocol::PacketType::MPC_CONTROL, response);
+        return;
+    }
+
+    //track width comes from the brain, (re)build the controller on the first packet or when it changes
+    const double track_width = static_cast<double>(packet.track_width);
+    if (!std::isfinite(track_width) || track_width <= 0.0) {
+        std::cerr << "MPC ERROR: bad track width " << track_width << ", sending zero volts\n";
+        serial.send(SerialProtocol::PacketType::MPC_CONTROL, response);
+        return;
+    }
+    if (!mpc || mpc->trackWidth() != track_width) {
+        std::cerr << "building MPC with track width " << track_width << " in\n";
+        params.L = track_width;
+        mpc = std::make_unique<MPCController<V, F>>(params);
+        mpc->reset();
+    }
+
+    //brain started a new path: drop warm start and OSQP workspace
+    if (packet.reset_controller) {
+        mpc->reset();
+    }
+    //delta-u limit starts from what the brain is applying (after any reset, so a path change mid-motion doesn't dip to 0V)
+    mpc->notifyAppliedVoltage(packet.V_left_applied, packet.V_right_applied);
+
+    //unpack pose
+    Pose pose{
+        packet.pose_x,
+        packet.pose_y,
+        packet.pose_theta
+    };
+
+    //unpack reference trajectory
+    auto z_desired = unpackZDesired<V, F>(packet.z_desired);
+
+    //run MPC optimization with exception safety
+    try {
+        WheelVelocities out = mpc->compute(pose, z_desired, packet.omega_L, packet.omega_R, packet.V_battery, packet.I_total);
+        //pack optimal voltages on success
+        response.V_left = static_cast<float>(out.left);
+        response.V_right = static_cast<float>(out.right);
+    }
+    catch (const std::exception& e){
+        //MPC failed: log error and send zero volts
+        std::cerr << "MPC ERROR: " << e.what() << ", sending zero volts\n";
+    }
+    //send optimal voltages
+    serial.send(SerialProtocol::PacketType::MPC_CONTROL, response);
+    std::cerr << "sent V_L=" << response.V_left << " V_R=" << response.V_right<<  std::endl;
+}
 
 int main() {
     //initiailizes prediction and control horizon (compile-time)
-    using V = std::integral_constant<std::size_t, 15>;
-    using F = std::integral_constant<std::size_t, 15>;
+    using V = std::integral_constant<std::size_t, mpc_config::V>;
+    using F = std::integral_constant<std::size_t, mpc_config::F>;
     // create MPC with parameters
    typename MPCController<V::value, F::value>::Params params(
-        1.625, //wheel radius (in)
-        10.5, //track width (in)
-        16.7211, //motor time-constant
-        71.3105, //motor gain constant
-        0.02, //sampling period (s)
+        mpc_config::WHEEL_RADIUS, //wheel radius (in)
+        0.0, //track width (in), set from each update packet (brain's TRACK_WIDTH)
+        mpc_config::MOTOR_A, //motor time-constant
+        mpc_config::MOTOR_B, //motor gain constant
+        mpc_config::H, //sampling period (s)
         200.0, //output weight for x
         200.0, //output weight for y
         60.0, //output weight for theta
@@ -35,9 +124,8 @@ int main() {
         0.0, //starting Voltage left
         0.0 //starting Voltage right
     );
-    //initialize the MPC solver and  reset() the internal state
-    MPCController<V::value, F::value> mpc(params);
-    mpc.reset();
+    //the MPC solver is built on the first update packet, once the brain has sent its track width
+    std::unique_ptr<MPCController<V::value, F::value>> mpc;
 
     //open serial to communicate for vex brain
     int fd = SerialProtocol::setUpMicrocontrollerSerial("/dev/ttyACM1", B115200);
@@ -74,7 +162,7 @@ wakeupTask.detach();
     //50 Hz control loop
     while (true) {
         //recieve update packet: compute voltages: send control packet
-        MPCController<V::value, F::value>::MPCControl(serial, mpc);
+        MPCControl(serial, mpc, params);
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 }
