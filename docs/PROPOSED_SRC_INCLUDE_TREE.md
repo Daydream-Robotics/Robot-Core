@@ -269,8 +269,11 @@ configuration and subsystem behavior.
 Contains inactive or historical project code, including perception work that
 is not part of the active build. Keeping it outside `src/` and `include/`
 prevents old files from being picked up by recursive source discovery and makes
-the active code easier to navigate. Archive files are references, not part of
-the supported application interface.
+the active code easier to navigate. Group archived code under its originating
+project (such as `v5-brain/`) and mirror that project's `include/` and `src/`
+layout. The existing Brain archive follows `include/daydream/` and
+`src/daydream/`, grouping headers and implementations by area. Archive files
+are references, not part of the supported application interface.
 
 ## Naming and dependency guidelines
 
