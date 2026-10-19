@@ -1,6 +1,6 @@
 #include <iomanip>
 #include <iostream>
-#include "mpc.hpp"
+#include "daydream/nano/motion/control/mpc.hpp"
 #define EIGEN_STACK_ALLOCATION_LIMIT 1048576 
 #include <unsupported/Eigen/MatrixFunctions>
 #include <cmath>

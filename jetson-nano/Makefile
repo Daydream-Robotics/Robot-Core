@@ -3,7 +3,7 @@ include common.mk
 
 TARGET := MPCController
 
-SRC := src/microcontroller_main.cpp src/mpc.cpp src/serialProtocol.cpp
+SRC := src/main.cpp src/daydream/nano/motion/control/mpc.cpp src/daydream/nano/link/serialProtocol.cpp
 
 all:
 	$(CXX) $(SRC) $(CXXFLAGS) $(LDFLAGS) -o $(TARGET)

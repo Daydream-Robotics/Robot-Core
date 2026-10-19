@@ -6,8 +6,9 @@ CXXFLAGS := \
     -std=c++17 \
     -O2 \
     -Iinclude \
-    -Iinclude/osqp \
-    -Iinclude/eigen
+    -I../shared/include \
+    -Iexternal/osqp/include/osqp \
+    -Iexternal/eigen/include
 
 # macOS needs SDK path for standard headers
 ifeq ($(UNAME_S),Darwin)
@@ -16,5 +17,5 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 LDFLAGS := \
-    firmware/libosqpstatic.a \
+    external/osqp/lib/libosqpstatic.a \
     -lm

@@ -19,8 +19,8 @@ sudo reboot
 
 
 ## Make and run program
-copy the microcontroller directory onto the microcontroller
-cd microcontroller
+copy the `jetson-nano` directory onto the Jetson Nano
+cd jetson-nano
 make clean && make
 ./MPCController
 
@@ -28,7 +28,7 @@ make clean && make
 
 
 
-### If the OSQP library in firmware/ doesn't work run this and replace the curr with the new one
+### If the OSQP library in external/osqp/lib/ doesn't work, rebuild it and replace the current library
 git clone https://github.com/osqp/osqp.git
 cd osqp
 mkdir build

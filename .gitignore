@@ -435,5 +435,7 @@ FodyWeavers.xsd
 *.msp
 /.d
 /.vscode
+/jetson-nano/MPCController
+/jetson-nano/.vscode/
 compile_commands.json
 .DS_Store

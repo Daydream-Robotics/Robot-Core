@@ -4,8 +4,8 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
-#include "mpc.hpp"
-#include "serialProtocol.hpp"
+#include "daydream/nano/motion/control/mpc.hpp"
+#include "daydream/nano/link/serialProtocol.hpp"
 
 int main() {
     //initiailizes prediction and control horizon (compile-time)
