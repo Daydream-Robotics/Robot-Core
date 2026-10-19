@@ -1,6 +1,6 @@
-[submodule "nano/third_party/osqp"]
-	path = nano/third_party/osqp
+[submodule "jetson-nano/external/osqp"]
+	path = jetson-nano/external/osqp
 	url = https://github.com/osqp/osqp.git
-[submodule "nano/third_party/qdldl"]
-	path = nano/third_party/qdldl
+[submodule "jetson-nano/external/qdldl"]
+	path = jetson-nano/external/qdldl
 	url = https://github.com/osqp/qdldl.git
