@@ -16,7 +16,7 @@ Robot-Core/
 │   ├── include/daydream/nano/
 │   ├── src/daydream/nano/ plus main.cpp
 │   └── external/         Eigen and OSQP
-├── shared/include/daydream/shared/protocol/
+├── shared/include/protocol/
 ├── common-utils/
 ├── archive/              Existing historical code and inactive perception
 ├── docs/                 MPC_DOCS.md and this proposal

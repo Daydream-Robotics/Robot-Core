@@ -4,7 +4,7 @@
 #include "daydream/motion/control/motionController.hpp"
 #include "daydream/localization/odometry.hpp"
 #include "daydream/motion/pathing/arclengthSplining.hpp"
-#include "daydream/shared/protocol/serialProtocol.hpp"
+#include "protocol/serialProtocol.hpp"
 
 #include <cstddef>
 #include <string>

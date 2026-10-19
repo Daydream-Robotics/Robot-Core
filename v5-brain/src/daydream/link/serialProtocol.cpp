@@ -1,4 +1,4 @@
-#include "daydream/shared/protocol/serialProtocol.hpp"
+#include "protocol/serialProtocol.hpp"
 
 #include <cstdio>
 #include <cstring>
