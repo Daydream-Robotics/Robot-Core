@@ -1,11 +1,15 @@
 ## Steps
-1. Run MPCSerial::identifyMotorModel() in opcontrol to get the a and b values that you set in microcontroller/src/microcontroller_main.cpp
-2. set the other parameters in microcontroller/src/microcontroller_main.cpp, specifically r, L, omega_motor_max
-3. If wanted change p_x, p_y, p_theta, q_u, q_zero_mult, q_final_mult, p_final_mult, delta_u_max, delta_u_min (tuning steps below)
-4. read over microcontroller/README.md to set up microcontroller
-5. copy over microcontroller/ to the microcontroller
-6. run ./MPCController on the microcontroller after building (look at microcontroller/README.md)
+1. Run MPCSerial::identifyMotorModel() in opcontrol to get the a and b values, then set MOTOR_A and MOTOR_B in nano/include/mpcConfig.hpp
+2. set the other shared parameters in nano/include/mpcConfig.hpp, specifically WHEEL_RADIUS, TRACK_WIDTH (the brain and the Nano both read this file, so they can't disagree). omega_motor_max and the tuning weights are in nano/src/microcontroller_main.cpp
+3. If wanted change p_x, p_y, p_theta, q_u, q_zero_mult, q_final_mult, p_final_mult, delta_u_max, delta_u_min in nano/src/microcontroller_main.cpp (tuning steps below)
+4. read over nano/README.md to set up the Nano
+5. copy over nano/ to the Nano (or clone the repo there)
+6. run ./build/MPCController on the Nano after building (look at nano/README.md)
 7. run this program on the brain
+
+The brain and the Nano must be updated together: the serial packet layout lives in nano/include/mpcPackets.hpp, and a mismatched build gets every packet rejected (the robot sits at 0 V).
+
+PathFollower::setPath() calls MPCSerial::reset(), which sets the reset flag in the update packet; the Nano resets its controller when it sees the flag.
 
 
 ## Tuning:
@@ -61,8 +65,8 @@ SerialProtocol::setUpVexSerial();
 	}
 
 
-    constexpr double GEAR_RATIO = 450.0 / 600.0;
-    MPCSerial::Params mpc_serial_params(0.02, GEAR_RATIO);
+    // everything except the gear ratio comes from nano/include/mpcConfig.hpp
+    MPCSerial::Params mpc_serial_params(DRIVE_GEAR_RATIO);
     mpc_serial_controller = new MPCSerial(mpc_serial_params);
     pathFollower = new PathFollower(*mpc_serial_controller);
 

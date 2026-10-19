@@ -3,30 +3,23 @@
 
 #include "arclengthSplining.hpp"
 #include "odometry.hpp"
+#include "referenceRollout.hpp"
 #define EIGEN_STACK_ALLOCATION_LIMIT 1048576
 #include <Eigen/Dense>
 #include <cstddef>
 
 //builds the MPC reference trajectory: F+1 target poses (x, y, theta) rolled out along an ALS path
-//copied from the brain's MPCSerial::buildUpdatePacket, keep the two in sync
+//the rollout itself is mpc_ref::rollout (referenceRollout.hpp), the same code the brain's MPCSerial runs
 template<std::size_t F>
 class MPCReference {
     public:
-        //timing, drivetrain, and reference-gen limits (set once at construction)
-        struct Params {
-            double h; //sample period (s)
-            double r; //wheel radius (in)
-            double track_width; //track width (in)
-            double a; //motor time-constant
-            double b; //motor gain constant
-            double a_max; //max accel of bot (in/s^2)
-            double v_ref_min; //speed floor (in/s)
-        };
+        //timing, drivetrain, and reference-gen limits (set once at construction, defaults from mpcConfig.hpp)
+        using Params = mpc_ref::Params;
 
         static constexpr std::size_t r_states = 3; //x, y, theta per stage
         using ZRef = Eigen::Matrix<double, r_states * (F + 1), 1>;
 
-        explicit MPCReference(const Params& params);
+        explicit MPCReference(const Params& params = Params{});
 
         //forget last cycle's reference speed (call on new path)
         void reset() {

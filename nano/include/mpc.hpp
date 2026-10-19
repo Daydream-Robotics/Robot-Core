@@ -103,14 +103,6 @@ class MPCController : public MotionController {
                 double omega_R;
             };
 
-            //interpolated path sample (pose + speed) at an arbitrary arc length
-            struct InterpSample {
-                double x = 0.0;
-                double y = 0.0;
-                double theta = 0.0;
-                double v = 0.0;
-            };
-
              //stuct to own the arrays behind an OSQP CSC matrix (keeps pointers valid)
             struct CscStorage {
                 std::vector<OSQPFloat> values;

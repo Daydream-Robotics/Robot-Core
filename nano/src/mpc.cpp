@@ -179,7 +179,7 @@ MPCController<V, F>::MPCController(const Params& params)
 }
 
 //w_rap angle to (-pi, pi]
-inline double wrapAngle(double angle) {
+static inline double wrapAngle(double angle) {
     while (angle >  PI) angle -= 2.0 * PI;
     while (angle < -PI) angle += 2.0 * PI;
     return angle;
@@ -538,6 +538,12 @@ WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, const Eige
     m_x_hat << currentPose.x, currentPose.y, currentPose.theta, omega_L, omega_R;
 
     try {
+        //reject NaN/inf inputs before they reach OSQP
+        if (!std::isfinite(currentPose.x) || !std::isfinite(currentPose.y) || !std::isfinite(currentPose.theta) ||
+            !std::isfinite(omega_L) || !std::isfinite(omega_R) || !std::isfinite(V_battery) || !std::isfinite(I_total) ||
+            !z_ref.allFinite()) {
+            throw std::runtime_error("MPC input is not finite");
+        }
         buildReferenceStates();
         buildStageModels();
         buildPredictionMatrices();
@@ -550,6 +556,11 @@ WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, const Eige
         m_u_left = 0.0;
         m_u_right = 0.0;
         m_u_prev.setZero();
+        //drop the OSQP workspace so a bad solve can't poison later ones; next solve sets up fresh
+        if (m_solver) {
+            osqp_cleanup(m_solver);
+            m_solver = nullptr;
+        }
         throw;
     }
     return WheelVelocities{m_u_left, m_u_right, ControlMode::INPUT_VOLTAGE};

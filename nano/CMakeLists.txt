@@ -49,8 +49,17 @@ if(MSVC)
 endif()
 
 # - - - - - - - - - - - - - - [NANO EXECUTABLE] - - - - - - - - - - - - - -
-# serial link to the brain needs termios, so Linux/macOS only
-if(UNIX)
+# only built when nano/ is the top-level project (DreamSim's add_subdirectory skips it)
+# CMAKE_SOURCE_DIR check instead of PROJECT_IS_TOP_LEVEL, which needs cmake 3.21
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_robotcore_top_level ON)
+else()
+    set(_robotcore_top_level OFF)
+endif()
+option(ROBOTCORE_BUILD_NANO_EXE "Build the Nano's MPCController serial program" ${_robotcore_top_level})
+
+# serial link to the brain uses termios + /dev/ttyACM, so Linux (the Nano) only
+if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_executable(MPCController
         src/microcontroller_main.cpp
         src/serialProtocol.cpp

@@ -6,29 +6,8 @@
 #include <thread>
 #include "mpc.hpp"
 #include "serialProtocol.hpp"
-
-//serial packets exchanged with the vex brain (layout must match the brain's MPCSerial)
-#pragma pack(push, 1)
-template<std::size_t F>
-struct MPCUpdatePacket {
-    float pose_x;
-    float pose_y;
-    float pose_theta;
-    float omega_L;
-    float omega_R;
-    float V_battery;
-    float I_total;
-    //F+1 reference poses (x, y, theta)
-    float z_desired[(F + 1) * 3];
-};
-#pragma pack(pop)
-
-#pragma pack(push, 1)
-struct MPCControlPacket {
-    float V_left;
-    float V_right;
-};
-#pragma pack(pop)
+#include "mpcConfig.hpp"
+#include "mpcPackets.hpp"
 
 //unpack z_desired from float array
 template<std::size_t V, std::size_t F>
@@ -46,14 +25,20 @@ auto unpackZDesired(const float* z_raw) {
 //function to recieve update packet: compute voltages: send control packet
 template<std::size_t V, std::size_t F>
 void MPCControl(SerialProtocol& serial, MPCController<V, F>& mpc) {
+    static_assert(F == mpc_config::F, "MPCUpdatePacket is sized for mpc_config::F");
     //wait for state packet from vex brain
-    std::optional<MPCUpdatePacket<F>> packet_opt = serial.receive<MPCUpdatePacket<F>>(SerialProtocol::PacketType::MPC_UPDATE);
+    std::optional<MPCUpdatePacket> packet_opt = serial.receive<MPCUpdatePacket>(SerialProtocol::PacketType::MPC_UPDATE);
     //timeout or bad packet
     if(!packet_opt.has_value()) {
         return;
     }
 
-    const MPCUpdatePacket<F>& packet = *packet_opt;
+    const MPCUpdatePacket& packet = *packet_opt;
+
+    //brain started a new path: drop warm start, delta-u history, and OSQP workspace
+    if (packet.reset_controller) {
+        mpc.reset();
+    }
 
     //unpack pose
     Pose pose{
@@ -85,15 +70,15 @@ void MPCControl(SerialProtocol& serial, MPCController<V, F>& mpc) {
 
 int main() {
     //initiailizes prediction and control horizon (compile-time)
-    using V = std::integral_constant<std::size_t, 15>;
-    using F = std::integral_constant<std::size_t, 15>;
+    using V = std::integral_constant<std::size_t, mpc_config::V>;
+    using F = std::integral_constant<std::size_t, mpc_config::F>;
     // create MPC with parameters
    typename MPCController<V::value, F::value>::Params params(
-        1.625, //wheel radius (in)
-        10.5, //track width (in)
-        16.7211, //motor time-constant
-        71.3105, //motor gain constant
-        0.02, //sampling period (s)
+        mpc_config::WHEEL_RADIUS, //wheel radius (in)
+        mpc_config::TRACK_WIDTH, //track width (in)
+        mpc_config::MOTOR_A, //motor time-constant
+        mpc_config::MOTOR_B, //motor gain constant
+        mpc_config::H, //sampling period (s)
         200.0, //output weight for x
         200.0, //output weight for y
         60.0, //output weight for theta

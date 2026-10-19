@@ -13,6 +13,8 @@ SRCDIR=$(ROOT)/src
 INCDIR=$(ROOT)/include
 
 WARNFLAGS+=
+# MPC config, serial packets, and reference rollout are shared with the Nano (header-only)
+EXTRA_INCDIR=$(ROOT)/nano/include
 EXTRA_CFLAGS=
 EXTRA_CXXFLAGS=
 
