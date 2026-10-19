@@ -1,4 +1,4 @@
-#include "daydream/nano/link/serialProtocol.hpp"
+#include "link/serialProtocol.hpp"
 
 #include <cstdio>
 #include <cstring>

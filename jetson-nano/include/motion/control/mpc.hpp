@@ -1,10 +1,10 @@
 #ifndef _MPC_HPP_
 #define _MPC_HPP_
 
-#include "daydream/nano/motion/control/motionController.hpp"
-#include "daydream/nano/localization/odometry.hpp"
-#include "daydream/nano/motion/pathing/arclengthSplining.hpp"
-#include "daydream/nano/link/serialProtocol.hpp"
+#include "motion/control/motionController.hpp"
+#include "localization/odometry.hpp"
+#include "motion/pathing/arclengthSplining.hpp"
+#include "link/serialProtocol.hpp"
 #include "osqp.h"
 #define EIGEN_STACK_ALLOCATION_LIMIT 1048576 
 #include <Eigen/Dense>

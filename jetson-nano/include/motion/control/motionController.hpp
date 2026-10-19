@@ -1,6 +1,6 @@
 #pragma once
-#include "daydream/nano/motion/pathing/arclengthSplining.hpp"
-#include "daydream/nano/localization/odometry.hpp"
+#include "motion/pathing/arclengthSplining.hpp"
+#include "localization/odometry.hpp"
 
 enum class ControlMode {
     INPUT_VELOCITY,
