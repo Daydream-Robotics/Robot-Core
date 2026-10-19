@@ -1,35 +1,20 @@
 # Robot-Core
 
-Core backend code for Daydream Robotics' VEX U robots.
+Core backend code for Daydream Robotics' VEX U robots. The repository is being reorganized into separate V5 Brain and Jetson Nano projects, with protocol code shared between them.
 
-Robot-Core contains the shared robot systems that run on the V5 Brain, including autonomous logic, odometry, PID control, path following, subsystem control, helper utilities, and path files. This repository is intended to serve as the common backend foundation for both robots.
+## Repository structure
 
-## Overview
-
-Robot-Core is responsible for the low-level and mid-level robot functionality used across the team’s codebase:
-
-- Robot lifecycle code
-- Autonomous routines
-- Odometry and localization
-- PID control
-- Pure pursuit / path following
-- Path and spline utilities
-- Subsystem interfaces
-- Object handling
-- SD card logging
-- SLAM / positioning experiments
-
-The repository currently includes `src`, `include`, `paths`, and `firmware` directories, along with PROS build files such as `project.pros`, `Makefile`, and `common.mk`.
-
-## Repository Structure
-
-```txt
+```text
 Robot-Core/
-├── include/        # Header files and public interfaces
-├── src/            # Core robot source files
-├── paths/          # Path files used by autonomous/path-following systems
-├── firmware/       # PROS/V5 firmware libraries and linker files
-├── Makefile        # Build configuration
-├── common.mk       # Shared PROS make configuration
-├── project.pros    # PROS project metadata
-└── README.md
+├── v5-brain/       PROS project for the VEX V5 Brain
+├── jetson-nano/    Jetson Nano MPC project and third-party dependencies
+├── shared/         Shared protocol declarations
+├── common-utils/   Plotting utilities and path test data
+├── archive/        Historical and inactive code
+├── docs/           MPC notes and the restructuring proposal
+└── .github/        GitHub workflows
+```
+
+The Brain project keeps its current PROS-dependent motion and localization code together while the device boundary is established. The Nano project contains its MPC application and its own motion, localization, and serial interfaces. Shared protocol declarations live under `shared/include/daydream/shared/`.
+
+Build instructions for each target are in its project directory. The Brain uses PROS Makefiles in `v5-brain/`; the Nano project uses `jetson-nano/Makefile` and its `common.mk` flags.

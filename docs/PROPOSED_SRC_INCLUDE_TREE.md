@@ -1,6 +1,29 @@
-﻿# Proposed `src/` and `include/` structure
+# Proposed repository structure
 
-This document describes the proposed target organization for Robot-Core and the role of its runtime tasks. The tree reflects the agreed direction, not a claim that every legacy file has already moved to its final location. Migrate existing code incrementally as modules are touched.
+This document records the initial repository restructure. It describes the current staged layout and keeps the earlier Brain application architecture notes below for later migration work.
+
+## Current staged layout
+
+```text
+Robot-Core/
+├── v5-brain/
+│   ├── project.pros, Makefile, common.mk
+│   ├── firmware/
+│   ├── include/          PROS, LVGL, GIF, and Brain project headers
+│   └── src/              Brain application and PROS-dependent modules
+├── jetson-nano/
+│   ├── Makefile, common.mk
+│   ├── include/daydream/nano/
+│   ├── src/daydream/nano/ plus main.cpp
+│   └── external/         Eigen and OSQP
+├── shared/include/daydream/shared/protocol/
+├── common-utils/
+├── archive/              Existing historical code and inactive perception
+├── docs/                 MPC_DOCS.md and this proposal
+└── .github/
+```
+
+The Brain motion and localization modules remain in `v5-brain/` while they depend on PROS device APIs and Brain-owned objects. This is a compatibility step; moving those modules to the Nano requires separating their hardware interfaces first. Shared math types have not been extracted yet, so no new shared files are introduced.
 
 ## Design goals
 
@@ -17,7 +40,9 @@ This document describes the proposed target organization for Robot-Core and the 
 - Keep archived or inactive work out of the directories PROS scans to compile
   the active application.
 
-## Proposed tree
+## Earlier Brain-only architecture notes
+
+The tree below is a longer-term Brain application organization reference. It predates the split into `v5-brain/` and `jetson-nano/`; it is not the current repository tree and includes future modules that have not been added.
 
 ```text
 Robot-Core/
@@ -95,7 +120,7 @@ Robot-Core/
 |       |   |-- math.hpp                    Shared math helpers
 |       |   |-- sdCardLogging.hpp            SD-card logging support
 |       |   `-- serialProtocol.hpp           Serial packet declarations
-`-- archives/
+`-- archive/
     |-- legacy_path_follower_main.cpp
     |-- legacy_example_main.cpp
     |-- legacy_pneumatics.cpp
@@ -218,7 +243,7 @@ other algorithms that turn pose or path targets into drive commands.
 following, and trajectory-specific logging. Odometry belongs directly under
 `motion/` because it estimates the robot's motion and pose.
 
-Localization that depends on range sensors and a particle filter belongs under `motion/localization/`. Sensor sampling, reading types, and sensor-specific conversion helpers live beside localization; configured PROS device objects live under `config/`. This keeps pose-estimation inputs and algorithms together without mixing hardware construction into the estimator. Inactive perception experiments remain under `archives/`.
+Localization that depends on range sensors and a particle filter belongs under `motion/localization/`. Sensor sampling, reading types, and sensor-specific conversion helpers live beside localization; configured PROS device objects live under `config/`. This keeps pose-estimation inputs and algorithms together without mixing hardware construction into the estimator. Inactive perception experiments remain under `archive/`.
 
 ### `utilities/`
 
@@ -239,7 +264,7 @@ robot-prefixed name. `hardware.hpp` is the proposed home for configured PROS
 device objects. As the hardware setup evolves, keep the boundary clear between
 configuration and subsystem behavior.
 
-### `archives/`
+### `archive/`
 
 Contains inactive or historical project code, including perception work that
 is not part of the active build. Keeping it outside `src/` and `include/`
