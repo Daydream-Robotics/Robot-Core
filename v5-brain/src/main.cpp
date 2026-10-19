@@ -1,12 +1,12 @@
 #include "main.h"
 
-#include "daydream/autonomous/autonomous.hpp"
-#include "daydream/config/subsystems.hpp"
-#include "daydream/motion/control/mpcSerial.hpp"
-#include "daydream/motion/pathFollower.hpp"
-#include "daydream/motion/pathing/paths.hpp"
-#include "daydream/subsystems/drivetrain.hpp"
-#include "daydream/subsystems/pneumatics.hpp"
+#include "autonomous/autonomous.hpp"
+#include "config/subsystems.hpp"
+#include "motion/control/mpcSerial.hpp"
+#include "motion/pathFollower.hpp"
+#include "motion/pathing/paths.hpp"
+#include "subsystems/drivetrain.hpp"
+#include "subsystems/pneumatics.hpp"
 
 namespace {
 
