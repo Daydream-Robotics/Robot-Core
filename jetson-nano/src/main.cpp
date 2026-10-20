@@ -118,8 +118,8 @@ int main() {
         0.083, //internal resistance of battery
         8.0, //max positive change in voltage between steps
         -8.0, //max negative change in voltage between steps
-        140, //max allowed x position on field
-        140, //max allowed y position on field
+        72, //max allowed |x| on field (in), field-center origin
+        72, //max allowed |y| on field (in), field-center origin
         100, //max allowed rad/s
         0.0, //starting Voltage left
         0.0 //starting Voltage right
