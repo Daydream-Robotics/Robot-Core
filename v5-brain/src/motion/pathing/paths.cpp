@@ -3,6 +3,7 @@
 #include "utils/helpers.hpp"
 
 std::vector<ALS_Path> paths;
+Pose autonStartPose = {0.0, 0.0, 0.0};
 
 std::vector<ALS_Path> Path::buildAllPathsFromJerryIO(const std::string& filePath, double sampleSpacing) {
     std::vector<ALS_Path> newPaths;
@@ -20,14 +21,12 @@ std::vector<ALS_Path> Path::buildAllPathsFromJerryIO(const std::string& filePath
     double initalHeadingRad = normalizeAngle(initialHeading * (M_PI / 180.0));
 
     printf("[PATH] Initial heading set to %f rad\n", initalHeadingRad);
-    Pose initialPose = {rawPaths[0][0].x, rawPaths[0][0].y, initalHeadingRad};
+    // paths stay in the field frame (JerryIO GPS coords: field center origin), odom is seeded with the start pose
+    autonStartPose = {rawPaths[0][0].x, rawPaths[0][0].y, initalHeadingRad};
 
     int pathIndex = 0;
     for (auto& rawPath : rawPaths) {
         printf("[PATH] Processing path %d, size %zu\n", pathIndex, rawPath.size());
-        rawPath = normalizePath(rawPath, initialPose);
-        printf("[PATH] Path %d normalized\n", pathIndex);
-
         ALS_Path tempAlsPath;
         printf("[PATH] Building ALS_Path for path %d\n", pathIndex);
         bool sucess = tempAlsPath.buildFromPoints(rawPath, sampleSpacing);
@@ -128,30 +127,4 @@ std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, 
     file.close();
 
     return raw_paths;
-}
-
-
-std::vector<Waypoint> Path::normalizePath(const std::vector<Waypoint>& rawPath, Pose initialPose) {
-    printf("[PATH] normalizePath starting, rawPath size: %zu\n", rawPath.size());
-    std::vector<Waypoint> normalizedPath;
-    normalizedPath.reserve(rawPath.size());
-
-    double cosTheta = std::cos(-initialPose.theta);
-    double sinTheta = std::sin(-initialPose.theta);
-
-    for (const auto& wp : rawPath) {  
-        Waypoint newWp;
-
-        double dx = wp.x - initialPose.x;
-        double dy = wp.y - initialPose.y;
-
-        newWp.x = dx * cosTheta - dy * sinTheta;
-        newWp.y = dx * sinTheta + dy * cosTheta;
-        newWp.v = wp.v;
-
-        normalizedPath.push_back(newWp);
-    }
-
-    printf("[PATH] normalizePath finished\n");
-    return normalizedPath;
 }

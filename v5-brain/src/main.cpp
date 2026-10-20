@@ -62,7 +62,7 @@ void competition_initialize() {}
 
 void autonomous() {
     drivetrain.stop();
-    odom.setPose({0.0, 0.0, 0.0});
+    odom.setPose(autonStartPose);
 
     Autonomous auton(drivetrain, odom, pneumatics);
     auton.runExample();

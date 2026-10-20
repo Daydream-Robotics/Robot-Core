@@ -44,18 +44,17 @@ class Path {
          */
         static std::vector<std::vector<Waypoint>> parseFile(const std::string& filePath, double& outInitalHeading);
         
-        /**
-         * @brief Transforms the raw path coordinates relative to the robot's starting posisition and orientation
-         * @param rawPath Vector of raw waypoints from the file relative to the field
-         * @param initalPose The starting pose of the robot relative to the field
-         * @returns Vector of transformed waypoints
-         */
-        static std::vector<Waypoint> normalizePath(const std::vector<Waypoint>& rawPath, Pose initialPose);
 };
 
 /**
  * @brief Global vector holding all auton paths
  */
 extern std::vector<ALS_Path> paths;
+
+/**
+ * @brief Field-frame pose at the start of the first path (field center origin, inches/rads)
+ * @note set by buildAllPathsFromJerryIO, odom is seeded with it at the start of auton
+ */
+extern Pose autonStartPose;
 
 #endif
