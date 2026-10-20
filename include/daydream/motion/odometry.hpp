@@ -24,6 +24,13 @@ enum class OdomError {
 };
 
 /**
+ * @brief Gets the most recent odometry error
+ * @note task safe
+ * @returns The latest OdomError, or OdomError::NONE if the last update succeeded
+ */
+OdomError getOdomError();
+
+/**
  * @struct YawResult
  * @brief Stores yaw measurement and associated odometry error
  */
@@ -166,6 +173,18 @@ private:
     WheelTravelResult getOdomWheelTravel(void);
 
     /**
+     * @brief Fallback yaw computed from drive encoders when the IMU is unavailable
+     * @param imuError The IMU error that triggered the fallback
+     */
+    YawResult getImeYaw(OdomError imuError);
+
+    /**
+     * @brief Heading in radians computed from the left/right drive encoder difference
+     * @returns Heading in radians, or NAN if either encoder group is invalid
+     */
+    double getEncoderHeading();
+
+    /**
      * @brief Averages the actual velocities of all motors in a motor group
      * @param group The motor group to average
      * @returns The average velocity in RPM, or PROS_ERR_F if any motor reports an error
@@ -181,6 +200,10 @@ private:
     double m_headingOffset = 0.0; //field heading = raw IMU heading + offset
     double m_lastRawTheta = 0.0; //latest raw IMU heading, used by setPose()
     bool m_initialized = false;
+
+    // reference values saved on each good IMU read so the IME fallback continues without a jump
+    double m_imuRefYaw = 0.0;
+    double m_encRefHeading = 0.0;
     
 };
 

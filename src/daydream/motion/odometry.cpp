@@ -5,20 +5,47 @@
 #include <cmath>
 #include <numbers>
 #include <vector>
+#include <atomic>
 
+static std::atomic<OdomError> s_lastOdomError{OdomError::NONE};
+
+OdomError getOdomError() {
+	return s_lastOdomError.load();
+}
+
+//IME
 static double averageMotorGroupPosition(const pros::MotorGroup& group) {
-    std::vector<double> positions = group.get_position_all();
+
+	std::vector<double> positions = group.get_position_all();
+
     if (positions.empty()) {
         return 0.0;
     }
 
     double sum = 0.0;
+
     for (double pos : positions) {
-        sum += pos;
+    	if (pos == PROS_ERR_F || !std::isfinite(pos)) continue;
+    	sum += pos;
+    	valid++;
     }
 
-    return sum / static_cast<double>(positions.size());
+	return valid > 0 ? sum / valid : NAN;
 }
+
+// Raw heading from drive encoders, in degrees, relative to the last reset
+double getRawImeHeading()
+{
+	//Assuming needs new variables
+	double leftDist  = leftMotors.get_position()  / 360.0 * wheelCircumference * gearRatio;
+	double rightDist = rightMotors.get_position() / 360.0 * wheelCircumference * gearRatio;
+
+	//  dθ = (dR − dL) / trackWidth
+	return (rightDist - leftDist) / trackWidth * (180.0 / M_PI);
+}
+
+
+
 
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
@@ -56,10 +83,12 @@ void Odometry::updatePose(void) {
                 // TODO: Handle error for tracking wheel initialization failure
                 // FIX: add file wide error variable to track odom errors and display on controller
                 // The file wide error variable should be accessible to other files through a public getter
+                s_lastOdomError = OdomError::TRACKING_WHEEL_ERROR;
 				return;
 			}
 		}
-		
+
+		s_lastOdomError = OdomError::NONE;
 		m_initialized = true;
 		return;
 	}
@@ -120,6 +149,8 @@ void Odometry::updatePose(void) {
 	// }
 
 	m_prevTheta = theta_rad;
+
+    s_lastOdomError = OdomError::NONE;
 }
 
 Pose Odometry::getPose() {
@@ -159,11 +190,36 @@ double Odometry::getPosY() {
     return y;
 }
 
+double Odometry::getEncoderHeading() {
+	//get left and right average motor group position
+	//check if left and right aren't nan, if they are return NAN
+
+
+	//have leftInches be left/360 * gear ratio * wheel diameter * pi
+	//have same for right
+
+	// return (rightInches - leftInches)/TRACK_WIDTH (note TRACK_WIDTH should exist but if not assume it does its in PR #126)
+}
+
+
+YawResult Odometry::getImeYaw(OdomError imuError) {
+	double encHeading = getEncoderHeading();
+	if (std::isnan(encHeading)) {
+		return {0.0, imuError};
+	}
+
+	m_mutex.take();
+	double yaw = m_imuRefYaw + (encHeading - m_encRefHeading);
+	m_mutex.give();
+
+	return {normalizeAngle(yaw), OdomError::NONE};
+}
+
 YawResult Odometry::getYaw(void) {
 
 	// imu disconnected
 	if (!imu.is_installed()) {
-		return {0.0, OdomError::IMU_DISCONNECTED};
+		return getImeYaw(OdomError::IMU_DISCONNECTED);
 	}
 
 	// imu still calibrating
@@ -182,6 +238,15 @@ YawResult Odometry::getYaw(void) {
 
 	// yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
 	double yaw_rad = std::atan2(2 * ((qt.w * qt.z) + (qt.x * qt.y)), 1 - (2 * ((qt.y * qt.y) + (qt.z * qt.z))));
+
+	// save reference so IME fallback continues from here without a jump
+	double encHeading = getEncoderHeading();
+	if (!std::isnan(encHeading)) {
+		m_mutex.take();
+		m_imuRefYaw = -yaw_rad;
+		m_encRefHeading = encHeading;
+		m_mutex.give();
+	}
 
 	// angle is returned from -pi to pi
 	return {-yaw_rad, OdomError::NONE};
@@ -255,6 +320,16 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
 
     double currLeft = averageMotorGroupPosition(leftMotors);
     double currRight = averageMotorGroupPosition(rightMotors);
+
+	if (std::isnan(currLeft) || std::isnan(currRight)) {
+		return {0, 0};
+	}
+
+	if (std::isnan(m_prevLeft) || std::isnan(m_prevRight)) {
+		m_prevLeft = currLeft;
+		m_prevRight = currRight;
+		return {0, 0};
+	}
 
     double dLeft = currLeft - m_prevLeft;
     double dRight = currRight - m_prevRight;
