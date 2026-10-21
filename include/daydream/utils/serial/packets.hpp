@@ -58,7 +58,7 @@ namespace packets {
         BLUE = 2 ///< 600 rpm
     };
 
-    /// @brief GroupCfg::brake_mode. Used by GroupMode::STOP and when the watchdog trips.
+    /// @brief GroupCfg::brake_mode. Used by GroupMode::STOP and when the watchdog trips in autonomous.
     enum class BrakeMode : uint8_t { 
         COAST = 0, 
         BRAKE = 1, 
@@ -120,7 +120,7 @@ namespace packets {
         uint8_t config_id; ///< 1–255. must change whenever the content changes. resending the same ID is ignored
         uint8_t state_period_ms; ///< STATE interval, 5–50. default 10
         uint8_t proto_version; ///< must equal PROTO_VERSION
-        uint16_t watchdog_ms; ///< stop all groups after this long with no valid COMMAND. 20–1000, default 100
+        uint16_t watchdog_ms; ///< in autonomous, stop all groups after this long with no valid COMMAND. 20–1000, default 100
         uint8_t n_groups; ///< 1–MAX_GROUPS
         uint8_t n_rotations; ///< 0–MAX_ROTATIONS
         uint8_t adi_expander_port; ///< smart port of the 3-wire expander. 0 = none
