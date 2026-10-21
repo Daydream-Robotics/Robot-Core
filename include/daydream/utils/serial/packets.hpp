@@ -143,7 +143,7 @@ namespace packets {
         uint8_t flags; ///< bit0 = reversed
     };
 
-    /// @brief STATE fixed part (30 bytes). Followed by GroupState[n_groups] and RotationState[n_rotations].
+    /// @brief STATE fixed part (34 bytes). Followed by GroupState[n_groups] and RotationState[n_rotations].
     struct StateFixed {
         uint32_t t_us; ///< brain µs clock, taken after device reads, just before sending. wraps every ~71.6 min
         uint32_t cmd_age_us; ///< µs from the end of the last valid COMMAND to t_us. NO_COMMAND = none since config
@@ -160,6 +160,7 @@ namespace packets {
         uint16_t rx_errors; ///< running count of frames the brain dropped. wraps
         uint8_t n_groups;
         uint8_t n_rotations;
+        int32_t heading_delta_cdeg; ///< heading change since delta_base_seq, computed on the brain from the IMEs. centidegrees, CCW positive
     };
 
     /// @brief One group in STATE (9 bytes). Values are averaged over the group's working motors
@@ -199,7 +200,7 @@ namespace packets {
 
     // layout checks: fail the build if packing or a field type changes a wire size
     static_assert(sizeof(ConfigFixed) == 14 && sizeof(GroupCfg) == 11 && sizeof(RotationCfg) == 2);
-    static_assert(sizeof(StateFixed) == 30 && sizeof(GroupState) == 9 && sizeof(RotationState) == 5);
+    static_assert(sizeof(StateFixed) == 34 && sizeof(GroupState) == 9 && sizeof(RotationState) == 5);
     static_assert(sizeof(CommandFixed) == 17 && sizeof(GroupCmd) == 7);
     static_assert(sizeof(float) == 4, "float fields must be IEEE-754 binary32");
 
@@ -239,4 +240,126 @@ namespace packets {
     static_assert(configSize(MAX_GROUPS, MAX_ROTATIONS) <= MAX_PAYLOAD);
     static_assert(stateSize(MAX_GROUPS, MAX_ROTATIONS) <= MAX_PAYLOAD);
     static_assert(commandSize(MAX_GROUPS) <= MAX_PAYLOAD);
+
+    /**
+     * @brief Rough size check, run as soon as the 6-byte header is in.
+     *
+     * Rejects a frame whose `size` can't be valid for its type before
+     * reading payload. Exact size is checked later, once the counts in
+     * the fixed part are known (Error::SIZE).
+     *
+     * @param type Header `type` field.
+     * @param size Header `size` field, in bytes.
+     * @return bool True if `size` is between the smallest and largest legal payload for `type`.
+     *         False for an unknown type.
+     */
+    constexpr bool sizeInRange(uint16_t type, uint16_t size) {
+        switch (type) {
+            case CONFIG: // at least 1 group, rotations optional
+                return size >= configSize(1, 0) && size <= configSize(MAX_GROUPS, MAX_ROTATIONS);
+            case STATE: // 0 groups when not configured
+                return size >= stateSize(0, 0)  && size <= stateSize(MAX_GROUPS, MAX_ROTATIONS);
+            case COMMAND: // at least 1 group, since the config needs one
+                return size >= commandSize(1)   && size <= commandSize(MAX_GROUPS);
+            case LOG: // 1 level byte + 1–MAX_LOG_TEXT text bytes
+                return size >= 2 && size <= 1 + MAX_LOG_TEXT;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @brief Exact size check
+     *
+     * Compares `size` against the size implied by the payload's counts.
+     * Call it only after sizeInRange() passes, which guarantees the fixed part
+     * is there to read. A mismatch is reported as Error::SIZE.
+     *
+     * @param type Header `type` field.
+     * @param p Start of the payload.
+     * @param size Header `size` field, in bytes.
+     * @param appliedGroups Group count of the applied config. Only used for COMMAND.
+     *        0 = not configured
+     * @return bool True if `size` matches the counts. False for an unknown type.
+     */
+    inline bool sizeExact(uint16_t type, const uint8_t* p, uint16_t size, uint8_t appliedGroups) {
+        switch (type) {
+            case CONFIG: {
+                // copy the fixed part out to read its counts
+                ConfigFixed f;
+                std::memcpy(&f, p, sizeof f);
+                // the counts say how many GroupCfg and RotationCfg follow. size must cover exactly that
+                return size == configSize(f.n_groups, f.n_rotations);
+            }
+            case STATE: {
+                // same as CONFIG: the fixed part says how many GroupState and RotationState follow
+                StateFixed f;
+                std::memcpy(&f, p, sizeof f);
+                return size == stateSize(f.n_groups, f.n_rotations);
+            }
+            case COMMAND:
+                // the group count comes from the applied config, not payload.
+                // not configured (0) passes so the caller reports Error::NOT_CONFIGURED instead of SIZE
+                return appliedGroups == 0 || size == commandSize(appliedGroups);
+            case LOG:
+                // 1 level byte + text of any length. sizeInRange() already bounded it to MAX_LOG_TEXT
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @brief Write cursor for building a payload into a byte buffer.
+     *
+     * Copies each value in with memcpy.
+     * Does no bounds checking, so `buf` must be big enough for everything put.
+     */
+    struct PayloadWriter {
+        uint8_t* buf; ///< destination buffer
+        size_t n = 0; ///< bytes written so far
+
+        /**
+         * @brief Appends `v` at the cursor and advances it.
+         *
+         * @param v Value to write. Its bytes are copied as-is (little-endian on both sides).
+         */
+        template <class T>
+        void put(const T& v) {
+            // copy v's raw bytes to the cursor.
+            std::memcpy(buf + n, &v, sizeof v);
+            // move the cursor past what was just written, so the next put() lands right after it
+            n += sizeof v;
+        }
+    };
+
+    /**
+     * @brief Read cursor for parsing a received payload.
+     *
+     * Copies each value out with memcpy, since packed fields are unaligned.
+     */
+    struct PayloadReader {
+        const uint8_t* buf; ///< received payload
+        size_t size; ///< payload length, in bytes
+        size_t n = 0; ///< bytes read so far
+
+        /**
+         * @brief Reads the next value at the cursor and advances it.
+         *
+         * @param v Filled with the value read. Left unchanged on failure.
+         * @return bool False if fewer than sizeof(T) bytes are left. The cursor doesn't move.
+         */
+        template <class T>
+        bool get(T& v) {
+            // not enough bytes left for a whole T.
+            if (n + sizeof v > size) {
+                return false;
+            }
+            // copy the bytes at the cursor into v.
+            std::memcpy(&v, buf + n, sizeof v);
+            // move the cursor past what was just read, so the next get() starts right after it
+            n += sizeof v;
+            return true;
+        }
+    };
 }
