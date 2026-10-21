@@ -63,7 +63,8 @@ option(ROBOTCORE_BUILD_NANO_EXE "Build the Nano's MPCController serial program" 
 if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_executable(MPCController
         src/main.cpp
-        src/link/serialProtocol.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../shared/src/serial/serialProtocol.cpp
     )
+    target_compile_definitions(MPCController PRIVATE __microcontroller__)
     target_link_libraries(MPCController PRIVATE robotcore_mpc m)
 endif()

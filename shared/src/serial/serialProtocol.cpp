@@ -1,4 +1,4 @@
-#include "link/serialProtocol.hpp"
+#include "serial/serialProtocol.hpp"
 
 #include <cstdio>
 #include <cstring>

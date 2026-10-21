@@ -4,7 +4,7 @@
 #include "motion/control/motionController.hpp"
 #include "localization/odometry.hpp"
 #include "motion/pathing/arclengthSplining.hpp"
-#include "protocol/serialProtocol.hpp"
+#include "serial/serialProtocol.hpp"
 //shared with the Nano (shared/include, via EXTRA_INCDIR in the Makefile)
 #include "mpc/mpcConfig.hpp"
 #include "mpc/mpcPackets.hpp"

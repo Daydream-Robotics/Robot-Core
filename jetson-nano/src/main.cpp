@@ -7,7 +7,7 @@
 #include <memory>
 #include <cmath>
 #include "motion/control/mpc.hpp"
-#include "link/serialProtocol.hpp"
+#include "serial/serialProtocol.hpp"
 #include "mpc/mpcConfig.hpp"
 #include "mpc/mpcPackets.hpp"
 

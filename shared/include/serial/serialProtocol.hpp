@@ -9,8 +9,6 @@
 #include <cstdio>
 #include <chrono>
 
-#define __microcontroller__
-
 #ifdef __vexbrain__
     #include "pros/apix.h"
 #endif
@@ -325,17 +323,6 @@ std::optional<T> SerialProtocol::receiveBinary(uint16_t expectedType) {
 
     // Validate payload size
     if (header.size != sizeof(T)) {
-#ifdef __microcontroller__
-        //right type, wrong size: the sender was built from a different packet layout
-        //log the first payload byte, which is the protocol version for the MPC packets (see mpcPackets.hpp)
-        uint8_t first_byte = 0;
-        if (header.size > 0 && readBytes(&first_byte, 1, 100)) {
-            std::cerr << "SERIAL ERROR: packet type " << header.type << " is " << header.size << " bytes, expected " << sizeof(T)
-                      << " (sender protocol version " << int(first_byte) << "?)\n";
-            skipBytes(header.size);
-            return std::nullopt;
-        }
-#endif
         skipBytes(header.size + 1);
         return std::nullopt;
     }
