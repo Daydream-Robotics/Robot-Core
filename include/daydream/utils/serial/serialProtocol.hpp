@@ -19,6 +19,7 @@
 
 #include "daydream/utils/serial/packets.hpp"
 
+// ! PLATFORM NOTE PUT THIS IN CONSTANTS.H and include it so that its the smae on nano vs brain
 #define __vexbrain__
 
 #ifdef __vexbrain__

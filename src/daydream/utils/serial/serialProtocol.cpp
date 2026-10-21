@@ -1,231 +1,370 @@
-#include "daydream/utils/serialProtocol.hpp"
+/**
+ * @file serialProtocol.cpp
+ * @brief Framing for the brain ⇄ Nano link. Shared code first, then one block per platform.
+ */
 
-#include <cstdio>
+#include "daydream/utils/serial/serialProtocol.hpp"
+
+#include <algorithm>
 #include <cstring>
-#include <chrono>
-#include <thread>
 
-//constructor
-SerialProtocol::SerialProtocol(int bufferSize, Mode mode)
-    : buffer_size(bufferSize),
-      mode(mode),
-      rx_buffer(8192),
+#ifdef __vexbrain__
+    #include "pros/error.h"
+    #include "pros/rtos.hpp"
+#endif
+
+#ifdef __microcontroller__
+    #include <chrono>
+    #include <string>
+    #include <fcntl.h>
+    #include <unistd.h>
+#endif
+
+static constexpr uint8_t SYNC_0 = 0x55; ///< first sync byte of every frame
+static constexpr uint8_t SYNC_1 = 0xAA; ///< second sync byte of every frame
+
+SerialProtocol::SerialProtocol(int buffer_size)
+    : buffer_size(std::max<int>(buffer_size, MAX_FRAME_SIZE)),
+      rx_buffer(this->buffer_size),
       rx_buffer_pos(0) {}
 
-//function to serialize packet into string then write to USB serial
-bool SerialProtocol::sendASCII(const Packet& packet) {
-    //converts packet struct into raw string packet
-    std::string data = serializePacket(packet);
-    //write to serial
-    std::fwrite(data.c_str(), 1, data.size(), stdout);
-    //force serial output immediately
-    std::fflush(stdout);
+bool SerialProtocol::send(uint16_t type, const void* payload, uint16_t size) {
+    // payload too big for one frame
+    if (size > packets::MAX_PAYLOAD) {
+        return false;
+    }
+    // build the whole frame in one buffer so it goes out in one write with no gaps
+    uint8_t frame[MAX_FRAME_SIZE];
+    // sync bytes
+    frame[0] = SYNC_0;
+    frame[1] = SYNC_1;
+    // type bytes
+    frame[2] = type & 0xFF;
+    frame[3] = (type >> 8) & 0xFF;
+    // size bytes
+    frame[4] = size & 0xFF;
+    frame[5] = (size >> 8) & 0xFF;
+    // payload
+    std::memcpy(frame + HEADER_SIZE, payload, size);
+    // CRC over type + size + payload (not the sync bytes)
+    uint16_t crc = crc16(frame + 2, HEADER_SIZE - 2 + size);
+    frame[HEADER_SIZE + size] = crc & 0xFF;
+    frame[HEADER_SIZE + size + 1] = (crc >> 8) & 0xFF;
 
-    return true;
+    return writeBytes(frame, HEADER_SIZE + size + CRC_SIZE);
 }
 
-std::optional<SerialProtocol::Packet> SerialProtocol::receiveASCII() {
-    //temporary recieve buffer
-    char buffer[1024];
-    //keep reading lines until we find a valid packet (skip debug messages)
-     while (std::fgets(buffer, sizeof(buffer), stdin)) {
-        std::string line(buffer);
-        auto packet = deserializePacket(line);
-        //only return if it's a valid packet type (not debug output)
-        if (packet.has_value() && isValidPacketType(packet->type)) {
-            return packet;
+std::optional<SerialProtocol::Frame> SerialProtocol::receive() {
+    // pull in any new bytes
+    readBytes();
+
+    std::optional<Frame> result;
+    while (rx_buffer_pos >= 2) {
+        const uint8_t* buf = rx_buffer.data();
+
+        // scan for sync bytes 0x55 0xAA
+        if (buf[0] != SYNC_0 || buf[1] != SYNC_1) {
+            skipBytes(1);
+            continue;
         }
-    }
-    return std::nullopt;
-}
-
-//converts packet struct into packet string
-std::string SerialProtocol::serializePacket(const Packet& packet) {
-    const char field_sep   = ',';
-    const char message_sep = ';';
-    const char end_char    = '\n';
-
-    //declares final output string
-    std::string out = packet.type;
-
-    //if no packet message just return packet type and newline
-    if (packet.message.empty()) {
-        out += end_char;
-        return out;
-    }
-
-    //add seperator between type and body
-    out += field_sep;
-
-    //loop through each message block
-    for (size_t i = 0; i < packet.message.size(); ++i) {
-        //stores current message block
-        const auto& block = packet.message[i];
-        //loop through fields in message
-        for (size_t j = 0; j < block.size(); ++j) {
-            //add field contents
-            out += block[j];
-            //add field seperator between fields (except for final field)
-            if (j + 1 < block.size()) {
-                out += field_sep;
-            }
-        }
-        //add message seperator between messages (except for final block)
-        if (i + 1 < packet.message.size()) {
-            out += message_sep;
-        }
-    }
-
-    //add final packet terminator
-    out += end_char;
-
-    return out;
-}
-
-//convert packet string into packet struct
-std::optional<SerialProtocol::Packet> SerialProtocol::deserializePacket(
-    const std::string& line) {
-    const char field_sep   = ',';
-    const char message_sep = ';';
-
-    //if the packet is empty return nullptr
-    if (line.empty()) {
-        return std::nullopt;
-    }
-
-    //makes a copy of line to safely modify
-    std::string trimmed = line;
-
-    //removes trailing newline
-    if(!trimmed.empty() && trimmed.back() == '\n') {
-        trimmed.pop_back();
-    }
-    //removes carriage return (artifact)
-    if(!trimmed.empty() && trimmed.back() == '\r') {
-        trimmed.pop_back();
-    }
-
-
-    Packet packet;
-    //find first field seperator
-    size_t sep_pos = trimmed.find(field_sep);
-    //if there isn't a seperator, that means packet only contains type (and return)
-    if (sep_pos == std::string::npos) {
-        packet.type = trimmed;
-        return packet;
-    }
-
-    //extracts packet type
-    packet.type = trimmed.substr(0, sep_pos);
-    //extracts packet body
-    std::string body = trimmed.substr(sep_pos + 1);
-
-    //store current parsing position
-    size_t start = 0;
-    //parse each message block
-    while (start < body.size()) {
-        //find next message seperator
-        size_t msg_end = body.find(message_sep, start);
-        //extract one message block
-        std::string block_str = body.substr(start, msg_end - start);
-
-        //store fields for current message block
-        std::vector<std::string> fields;
-        //store current field parsing position
-        size_t field_start = 0;
-        //parse fields inside message block
-        while (field_start < block_str.size()) {
-            //find next field seperator
-            size_t field_end = block_str.find(field_sep, field_start);
-            //extract field text
-            fields.push_back(block_str.substr(field_start, field_end - field_start));
-            
-            //if no more field seperators it means that final field is reached and we break
-            if (field_end == std::string::npos) {
-                break;
-            }
-
-            //move parser after field seperator
-            field_start = field_end + 1;
-        }
-
-        //store parsed fields into packet
-        if (!fields.empty()) {
-            packet.message.push_back(std::move(fields));
-        }
-
-        //if no more message seperators it means that final message block is reached and we break
-        if (msg_end == std::string::npos) {
+        // wait for the rest of the header
+        if (rx_buffer_pos < HEADER_SIZE) {
             break;
         }
 
-        //mover parser after message separator
-        start = msg_end + 1;
+        BinaryHeader header;
+        std::memcpy(&header, buf, HEADER_SIZE);
+
+        // validate packet type and rough size before waiting on the payload.
+        // on any failure only skip 1 byte, so a corrupted size can't swallow the frames after it
+        if (!isValidPacketType(header.type) || !packets::sizeInRange(header.type, header.size)) {
+            bad_frames++;
+            skipBytes(1);
+            continue;
+        }
+
+        // wait for the payload and CRC
+        size_t frame_size = HEADER_SIZE + header.size + CRC_SIZE;
+        if (rx_buffer_pos < frame_size) {
+            break;
+        }
+
+        const uint8_t* payload = buf + HEADER_SIZE;
+
+        // validate exact payload size from the counts in the payload
+        if (!packets::sizeExact(header.type, payload, header.size, command_groups)) {
+            bad_frames++;
+            skipBytes(1);
+            continue;
+        }
+
+        // read and verify CRC
+        uint16_t recv_crc = payload[header.size] | (payload[header.size + 1] << 8);
+        uint16_t computed_crc = crc16(buf + 2, HEADER_SIZE - 2 + header.size);
+        if (computed_crc != recv_crc) {
+            crc_errors++;
+            skipBytes(1);
+            continue;
+        }
+
+        // valid frame: copy it out and remove it from the buffer
+        result.emplace();
+        result->type = header.type;
+        result->size = header.size;
+        std::memcpy(result->payload, payload, header.size);
+        skipBytes(frame_size);
+        break;
     }
 
-    return packet;
+    // a frame is partway in if the buffer starts with a sync byte
+    in_frame = rx_buffer_pos >= 1 && rx_buffer[0] == SYNC_0;
+    return result;
 }
 
-//reads n bytes from serial with timeout support
-bool SerialProtocol::readBytes(void* dest, size_t n, int timeout_ms) {
-    uint8_t* out = reinterpret_cast<uint8_t*>(dest);
-    std::size_t remaining = n;
-
-    auto start_time = std::chrono::steady_clock::now();
-    while (remaining>0) {
-        //use any buffered data before reading from serial
-        if (rx_buffer_pos > 0) {
-            std::size_t to_copy = std::min(remaining, rx_buffer_pos);
-            memcpy(out, rx_buffer.data(), to_copy);
-            if (rx_buffer_pos > to_copy) {
-                //shifts remaining buffer data to the front
-                memmove(rx_buffer.data(), rx_buffer.data() + to_copy, rx_buffer_pos - to_copy);
-            }
-            rx_buffer_pos -= to_copy;
-            out+= to_copy;
-            remaining -= to_copy;
-            continue;
+uint16_t SerialProtocol::crc16(const uint8_t* data, size_t len, uint16_t crc) {
+    // process each byte in buffer
+    for (size_t i = 0; i < len; i++) {
+        // xor current byte into the top of the CRC register
+        crc ^= static_cast<uint16_t>(data[i]) << 8;
+        // process all the bits of the current byte
+        for (int b = 0; b < 8; b++) {
+            // if most sig bit (bit 15) is set, shift left and apply polynomial
+            crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
         }
-        //check timeout before reading more data
-        if (timeout_ms > 0) {
-            auto now = std::chrono::steady_clock::now();
-            if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() > timeout_ms) {
-                return false;
-            }
-        }
-
-        //read 1 byte so fread never blocks waiting to fill a large buffer
-        int byte = std::fread(rx_buffer.data(), 1, 1, stdin);
-        if (byte <= 0) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            continue;
-        }
-        rx_buffer_pos = byte;
     }
+    return crc;
+}
 
+void SerialProtocol::skipBytes(size_t num_bytes) {
+    num_bytes = std::min(num_bytes, rx_buffer_pos);
+    // shift remaining buffer data to the front
+    std::memmove(rx_buffer.data(), rx_buffer.data() + num_bytes, rx_buffer_pos - num_bytes);
+    rx_buffer_pos -= num_bytes;
+}
+
+
+#ifdef __vexbrain__
+
+SerialProtocol::~SerialProtocol() = default;
+
+bool SerialProtocol::setUpVexSerial(uint8_t port_number, int32_t baud) {
+    port = std::make_unique<pros::Serial>(port_number, baud);
+    // PROS_ERR here means the port number is bad or the port is in use
+    return port->get_read_avail() != PROS_ERR;
+}
+
+bool SerialProtocol::isValidPacketType(uint16_t type) {
+    return type == packets::CONFIG || type == packets::COMMAND;
+}
+
+int SerialProtocol::readBytes() {
+    // port not opened yet
+    if (!port) {
+        return 0;
+    }
+    // free space left in rx_buffer
+    size_t space = rx_buffer.size() - rx_buffer_pos;
+    // bytes waiting in the PROS receive buffer
+    int32_t available = port->get_read_avail();
+    // nothing to read, no room, or the port errored
+    if (space == 0 || available <= 0 || available == PROS_ERR) {
+        return 0;
+    }
+    // read only what's available and fits, so the read never blocks
+    int32_t to_read = std::min<int32_t>(available, static_cast<int32_t>(space));
+    // append to the end of the buffered data
+    int32_t read = port->read(rx_buffer.data() + rx_buffer_pos, to_read);
+    // read failed
+    if (read <= 0 || read == PROS_ERR) {
+        return 0;
+    }
+    // count the new bytes as buffered
+    rx_buffer_pos += read;
+    return read;
+}
+
+bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
+    // port not opened yet
+    if (!port) {
+        return false;
+    }
+    // keep writing until every byte is handed to PROS
+    while (n > 0) {
+        // space left in the PROS transmit buffer
+        int32_t free_space = port->get_write_free();
+        // port errored
+        if (free_space == PROS_ERR) {
+            return false;
+        }
+        // transmit buffer full, give 1 ms to drain
+        if (free_space <= 0) {
+            pros::delay(1);
+            continue;
+        }
+        // write only what fits right now
+        int32_t to_write = std::min<int32_t>(free_space, static_cast<int32_t>(n));
+        // PROS takes a non-const buffer but doesn't modify it
+        int32_t written = port->write(const_cast<uint8_t*>(data), to_write);
+        // write failed
+        if (written <= 0 || written == PROS_ERR) {
+            return false;
+        }
+        // move past what was written
+        data += written;
+        n -= written;
+    }
     return true;
 }
 
-//send wakeup string
-bool SerialProtocol::sendWakeup(const std::string& wakeup) {
-    //write wakeup string to serial
-    std::fwrite(wakeup.c_str(), 1, wakeup.size(), stdout);
-    //force immediate output
-    std::fflush(stdout);
-    return true;
+#endif
+
+#ifdef __microcontroller__
+
+/**
+ * @brief Writes a short string to a sysfs file.
+ *
+ * @param path File to write, e.g. "/sys/class/gpio/export".
+ * @param text Text to write. Failures are ignored.
+ */
+static void writeFile(const std::string& path, const std::string& text) {
+    // open for writing only
+    int file = open(path.c_str(), O_WRONLY);
+    // file doesn't exist or no permission
+    if (file < 0) {
+        return;
+    }
+    // sysfs takes the whole value in one write
+    (void)write(file, text.data(), text.size());
+    close(file);
 }
 
-//returns true if the packet type is valid.
-//its valid type if its either empty or is only alphanumeric chars and underscores.
-bool SerialProtocol::isValidPacketType(const std::string& type) {
-    if (type.empty()) {
-        return true;
+SerialProtocol::~SerialProtocol() {
+    // close the DE pin value file if it was opened
+    if (de_fd >= 0) {
+        close(de_fd);
     }
-    for (char c : type) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') {
+    // close the UART if it was opened
+    if (fd >= 0) {
+        close(fd);
+    }
+}
+
+bool SerialProtocol::setUpMicrocontrollerSerial(const char* port, speed_t baud, int de_gpio) {
+    // open serial device (read/write, no controlling terminal)
+    fd = open(port, O_RDWR | O_NOCTTY);
+    // failed to open port
+    if (fd < 0) {
+        return false;
+    }
+    struct termios tty;
+    // retrieve current terminal attributes
+    if (tcgetattr(fd, &tty) != 0) {
+        close(fd);
+        fd = -1;
+        return false;
+    }
+    // set input/output baud rate
+    cfsetospeed(&tty, baud);
+    cfsetispeed(&tty, baud);
+    // configure 8 data bits, enable receiver, ignore modem control lines
+    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8 | CLOCAL | CREAD;
+    // no parity, 1 stop bit, no hardware flow control
+    tty.c_cflag &= ~(PARENB | CSTOPB | CRTSCTS);
+    // disable software flow control and special handling of input bytes
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY | IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
+    // disable canonical mode, echo, signals, and extended input processing
+    tty.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+    // disable output processing (raw output mode)
+    tty.c_oflag &= ~OPOST;
+    // read behavior: return what's there, or wait at most 0.1s if nothing is
+    tty.c_cc[VMIN] = 0;
+    tty.c_cc[VTIME] = 1;
+    // apply configuration immediately
+    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+        close(fd);
+        fd = -1;
+        return false;
+    }
+    // throw away anything received before now
+    tcflush(fd, TCIOFLUSH);
+
+    // transceiver direction pin through sysfs
+    if (de_gpio >= 0) {
+        std::string gpio = std::to_string(de_gpio);
+        std::string dir = "/sys/class/gpio/gpio" + gpio;
+        // fails harmlessly if already exported
+        writeFile("/sys/class/gpio/export", gpio);
+        // output, starting low = receive
+        writeFile(dir + "/direction", "low");
+        // keep the value file open so setDE() is a single write
+        de_fd = open((dir + "/value").c_str(), O_WRONLY);
+        // GPIO missing or no permission
+        if (de_fd < 0) {
             return false;
         }
     }
     return true;
 }
 
+bool SerialProtocol::isValidPacketType(uint16_t type) {
+    // the nano only receives what the brain sends
+    return type == packets::STATE || type == packets::LOG;
+}
+
+int SerialProtocol::readBytes() {
+    // free space left in rx_buffer
+    size_t space = rx_buffer.size() - rx_buffer_pos;
+    // port not opened yet, or no room
+    if (fd < 0 || space == 0) {
+        return 0;
+    }
+    // append to the end of the buffered data. waits up to 0.1s if nothing is there
+    ssize_t n = read(fd, rx_buffer.data() + rx_buffer_pos, space);
+    // timed out with nothing, or read failed
+    if (n <= 0) {
+        return 0;
+    }
+    // count the new bytes as buffered
+    rx_buffer_pos += n;
+    return static_cast<int>(n);
+}
+
+bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
+    // port not opened yet
+    if (fd < 0) {
+        return false;
+    }
+    // take the bus
+    setDE(true);
+    // keep writing until every byte is handed to the UART
+    while (n > 0) {
+        ssize_t written = write(fd, data, n);
+        // write failed, release the bus before giving up
+        if (written <= 0) {
+            setDE(false);
+            return false;
+        }
+        // move past what was written
+        data += written;
+        n -= written;
+    }
+    // wait for the UART to finish sending
+    tcdrain(fd);
+    // tcdrain can return before the last stop bit is out.
+    // hold the bus ~2 byte times before releasing it
+    auto until = std::chrono::steady_clock::now() + std::chrono::microseconds(25);
+    // busy-wait
+    while (std::chrono::steady_clock::now() < until) {}
+    // release the bus so the brain can talk
+    setDE(false);
+    return true;
+}
+
+void SerialProtocol::setDE(bool on) {
+    // no DE pin with an auto-direction transceiver
+    if (de_fd >= 0) {
+        // sysfs value: "1" = high = transmit, "0" = low = receive. pwrite at offset 0 so the file never needs a seek
+        (void)pwrite(de_fd, on ? "1" : "0", 1, 0);
+    }
+}
+#endif
