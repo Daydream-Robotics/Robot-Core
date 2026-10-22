@@ -9,7 +9,7 @@ struct OdomConfig {
     double perpendicularTrackingWheelOffset;
     bool useMotorEncoders = false;
     double driveWheelDiameter = 0.0;
-    double driveTrackWidth = 0.0;
+    double driveTrackWidth = TRACK_WIDTH;
 };
 
 /**
@@ -46,6 +46,8 @@ struct WheelLengths {
 struct WheelTravelResult {
     WheelLengths travel{0.0, 0.0}; /**< The distances traveled by the parallel and perpendicular tracking wheels in inches */
     OdomError error{OdomError::NONE}; /**< The tracking wheel error status */
+    double currentParallelPosition{0.0};
+    double currentPerpendicularPosition{0.0};
 };
 
 /**

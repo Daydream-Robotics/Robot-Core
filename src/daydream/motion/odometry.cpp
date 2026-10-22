@@ -15,7 +15,7 @@ static std::optional<double> averageMotorGroupPosition(const pros::MotorGroup& g
 
     double sum = 0.0;
     for (double pos : positions) {
-        if (!std::isfinite(pos) || pos == PROS_ERR_F) {
+        if (!std::isfinite(pos)) {
 			return std::nullopt;
 		}
 		sum += pos;
@@ -32,7 +32,15 @@ void Odometry::updatePose(void) {
 
 	if (m_config.useMotorEncoders &&
 		motorResult.error != OdomError::NONE) {
-		pros::lcd::print(0, "[Update Pose] Motor Encoder Error!");
+
+		static uint32_t lastMotorFailurePrint = 0;
+		const uint32_t now = pros::millis();
+
+		if (now - lastMotorFailurePrint >= 500) {
+			pros::lcd::print(0, "[Update Pose] Motor Encoder Error!");
+			lastMotorFailurePrint = now;
+		}
+
 		return;
 	}
 
@@ -58,7 +66,7 @@ void Odometry::updatePose(void) {
 
 	if (encoderHeadingAvailable) {
 		encoderHeading =
-			(motorResult.rightInches - motorResult.leftInches)
+			(motorResult.leftInches - motorResult.rightInches)
 			/ m_config.driveTrackWidth;
 	}
 
@@ -117,7 +125,14 @@ void Odometry::updatePose(void) {
 			auto rightResult = averageMotorGroupPosition(rightMotors);
 
 			if (!leftResult.has_value() || !rightResult.has_value()) {
-				pros::lcd::print(0, "[Update Pose] Motor Encoder Error!");
+				static uint32_t lastInitMotorFailurePrint = 0;
+				const uint32_t now = pros::millis();
+
+				if (now - lastInitMotorFailurePrint >= 500) {
+					pros::lcd::print(0, "[Update Pose] Motor Encoder Error!");
+					lastInitMotorFailurePrint = now;
+				}
+
 				return;
 			}
 
@@ -212,6 +227,12 @@ void Odometry::updatePose(void) {
 	if (motorResult.error == OdomError::NONE && m_driveEncodersReady) {
 		m_prevLeft = motorResult.currentLeftPosition;
 		m_prevRight = motorResult.currentRightPosition;
+	}
+
+	// Save tracking wheel positions only after updating the pose
+	if (!m_config.useMotorEncoders) {
+		m_prevParallel = wheelResult.currentParallelPosition;
+		m_prevPerpendicular = wheelResult.currentPerpendicularPosition;
 	}
 
 	m_prevTheta = theta_rad;
@@ -312,11 +333,7 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	double delParallel = (dTicksL / 36000.0) * m_config.parallelWheelDiameter * std::numbers::pi; 
 	double delPerpendicular = (dTicksS / 36000.0) * m_config.perpendicularWheelDiameter * std::numbers::pi; 
 
-    // Save current position as previous
-	m_prevParallel = currParallel;
-	m_prevPerpendicular = currPerpendicular;
-
-	return {{delParallel, delPerpendicular}, OdomError::NONE};
+	return {{delParallel, delPerpendicular}, OdomError::NONE, currParallel, currPerpendicular};
 }
 
 VelocityResult Odometry::getParallelVel() {
@@ -417,5 +434,5 @@ Odometry odom({
 	PERPENDICULAR_TRACKING_WHEEL_OFFSET,
 	true,
 	DRIVE_WHEEL_DIAMETER_INCHES,
-	16.7211
+	TRACK_WIDTH
 });
