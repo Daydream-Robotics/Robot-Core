@@ -8,12 +8,14 @@
 #include <algorithm>
 #include <cstring>
 
-#ifdef __vexbrain__
+#ifdef __v5_brain__
+    #include <unistd.h>
+    #include "pros/apix.h"
     #include "pros/error.h"
     #include "pros/rtos.hpp"
 #endif
 
-#ifdef __microcontroller__
+#ifdef __jetson_nano__
     #include <chrono>
     #include <string>
     #include <fcntl.h>
@@ -23,10 +25,10 @@
 static constexpr uint8_t SYNC_0 = 0x55; ///< first sync byte of every frame
 static constexpr uint8_t SYNC_1 = 0xAA; ///< second sync byte of every frame
 
-SerialProtocol::SerialProtocol(int buffer_size)
-    : buffer_size(std::max<int>(buffer_size, MAX_FRAME_SIZE)),
-      rx_buffer(this->buffer_size),
-      rx_buffer_pos(0) {}
+SerialProtocol::SerialProtocol(int bufferSize)
+    : m_bufferSize(std::max<int>(bufferSize, MAX_FRAME_SIZE)),
+      m_rxBuffer(m_bufferSize),
+      m_rxBufferPos(0) {}
 
 bool SerialProtocol::send(uint16_t type, const void* payload, uint16_t size) {
     // payload too big for one frame
@@ -55,12 +57,20 @@ bool SerialProtocol::send(uint16_t type, const void* payload, uint16_t size) {
 }
 
 std::optional<SerialProtocol::Frame> SerialProtocol::receive() {
-    // pull in any new bytes
+    // a frame may already be buffered, e.g. a STATE that arrived with a LOG.
+    // parse before reading, so the Nano's blocking read can't sit on it
+    if (std::optional<Frame> frame = parseFrame()) {
+        return frame;
+    }
+    // pull in any new bytes and try again
     readBytes();
+    return parseFrame();
+}
 
+std::optional<SerialProtocol::Frame> SerialProtocol::parseFrame() {
     std::optional<Frame> result;
-    while (rx_buffer_pos >= 2) {
-        const uint8_t* buf = rx_buffer.data();
+    while (m_rxBufferPos >= 2) {
+        const uint8_t* buf = m_rxBuffer.data();
 
         // scan for sync bytes 0x55 0xAA
         if (buf[0] != SYNC_0 || buf[1] != SYNC_1) {
@@ -68,7 +78,7 @@ std::optional<SerialProtocol::Frame> SerialProtocol::receive() {
             continue;
         }
         // wait for the rest of the header
-        if (rx_buffer_pos < HEADER_SIZE) {
+        if (m_rxBufferPos < HEADER_SIZE) {
             break;
         }
 
@@ -78,31 +88,31 @@ std::optional<SerialProtocol::Frame> SerialProtocol::receive() {
         // validate packet type and rough size before waiting on the payload.
         // on any failure only skip 1 byte, so a corrupted size can't swallow the frames after it
         if (!isValidPacketType(header.type) || !packets::sizeInRange(header.type, header.size)) {
-            bad_frames++;
+            badFrames++;
             skipBytes(1);
             continue;
         }
 
         // wait for the payload and CRC
-        size_t frame_size = HEADER_SIZE + header.size + CRC_SIZE;
-        if (rx_buffer_pos < frame_size) {
+        size_t frameSize = HEADER_SIZE + header.size + CRC_SIZE;
+        if (m_rxBufferPos < frameSize) {
             break;
         }
 
         const uint8_t* payload = buf + HEADER_SIZE;
 
         // validate exact payload size from the counts in the payload
-        if (!packets::sizeExact(header.type, payload, header.size, command_groups)) {
-            bad_frames++;
+        if (!packets::sizeExact(header.type, payload, header.size, m_commandGroups)) {
+            badFrames++;
             skipBytes(1);
             continue;
         }
 
         // read and verify CRC
-        uint16_t recv_crc = payload[header.size] | (payload[header.size + 1] << 8);
-        uint16_t computed_crc = crc16(buf + 2, HEADER_SIZE - 2 + header.size);
-        if (computed_crc != recv_crc) {
-            crc_errors++;
+        uint16_t recvCrc = payload[header.size] | (payload[header.size + 1] << 8);
+        uint16_t computedCrc = crc16(buf + 2, HEADER_SIZE - 2 + header.size);
+        if (computedCrc != recvCrc) {
+            crcErrors++;
             skipBytes(1);
             continue;
         }
@@ -112,12 +122,12 @@ std::optional<SerialProtocol::Frame> SerialProtocol::receive() {
         result->type = header.type;
         result->size = header.size;
         std::memcpy(result->payload, payload, header.size);
-        skipBytes(frame_size);
+        skipBytes(frameSize);
         break;
     }
 
     // a frame is partway in if the buffer starts with a sync byte
-    in_frame = rx_buffer_pos >= 1 && rx_buffer[0] == SYNC_0;
+    m_inFrame = m_rxBufferPos >= 1 && m_rxBuffer[0] == SYNC_0;
     return result;
 }
 
@@ -135,22 +145,29 @@ uint16_t SerialProtocol::crc16(const uint8_t* data, size_t len, uint16_t crc) {
     return crc;
 }
 
-void SerialProtocol::skipBytes(size_t num_bytes) {
-    num_bytes = std::min(num_bytes, rx_buffer_pos);
+void SerialProtocol::skipBytes(size_t numBytes) {
+    numBytes = std::min(numBytes, m_rxBufferPos);
     // shift remaining buffer data to the front
-    std::memmove(rx_buffer.data(), rx_buffer.data() + num_bytes, rx_buffer_pos - num_bytes);
-    rx_buffer_pos -= num_bytes;
+    std::memmove(m_rxBuffer.data(), m_rxBuffer.data() + numBytes, m_rxBufferPos - numBytes);
+    m_rxBufferPos -= numBytes;
 }
 
 
-#ifdef __vexbrain__
+#ifdef __v5_brain__
 
 SerialProtocol::~SerialProtocol() = default;
 
-bool SerialProtocol::setUpVexSerial(uint8_t port_number, int32_t baud) {
-    port = std::make_unique<pros::Serial>(port_number, baud);
+bool SerialProtocol::setUpVexSerial(uint8_t portNumber, int32_t baud) {
+    m_port = std::make_unique<pros::Serial>(portNumber, baud);
     // PROS_ERR here means the port number is bad or the port is in use
-    return port->get_read_avail() != PROS_ERR;
+    return m_port->get_read_avail() != PROS_ERR;
+}
+
+bool SerialProtocol::setUpVexSerial() {
+    // disable COBS encoding in the PROS serial layer (raw byte streaming mode), as the previous protocol did
+    pros::c::serctl(SERCTL_DISABLE_COBS, nullptr);
+    m_usb = true;
+    return true;
 }
 
 bool SerialProtocol::isValidPacketType(uint16_t type) {
@@ -158,53 +175,80 @@ bool SerialProtocol::isValidPacketType(uint16_t type) {
 }
 
 int SerialProtocol::readBytes() {
+    // USB: read straight from stdin
+    if (m_usb) {
+        size_t space = m_rxBuffer.size() - m_rxBufferPos;
+        // PROS writes a 0 one byte past the end of what it reads, so always leave a spare byte
+        if (space < 2) {
+            return 0;
+        }
+        // waits (busy-polling) until at least one byte arrives, then returns what's there
+        ssize_t n = ::read(STDIN_FILENO, m_rxBuffer.data() + m_rxBufferPos, space - 1);
+        if (n <= 0) {
+            return 0;
+        }
+        m_rxBufferPos += n;
+        return static_cast<int>(n);
+    }
     // port not opened yet
-    if (!port) {
+    if (!m_port) {
         return 0;
     }
-    // free space left in rx_buffer
-    size_t space = rx_buffer.size() - rx_buffer_pos;
+    // free space left in m_rxBuffer
+    size_t space = m_rxBuffer.size() - m_rxBufferPos;
     // bytes waiting in the PROS receive buffer
-    int32_t available = port->get_read_avail();
+    int32_t available = m_port->get_read_avail();
     // nothing to read, no room, or the port errored
     if (space == 0 || available <= 0 || available == PROS_ERR) {
         return 0;
     }
     // read only what's available and fits, so the read never blocks
-    int32_t to_read = std::min<int32_t>(available, static_cast<int32_t>(space));
+    int32_t toRead = std::min<int32_t>(available, static_cast<int32_t>(space));
     // append to the end of the buffered data
-    int32_t read = port->read(rx_buffer.data() + rx_buffer_pos, to_read);
+    int32_t read = m_port->read(m_rxBuffer.data() + m_rxBufferPos, toRead);
     // read failed
     if (read <= 0 || read == PROS_ERR) {
         return 0;
     }
     // count the new bytes as buffered
-    rx_buffer_pos += read;
+    m_rxBufferPos += read;
     return read;
 }
 
 bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
+    // USB: write straight to stdout. PROS sends each write whole, so another task's printf can't land inside a frame
+    if (m_usb) {
+        while (n > 0) {
+            ssize_t written = ::write(STDOUT_FILENO, data, n);
+            if (written <= 0) {
+                return false;
+            }
+            data += written;
+            n -= written;
+        }
+        return true;
+    }
     // port not opened yet
-    if (!port) {
+    if (!m_port) {
         return false;
     }
     // keep writing until every byte is handed to PROS
     while (n > 0) {
         // space left in the PROS transmit buffer
-        int32_t free_space = port->get_write_free();
+        int32_t freeSpace = m_port->get_write_free();
         // port errored
-        if (free_space == PROS_ERR) {
+        if (freeSpace == PROS_ERR) {
             return false;
         }
         // transmit buffer full, give 1 ms to drain
-        if (free_space <= 0) {
+        if (freeSpace <= 0) {
             pros::delay(1);
             continue;
         }
         // write only what fits right now
-        int32_t to_write = std::min<int32_t>(free_space, static_cast<int32_t>(n));
+        int32_t toWrite = std::min<int32_t>(freeSpace, static_cast<int32_t>(n));
         // PROS takes a non-const buffer but doesn't modify it
-        int32_t written = port->write(const_cast<uint8_t*>(data), to_write);
+        int32_t written = m_port->write(const_cast<uint8_t*>(data), toWrite);
         // write failed
         if (written <= 0 || written == PROS_ERR) {
             return false;
@@ -218,7 +262,7 @@ bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
 
 #endif
 
-#ifdef __microcontroller__
+#ifdef __jetson_nano__
 
 /**
  * @brief Writes a short string to a sysfs file.
@@ -240,27 +284,27 @@ static void writeFile(const std::string& path, const std::string& text) {
 
 SerialProtocol::~SerialProtocol() {
     // close the DE pin value file if it was opened
-    if (de_fd >= 0) {
-        close(de_fd);
+    if (m_deFd >= 0) {
+        close(m_deFd);
     }
     // close the UART if it was opened
-    if (fd >= 0) {
-        close(fd);
+    if (m_fd >= 0) {
+        close(m_fd);
     }
 }
 
-bool SerialProtocol::setUpMicrocontrollerSerial(const char* port, speed_t baud, int de_gpio) {
+bool SerialProtocol::setUpMicrocontrollerSerial(const char* port, speed_t baud, int deGpio) {
     // open serial device (read/write, no controlling terminal)
-    fd = open(port, O_RDWR | O_NOCTTY);
+    m_fd = open(port, O_RDWR | O_NOCTTY);
     // failed to open port
-    if (fd < 0) {
+    if (m_fd < 0) {
         return false;
     }
     struct termios tty;
     // retrieve current terminal attributes
-    if (tcgetattr(fd, &tty) != 0) {
-        close(fd);
-        fd = -1;
+    if (tcgetattr(m_fd, &tty) != 0) {
+        close(m_fd);
+        m_fd = -1;
         return false;
     }
     // set input/output baud rate
@@ -280,26 +324,26 @@ bool SerialProtocol::setUpMicrocontrollerSerial(const char* port, speed_t baud, 
     tty.c_cc[VMIN] = 0;
     tty.c_cc[VTIME] = 1;
     // apply configuration immediately
-    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
-        close(fd);
-        fd = -1;
+    if (tcsetattr(m_fd, TCSANOW, &tty) != 0) {
+        close(m_fd);
+        m_fd = -1;
         return false;
     }
     // throw away anything received before now
-    tcflush(fd, TCIOFLUSH);
+    tcflush(m_fd, TCIOFLUSH);
 
     // transceiver direction pin through sysfs
-    if (de_gpio >= 0) {
-        std::string gpio = std::to_string(de_gpio);
+    if (deGpio >= 0) {
+        std::string gpio = std::to_string(deGpio);
         std::string dir = "/sys/class/gpio/gpio" + gpio;
         // fails harmlessly if already exported
         writeFile("/sys/class/gpio/export", gpio);
         // output, starting low = receive
         writeFile(dir + "/direction", "low");
         // keep the value file open so setDE() is a single write
-        de_fd = open((dir + "/value").c_str(), O_WRONLY);
+        m_deFd = open((dir + "/value").c_str(), O_WRONLY);
         // GPIO missing or no permission
-        if (de_fd < 0) {
+        if (m_deFd < 0) {
             return false;
         }
     }
@@ -312,33 +356,33 @@ bool SerialProtocol::isValidPacketType(uint16_t type) {
 }
 
 int SerialProtocol::readBytes() {
-    // free space left in rx_buffer
-    size_t space = rx_buffer.size() - rx_buffer_pos;
+    // free space left in m_rxBuffer
+    size_t space = m_rxBuffer.size() - m_rxBufferPos;
     // port not opened yet, or no room
-    if (fd < 0 || space == 0) {
+    if (m_fd < 0 || space == 0) {
         return 0;
     }
     // append to the end of the buffered data. waits up to 0.1s if nothing is there
-    ssize_t n = read(fd, rx_buffer.data() + rx_buffer_pos, space);
+    ssize_t n = read(m_fd, m_rxBuffer.data() + m_rxBufferPos, space);
     // timed out with nothing, or read failed
     if (n <= 0) {
         return 0;
     }
     // count the new bytes as buffered
-    rx_buffer_pos += n;
+    m_rxBufferPos += n;
     return static_cast<int>(n);
 }
 
 bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
     // port not opened yet
-    if (fd < 0) {
+    if (m_fd < 0) {
         return false;
     }
     // take the bus
     setDE(true);
     // keep writing until every byte is handed to the UART
     while (n > 0) {
-        ssize_t written = write(fd, data, n);
+        ssize_t written = write(m_fd, data, n);
         // write failed, release the bus before giving up
         if (written <= 0) {
             setDE(false);
@@ -349,7 +393,7 @@ bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
         n -= written;
     }
     // wait for the UART to finish sending
-    tcdrain(fd);
+    tcdrain(m_fd);
     // tcdrain can return before the last stop bit is out.
     // hold the bus ~2 byte times before releasing it
     auto until = std::chrono::steady_clock::now() + std::chrono::microseconds(25);
@@ -362,9 +406,9 @@ bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
 
 void SerialProtocol::setDE(bool on) {
     // no DE pin with an auto-direction transceiver
-    if (de_fd >= 0) {
+    if (m_deFd >= 0) {
         // sysfs value: "1" = high = transmit, "0" = low = receive. pwrite at offset 0 so the file never needs a seek
-        (void)pwrite(de_fd, on ? "1" : "0", 1, 0);
+        (void)pwrite(m_deFd, on ? "1" : "0", 1, 0);
     }
 }
 #endif

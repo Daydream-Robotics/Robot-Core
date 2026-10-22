@@ -4,7 +4,7 @@
 #include "motionController.hpp"
 #include "odometry.hpp"
 #include "arclengthSplining.hpp"
-#include "serialProtocol.hpp"
+#include "daydream/utils/serial/serialProtocol.hpp"
 #include "osqp.h"
 #define EIGEN_STACK_ALLOCATION_LIMIT 1048576 
 #include <Eigen/Dense>

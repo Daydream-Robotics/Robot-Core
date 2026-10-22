@@ -5,7 +5,7 @@
 #include <chrono>
 #include <thread>
 #include "mpc.hpp"
-#include "serialProtocol.hpp"
+#include "daydream/utils/serial/serialProtocol.hpp"
 
 int main() {
     //initiailizes prediction and control horizon (compile-time)

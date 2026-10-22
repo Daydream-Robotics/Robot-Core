@@ -5,6 +5,7 @@ CXX := g++
 CXXFLAGS := \
     -std=c++17 \
     -O2 \
+    -pthread \
     -Iinclude \
     -Iinclude/osqp \
     -Iinclude/eigen

@@ -20,45 +20,13 @@
 #include "daydream/utils/serial/packets.hpp"
 
 // ! PLATFORM NOTE PUT THIS IN CONSTANTS.H and include it so that its the smae on nano vs brain
-#define __vexbrain__
+#define __v5_brain__   // Nano copy: #define __jetson_nano__   ← the ONLY difference
 
-#ifdef __vexbrain__
-    #include "pros/apix.h"
-#endif
-
-#ifdef __microcontroller__
-    #include <termios.h>
-#endif
-
-/**
- * @file serialProtocol.hpp
- * @brief Framing layer for the V5 Brain ⇄ Jetson Nano serial link.
- *
- * Turns payloads into frames and frames back into payloads
- * (SERIAL_PROTOCOL.md sections 2-3). Both sides compile the same file. The
- * only difference is the platform define below.
- *
- * Frame format: [0x55][0xAA][type u16][size u16][payload][CRC-16 u16], all little-endian.
- */
-
-#pragma once
-
-#include <atomic>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <optional>
-#include <vector>
-
-#include "daydream/utils/serial/packets.hpp"
-
-#define __vexbrain__   // Nano copy: #define __microcontroller__   ← the ONLY difference
-
-#ifdef __vexbrain__
+#ifdef __v5_brain__
     #include "pros/serial.hpp"
 #endif
 
-#ifdef __microcontroller__
+#ifdef __jetson_nano__
     #include <termios.h>
 #endif
 
@@ -91,51 +59,68 @@ public:
     static constexpr size_t CRC_SIZE = 2; ///< bytes after the payload
     static constexpr size_t MAX_FRAME_SIZE = HEADER_SIZE + packets::MAX_PAYLOAD + CRC_SIZE; ///< largest possible frame
 
-    #ifdef __microcontroller__
+    #ifdef __jetson_nano__
     static constexpr speed_t DEFAULT_BAUD = B921600; ///< link baud rate
     #endif
 
-    std::atomic<uint16_t> crc_errors{0}; ///< frames dropped for a bad CRC. reported in STATE.rx_errors.
-    std::atomic<uint16_t> bad_frames{0}; ///< frames dropped for a bad type or size. reported in STATE.rx_errors
+    /// @brief Which physical link the protocol runs over.
+    enum class Transport : uint8_t {
+        RS485, ///< brain smart port ⇄ Nano UART, through RS-485 transceivers (half-duplex)
+        USB ///< brain USB port (PROS stdin/stdout) ⇄ Nano /dev/ttyACM1, like the previous protocol
+    };
+
+    std::atomic<uint16_t> crcErrors{0}; ///< frames dropped for a bad CRC. reported in STATE.rxErrors.
+    std::atomic<uint16_t> badFrames{0}; ///< frames dropped for a bad type or size. reported in STATE.rxErrors
 
     /**
      * @brief Constructs the protocol without opening a port.
      *
      * Call setUpVexSerial() or setUpMicrocontrollerSerial() afterwards.
      *
-     * @param buffer_size Receive buffer size in bytes. Raised to MAX_FRAME_SIZE if smaller.
+     * @param bufferSize Receive buffer size in bytes. Raised to MAX_FRAME_SIZE if smaller.
      */
-    SerialProtocol(int buffer_size = 2 * MAX_FRAME_SIZE);
+    SerialProtocol(int bufferSize = 2 * MAX_FRAME_SIZE);
 
 
     /// @brief Closes the port.
     ~SerialProtocol();
 
-    #ifdef __vexbrain__
+    #ifdef __v5_brain__
     /**
      * @brief Opens a smart port as a generic serial port for the link.
      *
-     * @param port Smart port number, 1–21.
+     * @param portNumber Smart port number, 1–21.
      * @param baud Baud rate, e.g. 921600.
      * @return bool false if the port number is bad or the port is in use.
      */
-    bool setUpVexSerial(uint8_t port, int32_t baud);
+    bool setUpVexSerial(uint8_t portNumber, int32_t baud);
+
+    /**
+     * @brief Uses the brain's USB port (PROS stdin/stdout) for the link, like the previous protocol.
+     *
+     * Turns off PROS's COBS stream framing so frames go out as raw bytes.
+     * Anything else the program prints to stdout or stderr goes out on the same
+     * wire, and the Nano's parser skips it.
+     *
+     * @return bool Always true.
+     */
+    bool setUpVexSerial();
     #endif
 
-    #ifdef __microcontroller__
+    #ifdef __jetson_nano__
     /**
      * @brief Opens and configures the UART for the link.
      *
      * Raw 8N1, no flow control. read() returns what is available, or waits at
      * most 100 ms if nothing is.
      *
-     * @param port UART device, e.g. "/dev/ttyTHS1".
+     * @param port UART device: "/dev/ttyTHS1" for RS-485, or "/dev/ttyACM1" for the brain's USB port.
      * @param baud termios speed constant, e.g. B921600.
-     * @param de_gpio sysfs GPIO number wired to the transceiver's DE and /RE pins.
-     *        -1 = auto-direction transceiver, no pin to drive.
+     * @param deGpio sysfs GPIO number wired to the transceiver's DE and /RE pins.
+     *        -1 = auto-direction transceiver or USB, no pin to drive.
      * @return bool False if the port or the GPIO couldn't be opened.
      */
-    bool setUpMicrocontrollerSerial(const char* port, speed_t baud = DEFAULT_BAUD, int de_gpio = -1);
+    bool setUpMicrocontrollerSerial(const char* port, speed_t baud = DEFAULT_BAUD, int deGpio = -1);
     #endif
 
 
@@ -163,8 +148,9 @@ public:
     /**
      * @brief Returns the next valid frame, if a full one has arrived.
      *
-     * Reads whatever bytes are available, then parses rx_buffer. Frames with
-     * the wrong direction, a bad size or a bad CRC are dropped and counted.
+     * Parses m_rxBuffer first, and only reads the port if no full frame is
+     * already buffered. Frames with the wrong direction, a bad size or a bad
+     * CRC are dropped and counted.
      * Returns at most one frame per call, so call it in a loop until it
      * returns std::nullopt.
      *
@@ -177,10 +163,10 @@ public:
     /**
      * @brief Whether a frame is partway received.
      *
-     * @return bool true if rx_buffer starts with a sync byte.
+     * @return bool true if m_rxBuffer starts with a sync byte.
      */
     bool midFrame() const { 
-        return in_frame; 
+        return m_inFrame; 
     }
 
     /**
@@ -189,7 +175,7 @@ public:
      * @param groups Group count of the applied config. 0 = not configured.
      */
     void setCommandGroups(uint8_t groups) { 
-        command_groups = groups; 
+        m_commandGroups = groups; 
     }
 
     /**
@@ -205,12 +191,12 @@ public:
     static uint16_t crc16(const uint8_t* data, size_t len, uint16_t crc = 0xFFFF);
 
 private:
-    int buffer_size;  ///< receive buffer size in bytes
-    std::vector<uint8_t> rx_buffer; ///< persistent receive buffer
-    size_t rx_buffer_pos; ///< bytes currently in rx_buffer
+    int m_bufferSize;  ///< receive buffer size in bytes
+    std::vector<uint8_t> m_rxBuffer; ///< persistent receive buffer
+    size_t m_rxBufferPos; ///< bytes currently in m_rxBuffer
 
-    std::atomic<bool> in_frame{false}; ///< see midFrame()
-    uint8_t command_groups = 0; ///< see setCommandGroups()
+    std::atomic<bool> m_inFrame{false}; ///< see midFrame()
+    uint8_t m_commandGroups = 0; ///< see setCommandGroups()
 
     /**
      * @brief Whether this side accepts a packet type.
@@ -223,9 +209,16 @@ private:
     static bool isValidPacketType(uint16_t type);
 
     /**
-     * @brief Moves the bytes available on the port into rx_buffer.
+     * @brief Parses the next valid frame out of m_rxBuffer, without reading the port.
      *
-     * @return int number of bytes read. 0 if none, or if rx_buffer is full.
+     * @return std::optional<Frame> The frame, or std::nullopt if no full valid frame is buffered.
+     */
+    std::optional<Frame> parseFrame();
+
+    /**
+     * @brief Moves the bytes available on the port into m_rxBuffer.
+     *
+     * @return int number of bytes read. 0 if none, or if m_rxBuffer is full.
      */
     int readBytes();
 
@@ -239,19 +232,20 @@ private:
     bool writeBytes(const uint8_t* data, size_t n);
 
     /**
-     * @brief Removes bytes from the front of rx_buffer.
+     * @brief Removes bytes from the front of m_rxBuffer.
      *
-     * @param num_bytes Number of bytes to remove. Clamped to rx_buffer_pos.
+     * @param numBytes Number of bytes to remove. Clamped to m_rxBufferPos.
      */
-    void skipBytes(size_t num_bytes);
+    void skipBytes(size_t numBytes);
 
-    #ifdef __vexbrain__
-    std::unique_ptr<pros::Serial> port; ///< link smart port. null until setUpVexSerial()
+    #ifdef __v5_brain__
+    std::unique_ptr<pros::Serial> m_port; ///< link smart port. null over USB, or until setUpVexSerial()
+    bool m_usb = false; ///< the link runs over USB (stdin/stdout) instead of m_port
     #endif
 
-    #ifdef __microcontroller__
-    int fd = -1; ///< UART file descriptor. -1 until setUpMicrocontrollerSerial()
-    int de_fd = -1; ///< sysfs value file of the DE GPIO. -1 = none
+    #ifdef __jetson_nano__
+    int m_fd = -1; ///< UART file descriptor. -1 until setUpMicrocontrollerSerial()
+    int m_deFd = -1; ///< sysfs value file of the DE GPIO. -1 = none
 
     /**
      * @brief Drives the transceiver direction pin.
