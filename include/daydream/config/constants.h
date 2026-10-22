@@ -75,6 +75,13 @@ constexpr double TURN_KI_THRESHOLD = 15.0;
 /* - - - - - - - - - - - - - - [Motion Controllers] - - - - - - - - - - - - - - */
 constexpr double END_TOLERANCE = 0.5;
 
+
+/* - - - - - - - - - - - - - - [Unit Conversions] - - - - - - - - - - - - - - */
+static constexpr double RPM_TO_RAD_S = 2.0 * 3.14159265358979323846 / 60.0; ///< rpm -> rad/s
+static constexpr double DEG_TO_RAD = 3.14159265358979323846 / 180.0; ///< degrees (motor encoder) -> rad
+static constexpr double CDEG_TO_RAD = DEG_TO_RAD / 100.0; ///< centidegrees (rotation sensor) -> rad
+
+
 enum class DriveType {
     SPLIT_ARCADE,
     TANK
