@@ -22,6 +22,75 @@ static double averageMotorGroupPosition(const pros::MotorGroup& group) {
 
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
+void Odometry::calculateTrackingWheelOffsets() {
+
+	// record starting tracking wheel positions 
+	double startParallel = parallelTrackingWheel.get_position(); 
+	double startPerpendicular = perpendicularTrackingWheel.get_position(); 
+
+	// Set up IMU rotation tracking
+	YawResult initialYaw = getYaw(); 
+
+	if (initialYaw.error != OdomError::NONE) {
+		return; 
+	}
+
+	double previousYaw = initialYaw.yaw;
+	double totalRotation = 0.0; 
+
+	// Calibration settings
+	const int turnSpeed = 40; 
+	const double targetRotation = 4.0 * std::numbers::pi; 
+
+	leftMotors.move_velocity(turnSpeed); 
+	rightMotors.move_velocity(-turnSpeed); 
+
+	while (std::abs(totalRotation) < targetRotation) {
+		YawResult result = getYaw(); 
+
+		if (result.error != OdomError::NONE) {
+			leftMotors.move_velocity(0); 
+			rightMotors.move_velocity(0); 
+			return;
+		}
+
+		double currentYaw = result.yaw; 
+
+		double deltaYaw = currentYaw - previousYaw; 
+
+		if (deltaYaw > std::numbers::pi) {
+			deltaYaw -= 2.0 * std::numbers::pi; 
+		} else if (deltaYaw < -std::numbers::pi) {
+			deltaYaw += 2.0 * std::numbers::pi; 
+		}
+
+		totalRotation += deltaYaw; 
+		previousYaw = currentYaw;
+
+		pros::delay(10); 
+	}
+
+	// stop the robot
+	leftMotors.move_velocity(0);
+	rightMotors.move_velocity(0);
+
+	// Get final tracking wheel positions
+	double endParallel = parallelTrackingWheel.get_position(); 
+	double endPerpendicular = perpendicularTrackingWheel.get_position(); 
+
+	// Calculate change in senor positions
+	double parallelDelta = endParallel - startParallel; 
+	double perpendicularDelta = endPerpendicular - startPerpendicular; 
+
+	// Convert senor positions to inches
+	double parallelDistance = (parallelDelta / 36000.0) * std::numbers::pi * m_config.parallelWheelDiameter; 
+	double perpendicularDistance = (perpendicularDelta / 36000.0) * std::numbers::pi * m_config.perpendicularWheelDiameter; 
+
+	// Calculate signed tracking wheel offsets
+	double parallelOffset = parallelDistance / totalRotation; 
+	double perpendicularOffset = -perpendicularDistance / totalRotation;
+}
+
 void Odometry::updatePose(void) {
 	YawResult yawResult = getYaw();
 
