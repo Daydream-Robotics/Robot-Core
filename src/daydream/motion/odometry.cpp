@@ -5,16 +5,20 @@
 #include <cmath>
 #include <numbers>
 #include <vector>
+#include <optional>
 
-static double averageMotorGroupPosition(const pros::MotorGroup& group) {
+static std::optional<double> averageMotorGroupPosition(const pros::MotorGroup& group) {
     std::vector<double> positions = group.get_position_all();
     if (positions.empty()) {
-        return 0.0;
+        return std::nullopt;
     }
 
     double sum = 0.0;
     for (double pos : positions) {
-        sum += pos;
+        if (!std::isfinite(pos)) {
+			return std::nullopt;
+		}
+		sum += pos;
     }
 
     return sum / static_cast<double>(positions.size());
@@ -23,6 +27,49 @@ static double averageMotorGroupPosition(const pros::MotorGroup& group) {
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
 void Odometry::updatePose(void) {
+	// Read motor encoders every update as IMU backup
+	DriveTravelResult motorResult = getDriveEncoderTravel();
+
+	if (m_config.useMotorEncoders &&
+		motorResult.error != OdomError::NONE) {
+
+		static uint32_t lastMotorFailurePrint = 0;
+		const uint32_t now = pros::millis();
+
+		if (now - lastMotorFailurePrint >= 500) {
+			pros::lcd::print(0, "[Update Pose] Motor Encoder Error!");
+			lastMotorFailurePrint = now;
+		}
+
+		return;
+	}
+
+	// Check tracking wheels for if they are the movement source
+	WheelTravelResult wheelResult;
+
+	if (!m_config.useMotorEncoders) {
+		wheelResult = getOdomWheelTravel();
+
+		if (wheelResult.error != OdomError::NONE) {
+			pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
+			return;
+		}
+	}
+
+	double encoderHeading = 0.0;
+
+	bool encoderHeadingAvailable =
+		motorResult.error == OdomError::NONE &&
+		m_driveEncodersReady &&
+		std::isfinite(m_config.driveTrackWidth) &&
+		m_config.driveTrackWidth > 0.0;
+
+	if (encoderHeadingAvailable) {
+		encoderHeading =
+			(motorResult.leftInches - motorResult.rightInches)
+			/ m_config.driveTrackWidth;
+	}
+
 	YawResult yawResult = getYaw();
 
 	if (yawResult.error != OdomError::NONE) {
@@ -32,22 +79,67 @@ void Odometry::updatePose(void) {
 			pros::lcd::print(0, "[Update Pose] IMU Failure! %lf", yawResult.yaw);
 			lastImuFailurePrint = now;
 		}
-		return;
+		if (!encoderHeadingAvailable && m_initialized) {
+			return;
+		}
 	}
 
-	const double yaw_deg = yawResult.yaw;
-	
-	// Get orientation from IMU
-	double theta_rad = yaw_deg;
-	theta_rad = normalizeAngle(theta_rad);
+	double theta_rad;
+
+	if (yawResult.error == OdomError::NONE) {
+		theta_rad = normalizeAngle(yawResult.yaw);
+
+		if (m_usingEncoderHeading && m_initialized) {
+			// Estimate movement during this final encoder interval
+			double recoveryDelta = encoderHeadingAvailable
+				? encoderHeading
+				: 0.0;
+
+			double estimatedTheta =
+				normalizeAngle(m_prevTheta + recoveryDelta);
+
+			m_mutex.take();
+
+			m_headingOffset = normalizeAngle(
+				m_headingOffset + normalizeAngle(estimatedTheta - theta_rad)
+			);
+
+			m_mutex.give();
+
+			// Preserve the actual rotation during this update
+			m_prevTheta = normalizeAngle(theta_rad - recoveryDelta);
+
+			m_usingEncoderHeading = false;
+		}
+	} else {
+		m_usingEncoderHeading = true;
+		theta_rad = normalizeAngle(m_prevTheta + encoderHeading);
+	}
 	
 	if (!m_initialized) {
 		m_prevTheta = theta_rad;
 		m_lastRawTheta = theta_rad;
 
 		if (m_config.useMotorEncoders) {
-			m_prevLeft = averageMotorGroupPosition(leftMotors);
-			m_prevRight = averageMotorGroupPosition(rightMotors);
+			auto leftResult = averageMotorGroupPosition(leftMotors);
+			auto rightResult = averageMotorGroupPosition(rightMotors);
+
+			if (!leftResult.has_value() || !rightResult.has_value()) {
+				static uint32_t lastInitMotorFailurePrint = 0;
+				const uint32_t now = pros::millis();
+
+				if (now - lastInitMotorFailurePrint >= 500) {
+					pros::lcd::print(0, "[Update Pose] Motor Encoder Error!");
+					lastInitMotorFailurePrint = now;
+				}
+
+				return;
+			}
+
+			m_prevLeft = leftResult.value();
+			m_prevRight = rightResult.value();
+			m_driveEncodersReady = true;
+
 		} else {
 			m_prevParallel = parallelTrackingWheel.get_position();
 			m_prevPerpendicular = perpendicularTrackingWheel.get_position();
@@ -58,24 +150,41 @@ void Odometry::updatePose(void) {
                 // The file wide error variable should be accessible to other files through a public getter
 				return;
 			}
+
+			auto leftResult = averageMotorGroupPosition(leftMotors);
+			auto rightResult = averageMotorGroupPosition(rightMotors);
+
+			if (leftResult.has_value() && rightResult.has_value()) {
+				m_prevLeft = leftResult.value();
+				m_prevRight = rightResult.value();
+				m_driveEncodersReady = true;
+			} else {
+				m_driveEncodersReady = false;
+			}
+		}
+
+		if (yawResult.error != OdomError::NONE &&
+			(!m_driveEncodersReady ||
+			!std::isfinite(m_config.driveTrackWidth) ||
+			m_config.driveTrackWidth <= 0.0)) {
+
+			pros::lcd::print(0, "[Update Pose] No valid heading source!");
+			return;
 		}
 		
+		m_usingEncoderHeading = (yawResult.error != OdomError::NONE);
 		m_initialized = true;
 		return;
 	}
 
 	// Calculate distance travelled by either drive encoders or tracking wheels
 	WheelLengths arcs;
+	
 	if (m_config.useMotorEncoders) {
-		arcs = getDriveEncoderTravel();
-	} else {
-		WheelTravelResult wheelResult = getOdomWheelTravel();
-
-		if (wheelResult.error != OdomError::NONE) {
-			pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
-			return;
-		}
-
+		double forwardInches = (motorResult.leftInches + motorResult.rightInches) / 2.0;
+		arcs = {forwardInches, 0.0};
+	}	
+	else {
 		arcs = wheelResult.travel;
 	}
 	
@@ -83,8 +192,13 @@ void Odometry::updatePose(void) {
 	double del_theta = normalizeAngle(theta_rad - m_prevTheta);
 
 	// Determine change in local x and in local y
-	double dx_local = arcs.parallel - (del_theta * m_config.parallelTrackingWheelOffset);
-	double dy_local = arcs.perpendicular + (del_theta * m_config.perpendicularTrackingWheelOffset);
+	double dx_local = arcs.parallel;
+	double dy_local = arcs.perpendicular;
+
+	if (!m_config.useMotorEncoders) {
+		dx_local -= del_theta * m_config.parallelTrackingWheelOffset;
+		dy_local += del_theta * m_config.perpendicularTrackingWheelOffset;
+	}
 
 	// Arc-length, chord-length correction
 	double chordFactor = 1.0;
@@ -109,6 +223,18 @@ void Odometry::updatePose(void) {
 	m_lastRawTheta = theta_rad;
 	m_mutex.give();
 
+	// Save encoder positions only after updating the pose
+	if (motorResult.error == OdomError::NONE && m_driveEncodersReady) {
+		m_prevLeft = motorResult.currentLeftPosition;
+		m_prevRight = motorResult.currentRightPosition;
+	}
+
+	// Save tracking wheel positions only after updating the pose
+	if (!m_config.useMotorEncoders) {
+		m_prevParallel = wheelResult.currentParallelPosition;
+		m_prevPerpendicular = wheelResult.currentPerpendicularPosition;
+	}
+
 	m_prevTheta = theta_rad;
 
 	// !IMPORTANT!: Likely not task safe
@@ -118,8 +244,6 @@ void Odometry::updatePose(void) {
 	// 	controller.print(0, 0, "X:%.1f Y:%.1f", m_currentPosition.x, m_currentPosition.y);
 	// 	lastPrintTime = pros::millis();
 	// }
-
-	m_prevTheta = theta_rad;
 }
 
 Pose Odometry::getPose() {
@@ -209,11 +333,7 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	double delParallel = (dTicksL / 36000.0) * m_config.parallelWheelDiameter * std::numbers::pi; 
 	double delPerpendicular = (dTicksS / 36000.0) * m_config.perpendicularWheelDiameter * std::numbers::pi; 
 
-    // Save current position as previous
-	m_prevParallel = currParallel;
-	m_prevPerpendicular = currPerpendicular;
-
-	return {{delParallel, delPerpendicular}, OdomError::NONE};
+	return {{delParallel, delPerpendicular}, OdomError::NONE, currParallel, currPerpendicular};
 }
 
 VelocityResult Odometry::getParallelVel() {
@@ -248,13 +368,28 @@ VelocityResult Odometry::getParallelVel() {
 	return {velocity, OdomError::NONE};
 }
 
-WheelLengths Odometry::getDriveEncoderTravel(void) {
+DriveTravelResult Odometry::getDriveEncoderTravel(void) {
 	if (!m_initialized) {
-		return {0, 0};
+		return {0.0, 0.0, OdomError::NONE};
 	}
 
-    double currLeft = averageMotorGroupPosition(leftMotors);
-    double currRight = averageMotorGroupPosition(rightMotors);
+    auto leftResult = averageMotorGroupPosition(leftMotors);
+    auto rightResult = averageMotorGroupPosition(rightMotors);
+
+	if (!leftResult.has_value() || !rightResult.has_value()) {
+		m_driveEncodersReady = false;
+		return {0.0, 0.0, OdomError::MOTOR_ENCODER_ERROR};
+	}
+
+	double currLeft = leftResult.value();
+	double currRight = rightResult.value();
+
+	if (!m_driveEncodersReady) {
+		m_prevLeft = currLeft;
+		m_prevRight = currRight;
+		m_driveEncodersReady = true;
+		return {0.0, 0.0, OdomError::NONE, currLeft, currRight};
+	}
 
     double dLeft = currLeft - m_prevLeft;
     double dRight = currRight - m_prevRight;
@@ -262,11 +397,7 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
     double leftInches = (dLeft / 360.0) *DRIVE_GEAR_RATIO  * m_config.driveWheelDiameter * std::numbers::pi;
     double rightInches = (dRight / 360.0) * DRIVE_GEAR_RATIO * m_config.driveWheelDiameter * std::numbers::pi;
 
-    m_prevLeft = currLeft;
-    m_prevRight = currRight;
-
-    double forwardInches = (leftInches + rightInches) / 2.0;
-    return {forwardInches, 0.0};
+    return {leftInches, rightInches, OdomError::NONE, currLeft, currRight};
 }
 
 double Odometry::averageMotorGroupVelocities(const pros::MotorGroup& group){
@@ -302,5 +433,6 @@ Odometry odom({
 	PARALLEL_TRACKING_WHEEL_OFFSET,
 	PERPENDICULAR_TRACKING_WHEEL_OFFSET,
 	true,
-	DRIVE_WHEEL_DIAMETER_INCHES
+	DRIVE_WHEEL_DIAMETER_INCHES,
+	TRACK_WIDTH
 });
