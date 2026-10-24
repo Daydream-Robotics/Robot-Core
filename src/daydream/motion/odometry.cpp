@@ -300,123 +300,136 @@ void Odometry::odomTask() {
 // ! TAI: move this to the new tuning file
 void Odometry::calculateTrackingWheelOffsets() {
 
-	// record starting tracking wheel positions 
-	double startParallel = parallelTrackingWheel.get_position(); 
-	double startPerpendicular = perpendicularTrackingWheel.get_position(); 
-
-	// Check for tracking wheel sensor errors
-	if (startParallel == PROS_ERR || startPerpendicular == PROS_ERR) {
-		pros::lcd::print(0, "Calibration: Tracking wheel error!"); 
-		return; 
-	}
-
-	// Set up IMU rotation tracking
-	YawResult initialYaw = getYaw(); 
-
-	if (initialYaw.error != OdomError::NONE) {
-		return; 
-	}
-
-	double previousYaw = initialYaw.yaw;
-	double totalRotation = 0.0; 
 
 	// Calibration settings
-	const int turnSpeed = 40; 
+	const int turnSpeed = 120; 
 	const double targetRotation = 4.0 * std::numbers::pi; 
 
 	// Variables for calibration timeout
 	const uint32_t startTime = pros::millis(); 
-	const uint32_t timeout = 15000; // 15 seconds 
+	const uint32_t timeout = 30000; // 30 seconds 
 
-	leftMotors.move_velocity(turnSpeed); 
-	rightMotors.move_velocity(-turnSpeed); 
+	// Variables for running sums 
+	double sumParallelTheta = 0.0; 
+	double sumPerpendicularTheta = 0.0; 
+	double sumThetaSquared = 0.0; 
 
-	while (std::abs(totalRotation) < targetRotation) {
+	for (int direction : {1, -1}) {
 
-		// Stop calibration if the time limit is exceeded
-		if (pros::millis() - startTime >= timeout) {
-			leftMotors.move_velocity(0); 
-			rightMotors.move_velocity(0); 
-			pros::lcd::print(0, "Calibration timeout!"); 
+		// Record starting tracking wheel positions 
+		double startParallel = parallelTrackingWheel.get_position(); 
+		double startPerpendicular = perpendicularTrackingWheel.get_position(); 
+
+		// Check for tracking wheel sensor errors
+		if (startParallel == PROS_ERR || startPerpendicular == PROS_ERR) {
+			pros::lcd::print(0, "Calibration: Tracking wheel error!"); 
 			return; 
 		}
 
-		YawResult result = getYaw(); 
+		// Set up IMU rotation tracking
+		YawResult initialYaw = getYaw(); 
 
-		if (result.error != OdomError::NONE) {
-			leftMotors.move_velocity(0); 
-			rightMotors.move_velocity(0); 
-			return;
+		if (initialYaw.error != OdomError::NONE) {
+			return; 
 		}
 
-		double currentYaw = result.yaw; 
+		double previousYaw = initialYaw.yaw;
+		double totalRotation = 0.0; 
 
-		double deltaYaw = currentYaw - previousYaw; 
+		leftMotors.move_velocity(turnSpeed * direction); 
+		rightMotors.move_velocity(-turnSpeed * direction); 
 
-		if (deltaYaw > std::numbers::pi) {
-			deltaYaw -= 2.0 * std::numbers::pi; 
-		} else if (deltaYaw < -std::numbers::pi) {
-			deltaYaw += 2.0 * std::numbers::pi; 
+
+		while (std::abs(totalRotation) < targetRotation) {
+
+			// Stop calibration if the time limit is exceeded
+			if (pros::millis() - startTime >= timeout) {
+				leftMotors.move_velocity(0); 
+				rightMotors.move_velocity(0); 
+				pros::lcd::print(0, "Calibration timeout!"); 
+				return; 
+			}
+
+			YawResult result = getYaw(); 
+
+			if (result.error != OdomError::NONE) {
+				leftMotors.move_velocity(0); 
+				rightMotors.move_velocity(0); 
+				return;
+			}
+
+			double currentYaw = result.yaw; 
+
+			double deltaYaw = angleDiffRad(currentYaw, previousYaw);
+
+			totalRotation += deltaYaw; 
+			previousYaw = currentYaw;
+
+			pros::delay(10); 
 		}
 
-		totalRotation += deltaYaw; 
-		previousYaw = currentYaw;
+		// Stop the robot
+		leftMotors.move_velocity(0);
+		rightMotors.move_velocity(0);
 
-		pros::delay(10); 
+		// Allow robot to settle before calculation 
+		pros::delay(500); 
+
+		// Account for any additional rotation while settling
+		YawResult finalYaw = getYaw(); 
+
+		if (finalYaw.error != OdomError::NONE) {
+			pros::lcd::print(0, "Calibration: IMU error!"); 
+			return; 
+		}
+
+		double finalDeltaYaw = angleDiffRad(finalYaw.yaw, previousYaw);
+
+		totalRotation += finalDeltaYaw; 
+
+		// Get final tracking wheel positions
+		double endParallel = parallelTrackingWheel.get_position(); 
+		double endPerpendicular = perpendicularTrackingWheel.get_position();
+		
+		if (endParallel == PROS_ERR || endPerpendicular == PROS_ERR) {
+			pros::lcd::print(0, "Calibration: Tracking wheel error!"); 
+			return; 
+		}
+
+		// Calculate change in sensor positions
+		double parallelDelta = endParallel - startParallel; 
+		double perpendicularDelta = endPerpendicular - startPerpendicular; 
+
+		// Convert sensor positions to inches
+		double parallelDistance = (parallelDelta / 36000.0) * std::numbers::pi * m_config.parallelWheelDiameter; 
+		double perpendicularDistance = (perpendicularDelta / 36000.0) * std::numbers::pi * m_config.perpendicularWheelDiameter; 
+
+		
+
+		// Prevent division by invalid/near-zero rotation 
+		if (!std::isfinite(totalRotation) || std::abs(totalRotation) < 1e-6 ||
+			!std::isfinite(parallelDistance) || !std::isfinite(perpendicularDistance)) {
+			pros::lcd::print(0, "Calibration: Invalid Measurements"); 
+			return; 
+		}
+
+		// Add measurements from both spin directions
+		sumParallelTheta += parallelDistance * totalRotation; 
+		sumPerpendicularTheta += perpendicularDistance * totalRotation; 
+		sumThetaSquared += totalRotation * totalRotation; 
+
 	}
 
-	// Stop the robot
-	leftMotors.move_velocity(0);
-	rightMotors.move_velocity(0);
-
-	// Allow robot to settle before calculation 
-	pros::delay(500); 
-
-	// Account for any additional rotation while settling
-	YawResult finalYaw = getYaw(); 
-
-	if (finalYaw.error != OdomError::NONE) {
-		pros::lcd::print(0, "Calibration: IMU error!"); 
+	// Validate accumulated measurements before calculating offsets
+	if (!std::isfinite(sumThetaSquared) || sumThetaSquared < 1e-9 ||
+		!std::isfinite(sumParallelTheta) || !std::isfinite(sumPerpendicularTheta)) {	
+		pros::lcd::print(0, "Calibration: Invalid Measurements"); 
 		return; 
 	}
-
-	double finalDeltaYaw = finalYaw.yaw - previousYaw; 
-
-	// Handle wraparound again
-	if (finalDeltaYaw > std::numbers::pi) {
-			finalDeltaYaw -= 2.0 * std::numbers::pi; 
-		} else if (finalDeltaYaw < -std::numbers::pi) {
-			finalDeltaYaw += 2.0 * std::numbers::pi; 
-		}
-
-	totalRotation += finalDeltaYaw; 
-
-	// Get final tracking wheel positions
-	double endParallel = parallelTrackingWheel.get_position(); 
-	double endPerpendicular = perpendicularTrackingWheel.get_position();
 	
-	if (endParallel == PROS_ERR || endPerpendicular == PROS_ERR) {
-		pros::lcd::print(0, "Calibration: Tracking wheel error!"); 
-		return; 
-	}
-
-	// Calculate change in senor positions
-	double parallelDelta = endParallel - startParallel; 
-	double perpendicularDelta = endPerpendicular - startPerpendicular; 
-
-	// Convert senor positions to inches
-	double parallelDistance = (parallelDelta / 36000.0) * std::numbers::pi * m_config.parallelWheelDiameter; 
-	double perpendicularDistance = (perpendicularDelta / 36000.0) * std::numbers::pi * m_config.perpendicularWheelDiameter; 
-
-	// Prevent division by invalid/near-zero rotation 
-	if (!std::isfinite(totalRotation) || std::abs(totalRotation) < 1e-6) {
-		pros::lcd::print(0, "Calibration: Invalid rotation!"); 
-		return; 
-	}
-
 	// Calculate signed tracking wheel offsets
-	double parallelOffset = parallelDistance / totalRotation; 
-	double perpendicularOffset = -perpendicularDistance / totalRotation;
+	double parallelOffset =  sumParallelTheta / sumThetaSquared;
+	double perpendicularOffset = -sumPerpendicularTheta / sumThetaSquared;
 
 	// Display calculated tracking wheel offsets (testing)
 	pros::lcd::print(0, "Parallel Offset: %.3f in", parallelOffset); 
