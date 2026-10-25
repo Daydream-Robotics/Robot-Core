@@ -46,24 +46,34 @@ void Odometry::updatePose(void) {
 		m_prevTheta = theta_rad;
 		m_lastRawTheta = theta_rad;
 
-		if (m_config.useMotorEncoders) {
-			m_prevLeft = averageMotorGroupPosition(leftMotors);
-			m_prevRight = averageMotorGroupPosition(rightMotors);
-		} else {
-			m_prevParallel = parallelTrackingWheel.get_position();
-			m_prevPerpendicular = perpendicularTrackingWheel.get_position();
+		m_prevLeft = averageMotorGroupPosition(leftMotors);
+		m_prevRight = averageMotorGroupPosition(rightMotors);
 
-			if (m_prevParallel == PROS_ERR || m_prevPerpendicular == PROS_ERR) {
-                // TODO: Handle error for tracking wheel initialization failure
-                // FIX: add file wide error variable to track odom errors and display on controller
-                // The file wide error variable should be accessible to other files through a public getter
-				return;
-			}
+		double currParallel = parallelTrackingWheel.get_position();
+		double currPerpendicular = perpendicularTrackingWheel.get_position();
+
+		if(currParallel == PROS_ERR){
+			m_prevParallel = PROS_ERR;
+		} else {
+			m_prevParallel = currParallel;
+		}
+
+		if(currPerpendicular == PROS_ERR){
+			m_prevPerpendicular = PROS_ERR;
+		} else {
+			m_prevPerpendicular = currPerpendicular;
+		}
+
+		if(currParallel == PROS_ERR && currPerpendicular == PROS_ERR){
+			m_config.useMotorEncoders = true;
+		} else {
+			m_config.useMotorEncoders = false;
 		}
 		
 		m_initialized = true;
 		return;
 	}
+
 
 	// Calculate distance travelled by either drive encoders or tracking wheels
 	WheelLengths arcs;
@@ -73,8 +83,8 @@ void Odometry::updatePose(void) {
 		WheelTravelResult wheelResult = getOdomWheelTravel();
 
 		if (wheelResult.error != OdomError::NONE) {
+			m_config.useMotorEncoders = false;
 			pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
-			return;
 		}
 
 		arcs = wheelResult.travel;
@@ -198,21 +208,64 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	double currPerpendicular = perpendicularTrackingWheel.get_position();
 
 	// Returns error for problem with either wheel
-	if (currParallel == PROS_ERR || currPerpendicular == PROS_ERR) {
+	if (currParallel == PROS_ERR && currPerpendicular == PROS_ERR) {
 		return {{0.0, 0.0}, OdomError::TRACKING_WHEEL_ERROR};
 	}
 
-    // Get delta between current and last frame 
-	double dTicksL = currParallel - m_prevParallel; 
-	double dTicksS = currPerpendicular - m_prevPerpendicular;
-
+	// For each sensor check check for recently reconnecting sensors
+	// Get delta between current and last frame 
 	// Convert centidegrees to degrees and find distance travelled by wheel
-	double delParallel = (dTicksL / 36000.0) * m_config.parallelWheelDiameter * std::numbers::pi; 
-	double delPerpendicular = (dTicksS / 36000.0) * m_config.perpendicularWheelDiameter * std::numbers::pi; 
-
     // Save current position as previous
-	m_prevParallel = currParallel;
-	m_prevPerpendicular = currPerpendicular;
+	// Perpendicular failure
+	if(currParallel != PROS_ERR && currPerpendicular == PROS_ERR){
+		double delParallel = 0.0;
+		if(m_prevParallel == PROS_ERR){
+			m_prevParallel = currParallel;
+			delParallel = 0.0;
+		} else {
+			double dParallel = currParallel - m_prevParallel;
+			delParallel = (dParallel / 36000.0) * m_config.parallelWheelDiameter * std::numbers::pi; 
+			m_prevParallel = currParallel;
+		}
+		m_prevPerpendicular = PROS_ERR;
+		return {{delParallel, 0.0}, OdomError::TRACKING_WHEEL_ERROR};
+	}
+
+	// Parallel failure
+	if(currParallel == PROS_ERR && currPerpendicular != PROS_ERR){
+		double delPerpendicular = 0.0;
+		WheelLengths driveTravel = getDriveEncoderTravel();
+		if(m_prevPerpendicular == PROS_ERR){
+			m_prevPerpendicular = currPerpendicular;
+			delPerpendicular = 0.0;
+		} else {
+			double dPerpendicular = currPerpendicular - m_prevPerpendicular;
+			delPerpendicular = (dPerpendicular / 36000.0) * m_config.perpendicularWheelDiameter * std::numbers::pi; 
+			m_prevParallel = currParallel;
+		}
+		m_prevParallel = PROS_ERR;
+		return {{driveTravel.parallel, delPerpendicular}, OdomError::TRACKING_WHEEL_ERROR};
+	}
+	double delParallel = 0.0; 
+	double delPerpendicular = 0.0;
+
+	// Check for recently reconnected parallel sensors
+	if(m_prevParallel == PROS_ERR){
+		m_prevParallel = currParallel;
+	} else {
+		double dParallel = currParallel - m_prevParallel;
+		delParallel = (dParallel / 36000.0) * m_config.parallelWheelDiameter * std::numbers::pi; 
+		m_prevParallel = currParallel;
+	}
+
+	// Check for recently reconnected perpendicular sensors
+	if(m_prevPerpendicular == PROS_ERR){
+		m_prevPerpendicular= currPerpendicular;
+	} else {
+		double dPerpendicular = currPerpendicular - m_prevPerpendicular;
+		delPerpendicular = (dPerpendicular / 36000.0) * m_config.perpendicularWheelDiameter * std::numbers::pi; 
+		m_prevPerpendicular= currPerpendicular;
+	}
 
 	return {{delParallel, delPerpendicular}, OdomError::NONE};
 }
@@ -226,7 +279,7 @@ VelocityResult Odometry::getParallelVel() {
 		double rightVelocity = averageMotorGroupVelocities(rightMotors);
 
 		if (leftVelocity == PROS_ERR_F || rightVelocity == PROS_ERR_F) {
-			return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+			return {0.0, OdomError::PARALLEL_WHEEL_ERROR};
 		}
 
 		// motor velocities are in RPM
@@ -238,7 +291,7 @@ VelocityResult Odometry::getParallelVel() {
 	}
 
 	if (initialVelocity == PROS_ERR) {
-		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+		return {0.0, OdomError::PARALLEL_WHEEL_ERROR};
 	}
 
 	// rotation sensor velocity is in centidegrees per second
