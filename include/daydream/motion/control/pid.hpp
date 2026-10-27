@@ -30,6 +30,7 @@ class PID {
     public:
         // Initialize PID with constants
         PID(double p, double i, double d, double start_i);
+        PID();
         
         // Set target and reset error
         void setTarget(double target, bool resetPID = true);

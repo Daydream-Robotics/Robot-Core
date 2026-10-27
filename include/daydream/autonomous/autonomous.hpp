@@ -3,6 +3,8 @@
 
 #include "daydream/motion/control/pid.hpp"
 #include "daydream/motion/odometry.hpp"
+#include "daydream/subsystems/drivetrain.hpp"
+#include "daydream/subsystems/pneumatics.hpp"
 
 // Autonomous class containing
 class Autonomous {
@@ -10,8 +12,12 @@ class Autonomous {
     friend class AutoTuner;
 
     public:
-        // Constructor
-        Autonomous();
+        Autonomous(
+            daydream::Drivetrain& drivetrain,
+            Odometry& odometry,
+            daydream::Pneumatics& pneumatics);
+
+        void runExample();
 
         // Turn to a target_heading [-180, 180]
         void turnTo(double targetHeading);
@@ -22,6 +28,10 @@ class Autonomous {
         bool travelToPoint(double targetX, double targetY, double maxSpeed=200, bool reverse=false, int timer=-1);
 
     private:
+
+        daydream::Drivetrain& m_drivetrain;
+        Odometry& m_odometry;
+        daydream::Pneumatics& m_pneumatics;
 
         // Distance PID controller
         PID distancePID;

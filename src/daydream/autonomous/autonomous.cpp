@@ -1,21 +1,29 @@
 #include "daydream/autonomous/autonomous.hpp"
-#include "daydream/config/subsystems.hpp"
 #include "daydream/config/constants.h"
 #include "daydream/utils/helpers.hpp"
 #include <cmath>
 #include <numbers>
 
 
-	
-
 // TODO: Tune PID parameters
-Autonomous::Autonomous() 
-	: distancePID(DISTANCE_KP, DISTANCE_KI, DISTANCE_KD, DISTANCE_KI_THRESHOLD),  // 5.0, 2.0, 0.0, 1.0
+Autonomous::Autonomous(
+    daydream::Drivetrain& drivetrain,
+    Odometry& odometry,
+    daydream::Pneumatics& pneumatics)
+	: m_drivetrain(drivetrain),
+	  m_odometry(odometry),
+	  m_pneumatics(pneumatics),
+	  distancePID(DISTANCE_KP, DISTANCE_KI, DISTANCE_KD, DISTANCE_KI_THRESHOLD),  // 5.0, 2.0, 0.0, 1.0
 	headingPID(HEADING_KP, HEADING_KI, HEADING_KD, HEADING_KI_THRESHOLD), // 0.002, 0.0, 0.0, 0.0
 	turnPID(TURN_KP, TURN_KI, TURN_KD, TURN_KI_THRESHOLD) { // 1.22, 0.000, 0.063875, 180
-		leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
-		rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
-	}
+	m_drivetrain.setBrakeMode(pros::E_MOTOR_BRAKE_HOLD);
+}
+
+void Autonomous::runExample() {
+	m_pneumatics.setMatchloader(true);
+	travel(24.0, 60.0, 0.0, 3.0);
+	m_pneumatics.setMatchloader(false);
+}
 
 void Autonomous::turnTo(double targetHeading) {
 	turnPID.reset();
@@ -77,8 +85,7 @@ void Autonomous::turnTo(double targetHeading) {
 		
         turnSpeed = std::copysign(turnSpeed, correction);
 		
-		leftMotors.move_velocity(turnSpeed);
-        rightMotors.move_velocity(-turnSpeed);
+		m_drivetrain.setVelocity(turnSpeed, -turnSpeed);
 		
 		double currentVelocity = (std::fabs(angleDiffDeg(targetHeading, filteredHeading)) < (1.0 * std::numbers::pi / 180)) ? angleDiffDeg(rawHeading, prevHeading) / dt : 999.0;
 		if (turnPID.exit_condition(currentVelocity) != PID::RUNNING)
@@ -90,8 +97,7 @@ void Autonomous::turnTo(double targetHeading) {
 
 	// pros::lcd::print(2, "Exited Turn Loop");
 
-	leftMotors.move_velocity(0);
-    rightMotors.move_velocity(0);
+	m_drivetrain.stop();
     pros::delay(10);
 }
 
@@ -119,7 +125,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 
     headingPID.setTarget(0.0);
 
-    Position start = odom.getPosition();
+    Position start = m_odometry.getPosition();
     double direction = (distance >= 0.0) ? 1.0 : -1.0;
 
 	Position headingUnit {
@@ -149,8 +155,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 
 		// controller.print(0,0, "%.2f, %.2f", pos_x, pos_y);
         // Compute traveled distance along heading vector
-        Position delta { odom.getPosX() - start.x, odom.getPosY() - start.y };
-		// printf("X: %.2f, Y: %.2f\n", odom.pos_x, odom.pos_y);
+        Position delta { m_odometry.getPosX() - start.x, m_odometry.getPosY() - start.y };
 
 		traveled = delta.x * headingUnit.x + delta.y * headingUnit.y;
 
@@ -194,8 +199,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
             right *= scale;
         }
 
-        leftMotors.move_velocity(left);
-        rightMotors.move_velocity(right);
+		m_drivetrain.setVelocity(left, right);
 
 		// Exit if any exit condition is met.
 		// Ignore velocity exit for the first second to allow robot to accelerate
@@ -214,8 +218,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
         pros::delay(10);
     }
 
-    leftMotors.move_velocity(0);
-    rightMotors.move_velocity(0);
+	m_drivetrain.stop();
     pros::delay(10);
 	return traveled;
 }

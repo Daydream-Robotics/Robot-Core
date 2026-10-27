@@ -2,6 +2,8 @@
 #include "main.h"
 #include "daydream/utils/helpers.hpp"
 
+std::vector<ALS_Path> paths;
+
 std::vector<ALS_Path> Path::buildAllPathsFromJerryIO(const std::string& filePath, double sampleSpacing) {
     std::vector<ALS_Path> newPaths;
 

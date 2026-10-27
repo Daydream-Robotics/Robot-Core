@@ -103,7 +103,7 @@ public:
      * @param config The physical odometry dimensions of the robot
      */
     Odometry(OdomConfig config);
-
+    
     /**
      * @brief Gets the robot's latest pose
      * @returns The latest Pose of the robot
@@ -158,6 +158,11 @@ public:
      * @brief Background task entry point
      */
     static void odomTask();
+
+    /**
+     * @brief Calculates tracking wheel offsets by rotating the robot 
+     */
+    void calculateTrackingWheelOffsets();
 
 private:
     // the config for the robot
