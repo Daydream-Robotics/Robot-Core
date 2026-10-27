@@ -35,7 +35,6 @@
 #define PROS_USE_LITERALS
 
 #include "api.h"
-#include "config/constants.h"
 
 /**
  * You should add more #includes here
@@ -117,22 +116,6 @@ void competition_initialize(void);
  * task, not resume it from where it left off.
  */
 void opcontrol(void);
-
-/**
- * Controls the intake for a certain amount of time. If no time is given, runs
- * indefinitely until told otherwise.
- */
-void move_intake(int front, int mid = STOP, int back = STOP, double seconds = 0.0);
-
-/**
- * Gets chassis motor values based on type of drive selected (Tank/Split Arcade).
- */
-void drive(DriveType type);
-
-void score();
-void matchload(int numRam = 1);
-void wallBall();
-void fullMatchload();
 
 #ifdef __cplusplus
 }

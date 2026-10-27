@@ -1,8 +1,8 @@
 #pragma once
 
-#include "brain/communication.hpp"
-#include "brain/sensors.hpp"
-#include "brain/types.hpp"
+#include "brain/mailboxes.hpp"
+#include "brain/control/driverInputReader.hpp"
+#include "brain/sensors/sensorService.hpp"
 
 #include "pros/rtos.hpp"
 

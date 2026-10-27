@@ -1,10 +1,5 @@
 #pragma once
 
-#include "brain/communication.hpp"
-#include "brain/control.hpp"
-#include "brain/diagnostics.hpp"
-#include "brain/localization.hpp"
-#include "brain/tasks.hpp"
 #include "brain/types.hpp"
 
 #include <memory>

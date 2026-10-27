@@ -38,6 +38,7 @@ add_library(robotcore_mpc STATIC
     src/motion/control/mpc.cpp
     src/motion/pathing/arclengthSplining.cpp
     src/motion/control/mpcReference.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/src/odometry.cpp
 )
 target_include_directories(robotcore_mpc PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
