@@ -268,7 +268,7 @@ private:
     struct Group {
         std::unique_ptr<pros::MotorGroup> motors; ///< the group's motors
         std::vector<double> lastPos; ///< per motor: last good position, degrees
-        std::vector<bool> lastOk; ///< per motor: whether the last read worked
+        std::vector<bool> lastValid; ///< per motor: whether the last read worked
         double accumRad = 0; ///< averaged IME position since config, radians
         bool missing = false; ///< a port had no motor when the config was applied
     };
