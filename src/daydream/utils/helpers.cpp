@@ -18,11 +18,6 @@ double normalizeAngle(double a) {
     return std::atan2(std::sin(a), std::cos(a));
 }
 
-// Return Euclidean distance btwn points p1 and p2
-double getDistance(Position p1, Position p2) {
-    return std::sqrt(std::pow((p2.x - p1.x), 2) + std::pow((p2.y - p1.y), 2));
-}
-
 // Convert Degrees to Radians
 double convertDegToRad(double degree) {
     return degree * (std::numbers::pi / 180.0);
