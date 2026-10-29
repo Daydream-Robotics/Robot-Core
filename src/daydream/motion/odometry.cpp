@@ -15,33 +15,48 @@ OdomError getOdomError() {
 
 //IME
 static double averageMotorGroupPosition(const pros::MotorGroup& group) {
-
-	std::vector<double> positions = group.get_position_all();
+    std::vector<double> positions = group.get_position_all();
 
     if (positions.empty()) {
-        return 0.0;
+        return NAN;
     }
 
     double sum = 0.0;
+    int valid = 0;
 
     for (double pos : positions) {
-    	if (pos == PROS_ERR_F || !std::isfinite(pos)) continue;
-    	sum += pos;
-    	valid++;
+        if (pos == PROS_ERR_F || !std::isfinite(pos)) {
+            continue;
+        }
+
+        sum += pos;
+        valid++;
     }
 
-	return valid > 0 ? sum / valid : NAN;
+    return valid > 0 ? sum / static_cast<double>(valid) : NAN;
 }
 
 // Raw heading from drive encoders, in degrees, relative to the last reset
-double getRawImeHeading()
-{
-	//Assuming needs new variables
-	double leftDist  = leftMotors.get_position()  / 360.0 * wheelCircumference * gearRatio;
-	double rightDist = rightMotors.get_position() / 360.0 * wheelCircumference * gearRatio;
+double getRawImeHeading() {
+    double leftTicks = averageMotorGroupPosition(leftMotors);
+    double rightTicks = averageMotorGroupPosition(rightMotors);
 
-	//  dθ = (dR − dL) / trackWidth
-	return (rightDist - leftDist) / trackWidth * (180.0 / M_PI);
+    if (!std::isfinite(leftTicks) ||
+        !std::isfinite(rightTicks) ||
+        TRACK_WIDTH <= 0.0) {
+        return NAN;
+    }
+
+    const double wheelCircumference =
+        DRIVE_WHEEL_DIAMETER_INCHES * std::numbers::pi;
+
+    double leftDist =
+        (leftTicks / 360.0) * DRIVE_GEAR_RATIO * wheelCircumference;
+
+    double rightDist =
+        (rightTicks / 360.0) * DRIVE_GEAR_RATIO * wheelCircumference;
+
+    return (rightDist - leftDist) / TRACK_WIDTH;
 }
 
 
@@ -191,14 +206,39 @@ double Odometry::getPosY() {
 }
 
 double Odometry::getEncoderHeading() {
-	//get left and right average motor group position
-	//check if left and right aren't nan, if they are return NAN
+    // Get average left and right motor encoder positions.
+    double leftTicks = averageMotorGroupPosition(leftMotors);
+    double rightTicks = averageMotorGroupPosition(rightMotors);
 
+    // Reject invalid encoder readings.
+    if (!std::isfinite(leftTicks) ||
+        !std::isfinite(rightTicks)) {
+        return NAN;
+    }
 
-	//have leftInches be left/360 * gear ratio * wheel diameter * pi
-	//have same for right
+    // Validate the configured wheel diameter and track width.
+    if (!std::isfinite(m_config.driveWheelDiameter) ||
+        m_config.driveWheelDiameter <= 0.0 ||
+        TRACK_WIDTH <= 0.0) {
+        return NAN;
+    }
 
-	// return (rightInches - leftInches)/TRACK_WIDTH (note TRACK_WIDTH should exist but if not assume it does its in PR #126)
+    // Convert encoder degrees into wheel travel in inches.
+    const double wheelCircumference =
+        m_config.driveWheelDiameter * std::numbers::pi;
+
+    const double leftInches =
+        (leftTicks / 360.0) *
+        DRIVE_GEAR_RATIO *
+        wheelCircumference;
+
+    const double rightInches =
+        (rightTicks / 360.0) *
+        DRIVE_GEAR_RATIO *
+        wheelCircumference;
+
+    // Calculate heading in radians.
+    return (rightInches - leftInches) / TRACK_WIDTH;
 }
 
 
