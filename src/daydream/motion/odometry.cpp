@@ -7,14 +7,11 @@
 #include <vector>
 #include <atomic>
 
-static std::atomic<OdomError> s_lastOdomError{OdomError::NONE};
-
-OdomError getOdomError() {
-	return s_lastOdomError.load();
+OdomError Odometry::getOdomError() {
+	return m_lastOdomError.load();
 }
 
-//IME
-static double averageMotorGroupPosition(const pros::MotorGroup& group) {
+double Odometry::averageMotorGroupPosition(const pros::MotorGroup& group) {
     std::vector<double> positions = group.get_position_all();
 
     if (positions.empty()) {
@@ -28,35 +25,16 @@ static double averageMotorGroupPosition(const pros::MotorGroup& group) {
         if (pos == PROS_ERR_F || !std::isfinite(pos)) {
             continue;
         }
-
         sum += pos;
         valid++;
     }
 
-    return valid > 0 ? sum / static_cast<double>(valid) : NAN;
-}
-
-// Raw heading from drive encoders, in degrees, relative to the last reset
-double getRawImeHeading() {
-    double leftTicks = averageMotorGroupPosition(leftMotors);
-    double rightTicks = averageMotorGroupPosition(rightMotors);
-
-    if (!std::isfinite(leftTicks) ||
-        !std::isfinite(rightTicks) ||
-        TRACK_WIDTH <= 0.0) {
+    if (valid == 0) {
         return NAN;
     }
 
-    const double wheelCircumference =
-        DRIVE_WHEEL_DIAMETER_INCHES * std::numbers::pi;
-
-    double leftDist =
-        (leftTicks / 360.0) * DRIVE_GEAR_RATIO * wheelCircumference;
-
-    double rightDist =
-        (rightTicks / 360.0) * DRIVE_GEAR_RATIO * wheelCircumference;
-
-    return (rightDist - leftDist) / TRACK_WIDTH;
+    const double average = sum / static_cast<double>(valid);
+    return average;
 }
 
 
@@ -68,6 +46,7 @@ void Odometry::updatePose(void) {
 	YawResult yawResult = getYaw();
 
 	if (yawResult.error != OdomError::NONE) {
+		m_lastOdomError = yawResult.error;
 		static uint32_t lastImuFailurePrint = 0;
 		const uint32_t now = pros::millis();
 		if (now - lastImuFailurePrint >= 500) {
@@ -98,12 +77,12 @@ void Odometry::updatePose(void) {
                 // TODO: Handle error for tracking wheel initialization failure
                 // FIX: add file wide error variable to track odom errors and display on controller
                 // The file wide error variable should be accessible to other files through a public getter
-                s_lastOdomError = OdomError::TRACKING_WHEEL_ERROR;
+                m_lastOdomError = OdomError::TRACKING_WHEEL_ERROR;
 				return;
 			}
 		}
 
-		s_lastOdomError = OdomError::NONE;
+		m_lastOdomError = OdomError::NONE;
 		m_initialized = true;
 		return;
 	}
@@ -165,7 +144,7 @@ void Odometry::updatePose(void) {
 
 	m_prevTheta = theta_rad;
 
-    s_lastOdomError = OdomError::NONE;
+    m_lastOdomError = OdomError::NONE;
 }
 
 Pose Odometry::getPose() {
@@ -238,11 +217,12 @@ double Odometry::getEncoderHeading() {
         wheelCircumference;
 
     // Calculate heading in radians.
-    return (rightInches - leftInches) / TRACK_WIDTH;
+    const double heading = (rightInches - leftInches) / TRACK_WIDTH;
+    return heading;
 }
 
 
-YawResult Odometry::getImeYaw(OdomError imuError) {
+YawResult Odometry::getIMEYaw(OdomError imuError) {
 	double encHeading = getEncoderHeading();
 	if (std::isnan(encHeading)) {
 		return {0.0, imuError};
@@ -252,14 +232,16 @@ YawResult Odometry::getImeYaw(OdomError imuError) {
 	double yaw = m_imuRefYaw + (encHeading - m_encRefHeading);
 	m_mutex.give();
 
+	double normalizedYaw = normalizeAngle(yaw);
 	return {normalizeAngle(yaw), OdomError::NONE};
 }
 
-YawResult Odometry::getYaw(void) {
+YawResult Odometry::getIMUYaw(void)
+{
 
 	// imu disconnected
 	if (!imu.is_installed()) {
-		return getImeYaw(OdomError::IMU_DISCONNECTED);
+		return {0.0, OdomError::IMU_DISCONNECTED};
 	}
 
 	// imu still calibrating
@@ -279,17 +261,32 @@ YawResult Odometry::getYaw(void) {
 	// yaw formula = atan2(2(wz + xy), 1 - 2(y^2 + z^2))
 	double yaw_rad = std::atan2(2 * ((qt.w * qt.z) + (qt.x * qt.y)), 1 - (2 * ((qt.y * qt.y) + (qt.z * qt.z))));
 
-	// save reference so IME fallback continues from here without a jump
-	double encHeading = getEncoderHeading();
-	if (!std::isnan(encHeading)) {
-		m_mutex.take();
-		m_imuRefYaw = -yaw_rad;
-		m_encRefHeading = encHeading;
-		m_mutex.give();
+	// IMU is clockwise positive, odom is CCW positive
+	double ccwYaw = -yaw_rad;
+	return {ccwYaw, OdomError::NONE};}
+
+
+YawResult Odometry::getYaw(void) {
+	YawResult imuResult = getIMUYaw();
+
+	if (imuResult.error == OdomError::NONE) {
+		// save reference so IME fallback continues from here without a jump
+		double encHeading = getEncoderHeading();
+		if (!std::isnan(encHeading)) {
+			m_mutex.take();
+			m_imuRefYaw = imuResult.yaw;
+			m_encRefHeading = encHeading;
+			m_mutex.give();
+		}
+		return imuResult;
 	}
 
-	// angle is returned from -pi to pi
-	return {-yaw_rad, OdomError::NONE};
+	if (imuResult.error == OdomError::IMU_DISCONNECTED) {
+		return getIMEYaw(imuResult.error);
+	}
+
+	// calibrating / communication error: report it, don't guess
+	return imuResult;
 }
 
 WheelTravelResult Odometry::getOdomWheelTravel(void) {

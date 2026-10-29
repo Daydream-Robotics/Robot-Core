@@ -1,6 +1,7 @@
 #pragma once
 
 #include "main.h"
+#include <atomic>
 
 struct OdomConfig {
     double parallelWheelDiameter;
@@ -23,12 +24,6 @@ enum class OdomError {
     TRACKING_WHEEL_ERROR
 };
 
-/**
- * @brief Gets the most recent odometry error
- * @note task safe
- * @returns The latest OdomError, or OdomError::NONE if the last update succeeded
- */
-OdomError getOdomError();
 
 /**
  * @struct YawResult
@@ -127,10 +122,17 @@ public:
      */
     double getPosY();
 
-    /** 
-     * @brief gets the yaw of the robot
+    /**
+ * @brief Gets the most recent odometry error
+ * @note task safe
+ * @returns The latest OdomError, or OdomError::NONE if the last update succeeded
+ */
+    OdomError getOdomError();
+
+    /**
+     * @brief Gets yaw, falling back to the drive encoders if the IMU is disconnected
      * @note Counter clockwise is positive
-     * @returns returns yaw/heading in degrees and error status
+     * @returns yaw/heading in radians and error status
      */
     YawResult getYaw(void);
     
@@ -173,10 +175,22 @@ private:
     WheelTravelResult getOdomWheelTravel(void);
 
     /**
+ * @brief Averages the position of all motors in a group, ignoring invalid readings
+ * @returns Average position in degrees, or NAN if no motor is valid
+ */
+    static double averageMotorGroupPosition(const pros::MotorGroup& group);
+
+    /**
+     * @brief Yaw straight from the IMU
+     * @returns yaw in radians (CCW positive) and IMU error status
+     */
+    YawResult getIMUYaw(void);
+
+    /**
      * @brief Fallback yaw computed from drive encoders when the IMU is unavailable
      * @param imuError The IMU error that triggered the fallback
      */
-    YawResult getImeYaw(OdomError imuError);
+    YawResult getIMEYaw(OdomError imuError);
 
     /**
      * @brief Heading in radians computed from the left/right drive encoder difference
@@ -204,6 +218,9 @@ private:
     // reference values saved on each good IMU read so the IME fallback continues without a jump
     double m_imuRefYaw = 0.0;
     double m_encRefHeading = 0.0;
+
+    // latest odom error, readable from any task
+    std::atomic<OdomError> m_lastOdomError{OdomError::NONE};
     
 };
 
