@@ -7,6 +7,75 @@
 #include <vector>
 #include <optional>
 
+struct MotorGroupPositionSample {
+	double average{0.0};
+	std::vector<std::optional<double>> motorPositions;
+};
+
+static std::optional<MotorGroupPositionSample>
+readMotorGroupSample(const pros::MotorGroup& group) {
+
+	std::vector<double> positions = group.get_position_all();
+
+	if (positions.empty()) {
+		return std::nullopt;
+	}
+
+	MotorGroupPositionSample sample;
+	double sum = 0.0;
+	size_t validCount = 0;
+
+	for (double pos : positions) {
+
+		if (!std::isfinite(pos)) {
+			sample.motorPositions.push_back(std::nullopt);
+			continue;
+		}
+
+		sample.motorPositions.push_back(pos);
+		sum += pos;
+		validCount++;
+	}
+
+	if (validCount == 0) {
+		return std::nullopt;
+	}
+
+	sample.average = sum / static_cast<double>(validCount);
+
+	return sample;
+}
+
+static std::optional<double> averageMotorDelta(
+	const std::vector<std::optional<double>>& previous,
+	const std::vector<std::optional<double>>& current) {
+
+		// The motor groups must have matching sizes
+		if (previous.size() != current.size()) {
+			return std::nullopt;
+		}
+
+		double sum = 0.0;
+		size_t validCount = 0;
+
+		for (size_t i = 0; i < current.size(); i++) {
+			// Only compare motors with two valid readings
+			if (!previous[i].has_value() || !current[i].has_value()) {
+				continue;
+			}
+
+			sum += current[i].value() - previous[i].value();
+			validCount++;
+		}
+
+		// No motors could be compared
+		if (validCount == 0) {
+			return std::nullopt;
+		}
+
+		return sum / static_cast<double>(validCount);
+	}
+
 static std::optional<double> averageMotorGroupPosition(const pros::MotorGroup& group) {
     std::vector<double> positions = group.get_position_all();
     if (positions.empty()) {
@@ -14,14 +83,25 @@ static std::optional<double> averageMotorGroupPosition(const pros::MotorGroup& g
     }
 
     double sum = 0.0;
+	size_t validCount = 0;
+
     for (double pos : positions) {
+
+		// Skip invalid motor readings
         if (!std::isfinite(pos)) {
-			return std::nullopt;
+			continue;
 		}
+
 		sum += pos;
+		validCount++;
     }
 
-    return sum / static_cast<double>(positions.size());
+	// No usable motors
+	if (validCount == 0) {
+		return std::nullopt;
+	}
+
+    return sum / static_cast<double>(validCount);
 }
 
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
@@ -74,6 +154,12 @@ void Odometry::updatePose(void) {
 	YawResult yawResult = getYaw();
 
 	if (yawResult.error != OdomError::NONE) {
+
+		// IMU may have lost its original heading reference
+		if (yawResult.error != OdomError::IMU_COMMUNICATION_ERROR) {
+			m_imuNeedsRebase = true;
+		}
+
 		static uint32_t lastImuFailurePrint = 0;
 		const uint32_t now = pros::millis();
 		if (now - lastImuFailurePrint >= 500) {
@@ -99,19 +185,24 @@ void Odometry::updatePose(void) {
 			double estimatedTheta =
 				normalizeAngle(m_prevTheta + recoveryDelta);
 
-			m_mutex.take();
+			if (m_imuNeedsRebase) {
+				m_mutex.take();
 
-			m_headingOffset = normalizeAngle(
-				m_headingOffset + normalizeAngle(estimatedTheta - theta_rad)
-			);
+				m_headingOffset = normalizeAngle(
+					m_headingOffset + normalizeAngle(estimatedTheta - theta_rad)
+				);
 
-			m_mutex.give();
+				m_mutex.give();
+			}
 
 			// Preserve the actual rotation during this update
 			m_prevTheta = normalizeAngle(theta_rad - recoveryDelta);
 
 			m_usingEncoderHeading = false;
 		}
+
+		m_imuNeedsRebase = false;
+
 	} else {
 		m_usingEncoderHeading = true;
 		theta_rad = normalizeAngle(m_prevTheta + encoderHeading);
@@ -122,10 +213,10 @@ void Odometry::updatePose(void) {
 		m_lastRawTheta = theta_rad;
 
 		if (m_config.useMotorEncoders) {
-			auto leftResult = averageMotorGroupPosition(leftMotors);
-			auto rightResult = averageMotorGroupPosition(rightMotors);
+			auto leftSample = readMotorGroupSample(leftMotors);
+			auto rightSample = readMotorGroupSample(rightMotors);
 
-			if (!leftResult.has_value() || !rightResult.has_value()) {
+			if (!leftSample.has_value() || !rightSample.has_value()) {
 				static uint32_t lastInitMotorFailurePrint = 0;
 				const uint32_t now = pros::millis();
 
@@ -137,8 +228,14 @@ void Odometry::updatePose(void) {
 				return;
 			}
 
-			m_prevLeft = leftResult.value();
-			m_prevRight = rightResult.value();
+			// Save existing group averages
+			m_prevLeft = leftSample->average;
+			m_prevRight = rightSample->average;
+
+			// Save each motor's individual starting position
+			m_prevLeftMotorPositions = leftSample->motorPositions;
+			m_prevRightMotorPositions = rightSample->motorPositions;
+
 			m_driveEncodersReady = true;
 
 		} else {
@@ -152,14 +249,20 @@ void Odometry::updatePose(void) {
 				return;
 			}
 
-			auto leftResult = averageMotorGroupPosition(leftMotors);
-			auto rightResult = averageMotorGroupPosition(rightMotors);
+			auto leftSample = readMotorGroupSample(leftMotors);
+			auto rightSample = readMotorGroupSample(rightMotors);
 
-			if (leftResult.has_value() && rightResult.has_value()) {
-				m_prevLeft = leftResult.value();
-				m_prevRight = rightResult.value();
+			if (leftSample.has_value() && rightSample.has_value()) {
+				m_prevLeft = leftSample->average;
+				m_prevRight = rightSample->average;
+
+				m_prevLeftMotorPositions = leftSample->motorPositions;
+				m_prevRightMotorPositions = rightSample->motorPositions;
+
 				m_driveEncodersReady = true;
 			} else {
+				m_prevLeftMotorPositions.clear();
+				m_prevRightMotorPositions.clear();
 				m_driveEncodersReady = false;
 			}
 		}
@@ -228,6 +331,10 @@ void Odometry::updatePose(void) {
 	if (motorResult.error == OdomError::NONE && m_driveEncodersReady) {
 		m_prevLeft = motorResult.currentLeftPosition;
 		m_prevRight = motorResult.currentRightPosition;
+
+		// Save each motor's position for the next update
+		m_prevLeftMotorPositions = motorResult.currentLeftMotorPositions;
+		m_prevRightMotorPositions = motorResult.currentRightMotorPositions;
 	}
 
 	// Save tracking wheel positions only after updating the pose
@@ -374,31 +481,53 @@ DriveTravelResult Odometry::getDriveEncoderTravel(void) {
 		return {0.0, 0.0, OdomError::NONE};
 	}
 
-    auto leftResult = averageMotorGroupPosition(leftMotors);
-    auto rightResult = averageMotorGroupPosition(rightMotors);
+    auto leftSample = readMotorGroupSample(leftMotors);
+    auto rightSample = readMotorGroupSample(rightMotors);
 
-	if (!leftResult.has_value() || !rightResult.has_value()) {
-		m_driveEncodersReady = false;
+	if (!leftSample.has_value() || !rightSample.has_value()) {
 		return {0.0, 0.0, OdomError::MOTOR_ENCODER_ERROR};
 	}
 
-	double currLeft = leftResult.value();
-	double currRight = rightResult.value();
+	double currLeft = leftSample->average;
+	double currRight = rightSample->average;
 
 	if (!m_driveEncodersReady) {
 		m_prevLeft = currLeft;
 		m_prevRight = currRight;
+
+		// Establish individual motor baselines
+		m_prevLeftMotorPositions = leftSample->motorPositions;
+		m_prevRightMotorPositions = rightSample->motorPositions;
+
 		m_driveEncodersReady = true;
-		return {0.0, 0.0, OdomError::NONE, currLeft, currRight};
+		return {0.0, 0.0, OdomError::NONE, currLeft, currRight, leftSample->motorPositions, rightSample->motorPositions};
 	}
 
-    double dLeft = currLeft - m_prevLeft;
-    double dRight = currRight - m_prevRight;
+    auto leftDelta = averageMotorDelta(
+		m_prevLeftMotorPositions,
+		leftSample->motorPositions
+	);
+
+	auto rightDelta = averageMotorDelta(
+		m_prevRightMotorPositions,
+		rightSample->motorPositions
+	);
+
+	if (!leftDelta.has_value() || !rightDelta.has_value()) {
+		// No comparable motor readings on at least one side
+		// Re-establish baselines on next update
+		m_driveEncodersReady = false;
+
+		return {0.0, 0.0, OdomError::MOTOR_ENCODER_ERROR};
+	}
+
+	double dLeft = leftDelta.value();
+	double dRight = rightDelta.value();
 
     double leftInches = (dLeft / 360.0) *DRIVE_GEAR_RATIO  * m_config.driveWheelDiameter * std::numbers::pi;
     double rightInches = (dRight / 360.0) * DRIVE_GEAR_RATIO * m_config.driveWheelDiameter * std::numbers::pi;
 
-    return {leftInches, rightInches, OdomError::NONE, currLeft, currRight};
+    return {leftInches, rightInches, OdomError::NONE, currLeft, currRight, leftSample->motorPositions, rightSample->motorPositions};
 }
 
 double Odometry::averageMotorGroupVelocities(const pros::MotorGroup& group){

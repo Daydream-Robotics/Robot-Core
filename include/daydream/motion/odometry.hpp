@@ -1,6 +1,8 @@
 #pragma once
 
 #include "main.h"
+#include <vector>
+#include <optional>
 
 struct OdomConfig {
     double parallelWheelDiameter;
@@ -60,6 +62,8 @@ struct DriveTravelResult {
     OdomError error{OdomError::NONE};
     double currentLeftPosition{0.0};
     double currentRightPosition{0.0};
+    std::vector<std::optional<double>> currentLeftMotorPositions;
+    std::vector<std::optional<double>> currentRightMotorPositions;
 };
 
 /**
@@ -199,11 +203,14 @@ private:
     double m_prevPerpendicular = 0;
     double m_prevLeft = 0;
     double m_prevRight = 0;
+    std::vector<std::optional<double>> m_prevLeftMotorPositions;
+    std::vector<std::optional<double>> m_prevRightMotorPositions;
     bool m_driveEncodersReady = false;
     double m_headingOffset = 0.0; //field heading = raw IMU heading + offset
     double m_lastRawTheta = 0.0; //latest raw IMU heading, used by setPose()
     bool m_initialized = false;
     bool m_usingEncoderHeading = false;
+    bool m_imuNeedsRebase = false;
     
 };
 
