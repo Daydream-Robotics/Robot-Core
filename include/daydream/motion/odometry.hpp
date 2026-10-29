@@ -1,6 +1,8 @@
 #pragma once
 
 #include "main.h"
+#include <vector>
+#include <optional>
 
 struct OdomConfig {
     double parallelWheelDiameter;
@@ -9,6 +11,7 @@ struct OdomConfig {
     double perpendicularTrackingWheelOffset;
     bool useMotorEncoders = false;
     double driveWheelDiameter = 0.0;
+    double driveTrackWidth = TRACK_WIDTH;
 };
 
 /**
@@ -20,7 +23,8 @@ enum class OdomError {
     IMU_DISCONNECTED,
     IMU_CALIBRATING,
     IMU_COMMUNICATION_ERROR,
-    TRACKING_WHEEL_ERROR
+    TRACKING_WHEEL_ERROR,
+    MOTOR_ENCODER_ERROR
 };
 
 /**
@@ -44,6 +48,22 @@ struct WheelLengths {
 struct WheelTravelResult {
     WheelLengths travel{0.0, 0.0}; /**< The distances traveled by the parallel and perpendicular tracking wheels in inches */
     OdomError error{OdomError::NONE}; /**< The tracking wheel error status */
+    double currentParallelPosition{0.0};
+    double currentPerpendicularPosition{0.0};
+};
+
+/**
+ * @struct DriveTravelResult
+ * @brief Stores individual drive wheel travel and encoder error result
+ */
+struct DriveTravelResult {
+    double leftInches{0.0};
+    double rightInches{0.0};
+    OdomError error{OdomError::NONE};
+    double currentLeftPosition{0.0};
+    double currentRightPosition{0.0};
+    std::vector<std::optional<double>> currentLeftMotorPositions;
+    std::vector<std::optional<double>> currentRightMotorPositions;
 };
 
 /**
@@ -136,7 +156,7 @@ public:
     /**
      * @brief Returns struct of distances travelled by drive encoders when using internal encoders
      */
-    WheelLengths getDriveEncoderTravel(void);
+    DriveTravelResult getDriveEncoderTravel(void);
 
     /**
      * @brief Background task entry point
@@ -183,9 +203,14 @@ private:
     double m_prevPerpendicular = 0;
     double m_prevLeft = 0;
     double m_prevRight = 0;
+    std::vector<std::optional<double>> m_prevLeftMotorPositions;
+    std::vector<std::optional<double>> m_prevRightMotorPositions;
+    bool m_driveEncodersReady = false;
     double m_headingOffset = 0.0; //field heading = raw IMU heading + offset
     double m_lastRawTheta = 0.0; //latest raw IMU heading, used by setPose()
     bool m_initialized = false;
+    bool m_usingEncoderHeading = false;
+    bool m_imuNeedsRebase = false;
     
 };
 
