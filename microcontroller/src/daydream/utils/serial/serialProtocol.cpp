@@ -88,7 +88,7 @@ std::optional<SerialProtocol::Frame> SerialProtocol::parseFrame() {
         // validate packet type and rough size before waiting on the payload.
         // on any failure only skip 1 byte, so a corrupted size can't swallow the frames after it
         if (!isValidPacketType(header.type) || !packets::sizeInRange(header.type, header.size)) {
-            badFrames++;
+            m_badFrames++;
             skipBytes(1);
             continue;
         }
@@ -103,7 +103,7 @@ std::optional<SerialProtocol::Frame> SerialProtocol::parseFrame() {
 
         // validate exact payload size from the counts in the payload
         if (!packets::sizeExact(header.type, payload, header.size, m_commandGroups)) {
-            badFrames++;
+            m_badFrames++;
             skipBytes(1);
             continue;
         }
@@ -112,7 +112,7 @@ std::optional<SerialProtocol::Frame> SerialProtocol::parseFrame() {
         uint16_t recvCrc = payload[header.size] | (payload[header.size + 1] << 8);
         uint16_t computedCrc = crc16(buf + 2, HEADER_SIZE - 2 + header.size);
         if (computedCrc != recvCrc) {
-            crcErrors++;
+            m_crcErrors++;
             skipBytes(1);
             continue;
         }

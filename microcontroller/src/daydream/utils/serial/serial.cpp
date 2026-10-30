@@ -253,7 +253,7 @@ void SerialLink::writerLoop() {
             int32_t battery = pros::battery::get_voltage();
             fixed.batteryMv = battery == PROS_ERR ? 0 : static_cast<uint16_t>(battery);
             readController(fixed);
-            fixed.rxErrors = m_serial.crcErrors + m_serial.badFrames;
+            fixed.rxErrors = m_serial.m_crcErrors + m_serial.m_badFrames;
             fixed.nGroups = static_cast<uint8_t>(m_groups.size());
             fixed.nRotations = static_cast<uint8_t>(m_wheels.size());
 

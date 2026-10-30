@@ -30,8 +30,13 @@
     #include <termios.h>
 #endif
 
+class SerialLink;
+
 /**
  * @brief Sends and receives framed packets over the RS-485 link or USB link.
+ *
+ * Only SerialLink uses it: everything except Transport and crc16() is private,
+ * and SerialLink is a friend. Use SerialLink to talk to the other side.
  *
  * receive() is only called by the reader and send() only by the writer. They
  * share no buffers, so the class needs no lock. midFrame() and the error
@@ -39,6 +44,30 @@
  */
 class SerialProtocol {
 public:
+    /// @brief Which physical link the protocol uses.
+    enum class Transport : uint8_t {
+        RS485, ///< brain smart port <-> Nano UART, through RS-485 transceivers
+        USB ///< brain USB port (PROS stdin/stdout) <-> Nano /dev/ttyACM1
+    };
+
+    /// @brief Closes the port.
+    ~SerialProtocol();
+
+    /**
+     * @brief Computes CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF).
+     *
+     * Check value: crc16("123456789") == 0x29B1.
+     *
+     * @param data Bytes to checksum. For a frame, type + size + payload.
+     * @param len Number of bytes.
+     * @param crc Starting value, to continue a previous CRC.
+     * @return uint16_t The CRC.
+     */
+    static uint16_t crc16(const uint8_t* data, size_t len, uint16_t crc = 0xFFFF);
+
+private:
+    friend class SerialLink;
+
     #pragma pack(push, 1)
     /// @brief Binary packet header
     struct BinaryHeader {
@@ -63,14 +92,8 @@ public:
     static constexpr speed_t DEFAULT_BAUD = B921600; ///< link baud rate
     #endif
 
-    /// @brief Which physical link the protocol uses.
-    enum class Transport : uint8_t {
-        RS485, ///< brain smart port <-> Nano UART, through RS-485 transceivers
-        USB ///< brain USB port (PROS stdin/stdout) <-> Nano /dev/ttyACM1
-    };
-
-    std::atomic<uint16_t> crcErrors{0}; ///< frames dropped for a bad CRC, reported in STATE.rxErrors.
-    std::atomic<uint16_t> badFrames{0}; ///< frames dropped for a bad type or size, reported in STATE.rxErrors
+    std::atomic<uint16_t> m_crcErrors{0}; ///< frames dropped for a bad CRC, reported in STATE.rxErrors.
+    std::atomic<uint16_t> m_badFrames{0}; ///< frames dropped for a bad type or size, reported in STATE.rxErrors
 
     /**
      * @brief Constructs the protocol without opening a port.
@@ -81,9 +104,6 @@ public:
      */
     SerialProtocol(int bufferSize = 2 * MAX_FRAME_SIZE);
 
-
-    /// @brief Closes the port.
-    ~SerialProtocol();
 
     #ifdef __v5_brain__
     /**
@@ -100,7 +120,7 @@ public:
      *
      * Turns off PROS's COBS stream framing so frames go out as raw bytes.
      *
-     * @return bool False if PROS couldn't turn off COBS, so the link can't be used.
+     * @return bool false if PROS couldn't turn off COBS
      */
     bool setUpVexSerial();
     #endif
@@ -109,21 +129,21 @@ public:
     /**
      * @brief Opens and configures the UART for the link.
      *
-     * Raw 8N1, no flow control. read() returns what is available, or waits at
+     * No flow control. read() returns what is available, or waits at
      * most 100 ms if nothing is.
      *
      * @param port UART device: "/dev/ttyTHS1" for RS-485, or "/dev/ttyACM1" for the brain's USB port.
      * @param baud termios speed constant, e.g. B921600.
      * @param deGpio sysfs GPIO number wired to the transceiver's DE and /RE pins.
      *        -1 = auto-direction transceiver or USB, no pin to drive.
-     * @return bool False if the port or the GPIO couldn't be opened.
+     * @return bool false if the port or the GPIO couldn't be opened.
      */
     bool setUpMicrocontrollerSerial(const char* port, speed_t baud = DEFAULT_BAUD, int deGpio = -1);
     #endif
 
 
     /**
-     * @brief Sends one frame: header, payload and CRC-16 in a single write.
+     * @brief Sends one frame with header, payload and CRC-16.
      *
      * @param type packets::PacketType.
      * @param payload Payload bytes.
@@ -152,7 +172,7 @@ public:
      * Returns at most one frame per call, so call it in a loop until it
      * returns std::nullopt.
      *
-     * Brain: never blocks. Nano: blocks up to 100 ms waiting for bytes.
+     * Brain: doesn't blocks. Nano: blocks up to 100 ms waiting for bytes.
      *
      * @return std::optional<Frame> The frame, or std::nullopt if no full valid frame is buffered.
      */
@@ -176,19 +196,6 @@ public:
         m_commandGroups = groups; 
     }
 
-    /**
-     * @brief Computes CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF).
-     *
-     * Check value: crc16("123456789") == 0x29B1.
-     *
-     * @param data Bytes to checksum. For a frame: type + size + payload.
-     * @param len Number of bytes.
-     * @param crc Starting value, to continue a previous CRC.
-     * @return uint16_t The CRC.
-     */
-    static uint16_t crc16(const uint8_t* data, size_t len, uint16_t crc = 0xFFFF);
-
-private:
     int m_bufferSize;  ///< receive buffer size in bytes
     std::vector<uint8_t> m_rxBuffer; ///< persistent receive buffer
     size_t m_rxBufferPos; ///< bytes currently in m_rxBuffer
@@ -202,7 +209,7 @@ private:
      * Brain: CONFIG and COMMAND. Nano: STATE and LOG.
      *
      * @param type Header `type` field.
-     * @return bool True if the type is sent by the other side.
+     * @return bool true if the type is sent by the other side.
      */
     static bool isValidPacketType(uint16_t type);
 
