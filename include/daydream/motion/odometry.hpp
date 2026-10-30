@@ -3,6 +3,7 @@
 #include "main.h"
 #include <vector>
 #include <optional>
+#include <atomic>
 
 struct OdomConfig {
     double parallelWheelDiameter;
@@ -24,7 +25,8 @@ enum class OdomError {
     IMU_CALIBRATING,
     IMU_COMMUNICATION_ERROR,
     TRACKING_WHEEL_ERROR,
-    MOTOR_ENCODER_ERROR
+    MOTOR_ENCODER_ERROR,
+    IMU_FALLBACK // IMU is unavailable, heading is coming from the drive encoders
 };
 
 /**
@@ -140,10 +142,18 @@ public:
      */
     double getPosY();
 
-    /** 
-     * @brief gets the yaw of the robot
+    /**
+     * @brief Gets the most recent odometry error
+     * @note task safe
+     * @returns The latest OdomError, OdomError::IMU_FALLBACK if the pose is updating from
+     *          the drive encoders, or OdomError::NONE if the last update succeeded
+     */
+    OdomError getOdomError();
+
+    /**
+     * @brief Gets yaw, falling back to the drive encoder heading tracked by odometry if the IMU is unavailable
      * @note Counter clockwise is positive
-     * @returns returns yaw/heading in degrees and error status
+     * @returns yaw/heading in radians and error status
      */
     YawResult getYaw(void);
     
@@ -191,6 +201,12 @@ private:
     WheelTravelResult getOdomWheelTravel(void);
 
     /**
+     * @brief Yaw straight from the IMU
+     * @returns yaw in radians (CCW positive) and IMU error status
+     */
+    YawResult getIMUYaw(void);
+
+    /**
      * @brief Averages the actual velocities of all motors in a motor group
      * @param group The motor group to average
      * @returns The average velocity in RPM, or PROS_ERR_F if any motor reports an error
@@ -209,8 +225,11 @@ private:
     double m_headingOffset = 0.0; //field heading = raw IMU heading + offset
     double m_lastRawTheta = 0.0; //latest raw IMU heading, used by setPose()
     bool m_initialized = false;
-    bool m_usingEncoderHeading = false;
+    std::atomic<bool> m_usingEncoderHeading{false}; // read by getYaw() from other tasks
     bool m_imuNeedsRebase = false;
+
+    // latest odom error, readable from any task
+    std::atomic<OdomError> m_lastOdomError{OdomError::NONE};
     
 };
 

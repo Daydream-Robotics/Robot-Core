@@ -122,6 +122,7 @@ void Odometry::updatePose(void) {
 			lastMotorFailurePrint = now;
 		}
 
+		m_lastOdomError = OdomError::MOTOR_ENCODER_ERROR;
 		return;
 	}
 
@@ -132,6 +133,7 @@ void Odometry::updatePose(void) {
 		wheelResult = getOdomWheelTravel();
 
 		if (wheelResult.error != OdomError::NONE) {
+			m_lastOdomError = wheelResult.error;
 			pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
 			return;
 		}
@@ -151,7 +153,7 @@ void Odometry::updatePose(void) {
 			/ m_config.driveTrackWidth;
 	}
 
-	YawResult yawResult = getYaw();
+	YawResult yawResult = getIMUYaw();
 
 	if (yawResult.error != OdomError::NONE) {
 
@@ -167,6 +169,7 @@ void Odometry::updatePose(void) {
 			lastImuFailurePrint = now;
 		}
 		if (!encoderHeadingAvailable && m_initialized) {
+			m_lastOdomError = yawResult.error;
 			return;
 		}
 	}
@@ -225,6 +228,7 @@ void Odometry::updatePose(void) {
 					lastInitMotorFailurePrint = now;
 				}
 
+				m_lastOdomError = OdomError::MOTOR_ENCODER_ERROR;
 				return;
 			}
 
@@ -243,9 +247,7 @@ void Odometry::updatePose(void) {
 			m_prevPerpendicular = perpendicularTrackingWheel.get_position();
 
 			if (m_prevParallel == PROS_ERR || m_prevPerpendicular == PROS_ERR) {
-                // TODO: Handle error for tracking wheel initialization failure
-                // FIX: add file wide error variable to track odom errors and display on controller
-                // The file wide error variable should be accessible to other files through a public getter
+				m_lastOdomError = OdomError::TRACKING_WHEEL_ERROR;
 				return;
 			}
 
@@ -273,10 +275,12 @@ void Odometry::updatePose(void) {
 			m_config.driveTrackWidth <= 0.0)) {
 
 			pros::lcd::print(0, "[Update Pose] No valid heading source!");
+			m_lastOdomError = yawResult.error;
 			return;
 		}
-		
+
 		m_usingEncoderHeading = (yawResult.error != OdomError::NONE);
+		m_lastOdomError = m_usingEncoderHeading ? OdomError::IMU_FALLBACK : OdomError::NONE;
 		m_initialized = true;
 		return;
 	}
@@ -345,6 +349,8 @@ void Odometry::updatePose(void) {
 
 	m_prevTheta = theta_rad;
 
+	m_lastOdomError = m_usingEncoderHeading ? OdomError::IMU_FALLBACK : OdomError::NONE;
+
 	// !IMPORTANT!: Likely not task safe
 	// print to the controller every 100 ms 
 	// static uint32_t lastPrintTime = 0;
@@ -391,7 +397,26 @@ double Odometry::getPosY() {
     return y;
 }
 
+OdomError Odometry::getOdomError() {
+	return m_lastOdomError.load();
+}
+
 YawResult Odometry::getYaw(void) {
+	YawResult imuResult = getIMUYaw();
+
+	if (imuResult.error == OdomError::NONE || !m_usingEncoderHeading) {
+		return imuResult;
+	}
+
+	// IMU is unavailable, use the encoder heading updatePose() is tracking
+	m_mutex.take();
+	double encoderYaw = m_lastRawTheta;
+	m_mutex.give();
+
+	return {encoderYaw, OdomError::NONE};
+}
+
+YawResult Odometry::getIMUYaw(void) {
 
 	// imu disconnected
 	if (!imu.is_installed()) {
@@ -586,7 +611,7 @@ void Odometry::calculateTrackingWheelOffsets() {
 		}
 
 		// Set up IMU rotation tracking
-		YawResult initialYaw = getYaw();
+		YawResult initialYaw = getIMUYaw();
 
 		if (initialYaw.error != OdomError::NONE) {
 			pros::lcd::print(0, "Calibration: IMU error!");
@@ -609,7 +634,7 @@ void Odometry::calculateTrackingWheelOffsets() {
 				return;
 			}
 
-			YawResult result = getYaw();
+			YawResult result = getIMUYaw();
 
 			if (result.error != OdomError::NONE) {
 				leftMotors.move_velocity(0);
@@ -635,7 +660,7 @@ void Odometry::calculateTrackingWheelOffsets() {
 		pros::delay(500);
 
 		// Account for any additional rotation while settling
-		YawResult finalYaw = getYaw();
+		YawResult finalYaw = getIMUYaw();
 
 		if (finalYaw.error != OdomError::NONE) {
 			pros::lcd::print(0, "Calibration: IMU error!");
