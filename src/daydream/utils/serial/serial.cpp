@@ -147,6 +147,19 @@ void SerialLink::log(uint8_t level, const char* format, ...) {
     m_logCount++;
 }
 
+void SerialLink::setNanoControl(bool enabled) {
+    // switching off: tell the Nano once, before STATE stops
+    if (!enabled && m_nanoControl) {
+        log(0, "nano control off: driver control on the brain");
+    }
+    m_nanoControl = enabled;
+}
+
+bool SerialLink::linkQuiet() const {
+    // driver control: brain code drives, so no STATE is sent (LOG still is). disabled always runs normally
+    return !m_nanoControl && !pros::competition::is_disabled();
+}
+
 void SerialLink::readerLoop() {
     while (true) {
         // handle every frame that has fully arrived
@@ -181,6 +194,12 @@ void SerialLink::writerLoop() {
         // don't start talking over a frame that's still coming in. wait at most 2 ms
         for (int i = 0; i < 2 && m_serial.midFrame(); i++) {
             pros::delay(1);
+        }
+
+        // driver control: send a pending LOG but no STATE, so the Nano sends no COMMAND
+        if (linkQuiet()) {
+            flushOneLog();
+            continue;
         }
 
         packets::StateFixed fixed{};
@@ -471,34 +490,37 @@ packets::Error SerialLink::applyCommand(const uint8_t* payload, uint16_t size) {
         }
     }
 
-    // apply each group's command
-    for (size_t i = 0; i < m_groups.size(); i++) {
-        pros::MotorGroup& motors = *m_groups[i].motors;
-        const packets::GroupCmd& cmd = cmds[i];
-        switch (static_cast<packets::GroupMode>(cmd.mode)) {
-            case packets::GroupMode::VOLTAGE:
-                // clamp to the motor's range
-                motors.move_voltage(std::clamp<int32_t>(std::lround(cmd.value), -12000, 12000));
-                break;
-            case packets::GroupMode::VELOCITY:
-                motors.move_velocity(std::lround(cmd.value));
-                break;
-            case packets::GroupMode::POSITION:
-                motors.move_absolute(cmd.value, cmd.aux);
-                break;
-            default:
-                // STOP, and any unknown mode, stops with the group's brake mode
-                motors.brake();
-                break;
+    // in driver control the brain's own code drives the motors and pneumatics, so leave them alone
+    if (m_nanoControl) {
+        // apply each group's command
+        for (size_t i = 0; i < m_groups.size(); i++) {
+            pros::MotorGroup& motors = *m_groups[i].motors;
+            const packets::GroupCmd& cmd = cmds[i];
+            switch (static_cast<packets::GroupMode>(cmd.mode)) {
+                case packets::GroupMode::VOLTAGE:
+                    // clamp to the motor's range
+                    motors.move_voltage(std::clamp<int32_t>(std::lround(cmd.value), -12000, 12000));
+                    break;
+                case packets::GroupMode::VELOCITY:
+                    motors.move_velocity(std::lround(cmd.value));
+                    break;
+                case packets::GroupMode::POSITION:
+                    motors.move_absolute(cmd.value, cmd.aux);
+                    break;
+                default:
+                    // STOP, and any unknown mode, stops with the group's brake mode
+                    motors.brake();
+                    break;
+            }
         }
-    }
 
-    // ADI: only slots in the mask that are enabled outputs
-    uint16_t mask = command.adiOutMask & m_adiEnable;
-    for (int k = 0; k < packets::MAX_ADI; k++) {
-        if ((mask >> k) & 1) {
-            // physical level = logical state XOR active-low
-            m_adi[k]->set_value(((command.adiOutState ^ m_adiActiveLow) >> k) & 1);
+        // ADI: only slots in the mask that are enabled outputs
+        uint16_t mask = command.adiOutMask & m_adiEnable;
+        for (int k = 0; k < packets::MAX_ADI; k++) {
+            if ((mask >> k) & 1) {
+                // physical level = logical state XOR active-low
+                m_adi[k]->set_value(((command.adiOutState ^ m_adiActiveLow) >> k) & 1);
+            }
         }
     }
 

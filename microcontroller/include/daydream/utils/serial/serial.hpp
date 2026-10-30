@@ -189,7 +189,7 @@ public:
 
     #ifdef __v5_brain__
     /**
-     * @brief queues a line of text for the Nano. sent as LOG, at most one per tick
+     * @brief queues a line of text for the Nano. sent as LOG, at most one per tick, in every mode including driver control
      *
      * safe to call from any task. text past MAX_LOG_TEXT is cut off, and the
      * line is dropped if LOG_QUEUE_SIZE lines are already waiting
@@ -198,6 +198,19 @@ public:
      * @param format printf-style format string
      */
     void log(uint8_t level, const char* format, ...);
+
+    /**
+     * @brief sets whether the Nano drives the motors and pneumatics
+     *
+     * true (the default): the Nano drives them through COMMAND, for autonomous.
+     * false: brain code drives them, for driver control. switching to false sends
+     * the Nano a one-line LOG notice. after that, while the robot is enabled, the
+     * link goes quiet: no STATE, so no COMMAND. LOG lines from log() still go out.
+     * while the robot is disabled the link runs normally either way
+     *
+     * @param enabled true = the Nano is in control
+     */
+    void setNanoControl(bool enabled);
     #endif
 
     #ifdef __jetson_nano__
@@ -300,7 +313,7 @@ private:
     /// @brief reader task: applies every CONFIG and COMMAND as it arrives
     void readerLoop();
 
-    /// @brief writer task: every tick, checks the watchdog, samples, sends one LOG if queued, then STATE
+    /// @brief writer task: every tick, checks the watchdog, samples, sends one LOG if queued, then STATE. in driver control only the LOG
     void writerLoop();
 
     /**
@@ -362,6 +375,13 @@ private:
     /// @brief sends the oldest queued LOG line, if any
     void flushOneLog();
 
+    /**
+     * @brief whether the link is quiet: Nano control is off and the robot is enabled (driver control)
+     *
+     * @return bool true = send no STATE (LOG lines still go out)
+     */
+    bool linkQuiet() const;
+
     SerialProtocol m_serial; ///< framing and the smart port
     uint8_t m_linkPort; ///< smart port of the link. no device may use it
     int32_t m_baud; ///< link baud rate
@@ -393,6 +413,8 @@ private:
     std::vector<uint8_t> m_bootConfig; ///< built-in CONFIG payload, applied by start()
     uint32_t m_cmdRxUs = 0; ///< when the last valid COMMAND arrived, pros::c::micros()
     uint32_t m_cmdRxMs = 0; ///< when the last valid COMMAND arrived, pros::millis()
+
+    std::atomic<bool> m_nanoControl{true}; ///< the Nano drives the motors and pneumatics. see setNanoControl()
 
     pros::Mutex m_logMutex; ///< guards the log queue
     std::array<LogEntry, LOG_QUEUE_SIZE> m_logQueue; ///< ring buffer of queued lines
