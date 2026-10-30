@@ -690,4 +690,455 @@ static int64_t nowUs() {
                std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
+/**
+ * @brief Converts a steady_clock time point to microseconds.
+ *
+ * @param t Time point.
+ * @return int64_t Microseconds on the same scale as nowUs().
+ */
+static int64_t toUs(std::chrono::steady_clock::time_point t) {
+    return std::chrono::duration_cast<std::chrono::microseconds>(t.time_since_epoch()).count();
+}
+
+/**
+ * @brief Converts a numeric baud rate to a termios speed constant.
+ *
+ * @param baud Baud rate, e.g. 921600.
+ * @return speed_t The termios constant, or B0 if the rate isn't supported.
+ */
+static speed_t toSpeed(int32_t baud) {
+    switch (baud) {
+        case 115200: return B115200;
+        case 230400: return B230400;
+        case 460800: return B460800;
+        case 921600: return B921600;
+        default: return B0;
+    }
+}
+
+/**
+ * @brief Time a frame takes on the wire, at 10 bits per byte (8N1).
+ *
+ * @param bytes Bytes on the wire, header and CRC included.
+ * @param baud Baud rate. 0 = no wire to correct for (USB).
+ * @return int64_t Microseconds.
+ */
+static int64_t airtimeUs(size_t bytes, int32_t baud) {
+    if (baud <= 0) {
+        return 0;
+    }
+    return static_cast<int64_t>(bytes) * 10 * 1000000 / baud;
+}
+
+/**
+ * @brief Gives a thread real-time (SCHED_FIFO) priority.
+ *
+ * Needs root or CAP_SYS_NICE.
+ *
+ * @param thread Thread to change.
+ * @param priority SCHED_FIFO priority, 1–99.
+ */
+static void makeRealtime(std::thread& thread, int priority) {
+    sched_param param{};
+    param.sched_priority = priority;
+    // the result is ignored on purpose: the link still works, with more jitter
+    (void)pthread_setschedparam(thread.native_handle(), SCHED_FIFO, &param);
+}
+
+SerialLink::SerialLink(const char* port, int32_t baud, int deGpio, std::vector<uint8_t> config, SerialProtocol::Transport transport)
+    : m_device(port),
+      m_baud(baud),
+      m_transport(transport),
+      m_deGpio(deGpio),
+      m_config(std::move(config)) {
+    // checks our own CONFIG's fixed part
+    packets::ConfigFixed fixed{};
+    if (m_config.size() >= sizeof(fixed)) {
+        std::memcpy(&fixed, m_config.data(), sizeof(fixed));
+    }
+    m_myConfigId = fixed.configId;
+    m_nGroups = fixed.nGroups;
+    m_statePeriodMs = fixed.statePeriodMs;
+
+    // every group starts at STOP (mode 0)
+    m_groupCmds.assign(m_nGroups, packets::GroupCmd{});
+    m_commandFixed.configId = m_myConfigId;
+    m_commandFixed.nGroups = m_nGroups;
+}
+
+SerialLink::~SerialLink() {
+    // tell both threads to stop and wake the writer if it's waiting
+    m_running = false;
+    m_replyCv.notify_all();
+    if (m_reader.joinable()) {
+        m_reader.join();
+    }
+    if (m_writer.joinable()) {
+        m_writer.join();
+    }
+}
+
+bool SerialLink::start() {
+    speed_t speed = toSpeed(m_baud);
+    // unsupported baud, or a CONFIG whose size doesn't match its own counts
+    auto size = static_cast<uint16_t>(m_config.size());
+    if (speed == B0 || m_myConfigId == 0 || !packets::sizeInRange(packets::CONFIG, size) ||
+        !packets::sizeExact(packets::CONFIG, m_config.data(), size, 0)) {
+        return false;
+    }
+    if (!m_serial.setUpMicrocontrollerSerial(m_device.c_str(), speed, m_deGpio)) {
+        return false;
+    }
+    m_running = true;
+    m_reader = std::thread([this] { readerLoop(); });
+    m_writer = std::thread([this] { writerLoop(); });
+    // the writer's 2 ms reply deadline is the tightest, so it gets the higher priority
+    makeRealtime(m_reader, 80);
+    makeRealtime(m_writer, 81);
+    return true;
+}
+
+void SerialLink::setGroup(uint8_t slot, packets::GroupMode mode, float value, int16_t aux) {
+    std::lock_guard<std::mutex> lock(m_commandMutex);
+    if (slot >= m_groupCmds.size()) {
+        return;
+    }
+    m_groupCmds[slot] = packets::GroupCmd{static_cast<uint8_t>(mode), aux, value};
+}
+
+void SerialLink::setAdi(uint8_t slot, bool on) {
+    if (slot >= packets::MAX_ADI) {
+        return;
+    }
+    uint16_t bit = static_cast<uint16_t>(1u << slot);
+    std::lock_guard<std::mutex> lock(m_commandMutex);
+    m_commandFixed.adiOutMask |= bit;
+    if (on) {
+        m_commandFixed.adiOutState |= bit;
+    } 
+    else {
+        m_commandFixed.adiOutState &= static_cast<uint16_t>(~bit);
+    }
+}
+
+uint8_t SerialLink::request(packets::Request type, uint8_t target, float value) {
+    std::lock_guard<std::mutex> lock(m_commandMutex);
+    // next ID: 1–255
+    do {
+        m_nextRequestId = m_nextRequestId == 255 ? 1 : m_nextRequestId + 1;
+    } while (m_nextRequestId == m_brainRequestId);
+    // repeated in every COMMAND until the brain echoes the ID
+    m_commandFixed.requestId = m_nextRequestId;
+    m_commandFixed.requestType = static_cast<uint8_t>(type);
+    m_commandFixed.requestTarget = target;
+    m_commandFixed.requestValue = value;
+    return m_nextRequestId;
+}
+
+bool SerialLink::requestDone(uint8_t id) const {
+    return id != 0 && m_brainRequestId == id;
+}
+
+void SerialLink::onSample(std::function<void(const Sample&)> callback) {
+    std::lock_guard<std::mutex> lock(m_sampleMutex);
+    m_callbacks.push_back(std::move(callback));
+}
+
+std::optional<SerialLink::Sample> SerialLink::latestSample() const {
+    std::lock_guard<std::mutex> lock(m_sampleMutex);
+    return m_latest;
+}
+
+bool SerialLink::linkUp() const {
+    int64_t last = m_lastStateUs;
+    // never heard from the brain
+    if (last == 0) {
+        return false;
+    }
+    return nowUs() - last < static_cast<int64_t>(LINK_DOWN_PERIODS) * m_statePeriodMs * 1000;
+}
+
+void SerialLink::readerLoop() {
+    while (m_running) {
+        // blocks up to 100 ms when nothing is coming in, so `running` is rechecked often
+        std::optional<SerialProtocol::Frame> frame = m_serial.receive();
+        if (!frame) {
+            continue;
+        }
+        if (frame->type == packets::STATE) {
+            // the end of STATE hands the bus to us. stamp it and wake the writer before decoding,
+            // so decoding time doesn't eat into the reply window
+            Clock::time_point end = Clock::now();
+            {
+                std::lock_guard<std::mutex> lock(m_replyMutex);
+                m_stateEnd = end;
+                m_statePending = true;
+            }
+            m_replyCv.notify_one();
+            handleState(*frame, end);
+        } 
+        else if (frame->type == packets::LOG) {
+            handleLog(*frame);
+        }
+    }
+}
+
+void SerialLink::writerLoop() {
+    // the first CONFIG goes out on the first STATE
+    int ticksSinceConfig = CONFIG_RETRY_TICKS;
+    uint8_t buf[packets::MAX_PAYLOAD];
+
+    while (m_running) {
+        // wait for a STATE
+        Clock::time_point end;
+        {
+            std::unique_lock<std::mutex> lock(m_replyMutex);
+            m_replyCv.wait_for(lock, std::chrono::milliseconds(100), [this] { return m_statePending || !m_running; });
+            if (!m_statePending) {
+                continue;
+            }
+            m_statePending = false;
+            end = m_stateEnd;
+        }
+        // give the brain's transceiver time to turn around
+        std::this_thread::sleep_until(end + std::chrono::microseconds(packets::GUARD_US));
+        // too late to start, skip this tick and send nothing
+        if (Clock::now() > end + std::chrono::microseconds(packets::REPLY_START_MAX_US)) {
+            skippedReplies++;
+            continue;
+        }
+
+        // the brain doesn't have our config: send CONFIG instead of COMMAND, at most every 20 ticks.
+        // uses the previous STATE's configId if the reader hasn't decoded this one yet, which only delays by a tick
+        if (m_brainConfigId != m_myConfigId) {
+            if (++ticksSinceConfig >= CONFIG_RETRY_TICKS) {
+                m_serial.send(packets::CONFIG, m_config.data(), static_cast<uint16_t>(m_config.size()));
+                ticksSinceConfig = 0;
+            }
+            continue;
+        }
+
+        // configured: if the brain ever loses the config, resend it
+        ticksSinceConfig = CONFIG_RETRY_TICKS;
+
+        // snapshot the mailbox, (always the latest command)
+        packets::PayloadWriter out{buf};
+        {
+            std::lock_guard<std::mutex> lock(m_commandMutex);
+            packets::CommandFixed fixed = m_commandFixed;
+            fixed.cmdSeq = ++m_cmdSeq;
+            fixed.ackStateSeq = m_ackStateSeq;
+            out.put(fixed);
+            for (const packets::GroupCmd& cmd : m_groupCmds) {
+                out.put(cmd);
+            }
+        }
+        // t0 for time sync: when this COMMAND started going out
+        m_cmdSentUs[m_cmdSeq % CMD_TIMES_SIZE] = nowUs();
+        m_serial.send(packets::COMMAND, out);
+    }
+}
+
+void SerialLink::handleState(const SerialProtocol::Frame& frame, Clock::time_point end) {
+    packets::PayloadReader reader{frame.payload, frame.size};
+    packets::StateFixed fixed;
+    reader.get(fixed);
+    int64_t t3 = toUs(end);
+    m_lastStateUs = t3;
+
+    // BOOTED turning on means the brain program restarted: its clock, positions and requests start over
+    bool booted = (fixed.status & packets::status::BOOTED) != 0;
+    if (booted && !m_brainBooted) {
+        resetBrainSession();
+        resetPositions();
+    }
+    m_brainBooted = booted;
+    // a different config was applied: positions restart from its origin
+    if (fixed.configId != m_brainConfigId) {
+        resetPositions();
+    }
+    m_brainConfigId = fixed.configId;
+    m_brainRequestId = fixed.lastRequestId;
+
+    // stop repeating the request because the brain ran it
+    {
+        std::lock_guard<std::mutex> lock(m_commandMutex);
+        if (m_commandFixed.requestId != 0 && m_commandFixed.requestId == fixed.lastRequestId) {
+            m_commandFixed.requestId = 0;
+            m_commandFixed.requestType = static_cast<uint8_t>(packets::Request::NONE);
+        }
+    }
+
+    // time sync
+    int64_t tNano = syncTime(fixed, frame.size, t3);
+
+    if (fixed.configId != m_myConfigId || fixed.nGroups != m_nGroups) {
+        return;
+    }
+
+    Sample sample;
+    sample.tNanoUs = tNano;
+    sample.stateSeq = fixed.stateSeq;
+    sample.status = fixed.status;
+    sample.lastRequestId = fixed.lastRequestId;
+    sample.lastError = fixed.lastError;
+    sample.batteryMv = fixed.batteryMv;
+    std::memcpy(sample.ctrlAxes, fixed.ctrlAxes, sizeof(sample.ctrlAxes));
+    sample.ctrlButtons = fixed.ctrlButtons;
+    sample.rxErrors = fixed.rxErrors;
+
+    // read the per-device entries. deltas go into one channel list, groups, then rotations
+    size_t channels = fixed.nGroups + fixed.nRotations;
+    std::vector<double> delta(channels);
+    for (size_t i = 0; i < fixed.nGroups; i++) {
+        packets::GroupState state;
+        reader.get(state);
+        delta[i] = state.imeDeltaRad;
+        sample.omegaRadS.push_back(state.omegaRadS);
+        sample.groupFlags.push_back(state.flags);
+    }
+    for (size_t i = 0; i < fixed.nRotations; i++) {
+        packets::RotationState state;
+        reader.get(state);
+        delta[fixed.nGroups + i] = state.deltaRad;
+        sample.wheelFlags.push_back(state.flags);
+    }
+
+    // find the base, 0 = the config origin, otherwise a STATE we recorded
+    std::vector<double> zeros(channels, 0.0);
+    const std::vector<double>* base = nullptr;
+    if (fixed.deltaBaseSeq == 0) {
+        base = &zeros;
+    } 
+    else {
+        for (const PosEntry& entry : m_posHistory) {
+            if (entry.seq == fixed.deltaBaseSeq && entry.pos.size() == channels) {
+                base = &entry.pos;
+                break;
+            }
+        }
+    }
+
+    // previous positions, for the per-tick step. none yet = the config origin
+    const std::vector<double>& prev = m_lastPos.size() == channels ? m_lastPos : zeros;
+
+    // pos[stateSeq] = pos[base] + delta
+    std::vector<double> now(channels);
+    if (base) {
+        for (size_t i = 0; i < channels; i++) {
+            now[i] = (*base)[i] + delta[i];
+        }
+    } 
+    else {
+        // unknown base (Nano restart):
+        // take this STATE as the origin and carry on from the last known positions
+        now = prev;
+        unknownBases++;
+    }
+
+    // split into groups and rotations, with the step since the previous Sample
+    for (size_t i = 0; i < channels; i++) {
+        double step = now[i] - prev[i];
+        if (i < fixed.nGroups) {
+            sample.imeRad.push_back(now[i]);
+            sample.imeStepRad.push_back(step);
+        } 
+        else {
+            sample.wheelRad.push_back(now[i]);
+            sample.wheelStepRad.push_back(step);
+        }
+    }
+
+     // record this STATE's positions, then ack it so the brain can move its base here
+    m_posHistory[fixed.stateSeq % POS_HISTORY_SIZE] = PosEntry{fixed.stateSeq, now};
+    m_lastPos = std::move(now);
+    m_ackStateSeq = fixed.stateSeq;
+
+    // publish, and copy the callbacks so they run without the lock held
+    std::vector<std::function<void(const Sample&)>> toCall;
+    {
+        std::lock_guard<std::mutex> lock(m_sampleMutex);
+        m_latest = sample;
+        toCall = m_callbacks;
+    }
+    for (auto& callback : toCall) {
+        callback(sample);
+    }
+}
+
+void SerialLink::handleLog(const SerialProtocol::Frame& frame) {
+    // payload is 1 level byte, then text that isn't null-terminated
+    std::fprintf(stderr, "[brain L%u] %.*s\n", frame.payload[0], static_cast<int>(frame.size - 1),
+                 reinterpret_cast<const char*>(frame.payload + 1));
+}
+
+int64_t SerialLink::syncTime(const packets::StateFixed& fixed, uint16_t stateBytes, int64_t t3) {
+    // unwrap the brain's 32-bit µs clock, which wraps every ~71.6 min
+    if (m_haveBrainTime && fixed.tUs < m_lastBrainTUs) {
+        m_brainTimeHigh += int64_t(1) << 32;
+    }
+    m_lastBrainTUs = fixed.tUs;
+    m_haveBrainTime = true;
+
+    // t2 is when the brain sent this STATE, brain clock
+    int64_t t2 = m_brainTimeHigh + fixed.tUs;
+    // the reader sees the end of STATE. its start was one time earlier
+    // over USB the bytes take no real time on a wire, so we don't take off time
+    int32_t wireBaud = m_transport == SerialProtocol::Transport::USB ? 0 : m_baud;
+    int64_t t3Start = t3 - airtimeUs(SerialProtocol::HEADER_SIZE + stateBytes + SerialProtocol::CRC_SIZE, wireBaud);
+
+    // a new round trip closes when the brain reports a COMMAND we haven't used yet
+    if (fixed.cmdAgeUs != packets::NO_COMMAND && fixed.lastCmdSeq != m_lastSyncedCmd) {
+        m_lastSyncedCmd = fixed.lastCmdSeq;
+        // t0 is when we started sending that COMMAND (Nano clock)
+        int64_t t0 = m_cmdSentUs[fixed.lastCmdSeq % CMD_TIMES_SIZE];
+        // t1 iswhen the brain started receiving it, (brain clock) (cmdAgeUs is measured from its end)
+        size_t commandBytes = SerialProtocol::HEADER_SIZE + packets::commandSize(m_nGroups) + SerialProtocol::CRC_SIZE;
+        int64_t t1 = t2 - fixed.cmdAgeUs - airtimeUs(commandBytes, wireBaud);
+        int64_t rtt = (t3Start - t0) - (t2 - t1);
+        int64_t offset = ((t1 - t0) + (t2 - t3Start)) / 2;
+        // drop impossible samples
+        if (t0 != 0 && rtt >= 0 && rtt < 50000) {
+            m_syncWindow.push_back(SyncSample{t3, rtt, offset});
+        }
+    }
+
+    // keep about 1 s of samples
+    while (!m_syncWindow.empty() && t3 - m_syncWindow.front().t3 > SYNC_WINDOW_US) {
+        m_syncWindow.pop_front();
+    }
+    // the sample with the lowest round trip had the least queueing delay, so its offset is the most accurate
+    if (!m_syncWindow.empty()) {
+        auto best = std::min_element(m_syncWindow.begin(), m_syncWindow.end(),
+                                     [](const SyncSample& a, const SyncSample& b) { return a.rtt < b.rtt; });
+        m_bestOffset = best->offset;
+        m_haveOffset = true;
+    }
+    // no sync yet which means the best guess is when the STATE started arriving
+    if (!m_haveOffset) {
+        return t3Start;
+    }
+    return t2 - m_bestOffset;
+}
+
+void SerialLink::resetBrainSession() {
+    // the brain's clock restarted, so old time-sync data is meaningless
+    m_syncWindow.clear();
+    m_haveOffset = false;
+    m_haveBrainTime = false;
+    m_brainTimeHigh = 0;
+    m_lastSyncedCmd = 0;
+    // drop any pending request, the new brain program has never seen it
+    std::lock_guard<std::mutex> lock(m_commandMutex);
+    m_commandFixed.requestId = 0;
+    m_commandFixed.requestType = static_cast<uint8_t>(packets::Request::NONE);
+}
+
+void SerialLink::resetPositions() {
+    // positions restart from the config origin
+    m_posHistory.fill(PosEntry{});
+    m_lastPos.clear();
+    m_ackStateSeq = 0;
+}
+
 #endif
