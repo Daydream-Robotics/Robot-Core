@@ -58,11 +58,11 @@ bool SerialProtocol::send(uint16_t type, const void* payload, uint16_t size) {
 
 std::optional<SerialProtocol::Frame> SerialProtocol::receive() {
     // a frame may already be buffered, e.g. a STATE that arrived with a LOG.
-    // parse before reading, so the Nano's blocking read can't sit on it
+    // parse before reading
     if (std::optional<Frame> frame = parseFrame()) {
         return frame;
     }
-    // pull in any new bytes and try again
+    // get new bytes and try again
     readBytes();
     return parseFrame();
 }
@@ -82,11 +82,12 @@ std::optional<SerialProtocol::Frame> SerialProtocol::parseFrame() {
             break;
         }
 
+        // read/copy the header
         BinaryHeader header;
         std::memcpy(&header, buf, HEADER_SIZE);
 
-        // validate packet type and rough size before waiting on the payload.
-        // on any failure only skip 1 byte, so a corrupted size can't swallow the frames after it
+        // validate packet type and rough size
+        // on any failure skip 1 byte
         if (!isValidPacketType(header.type) || !packets::sizeInRange(header.type, header.size)) {
             m_badFrames++;
             skipBytes(1);
@@ -101,7 +102,7 @@ std::optional<SerialProtocol::Frame> SerialProtocol::parseFrame() {
 
         const uint8_t* payload = buf + HEADER_SIZE;
 
-        // validate exact payload size from the counts in the payload
+        // validate exact payload size
         if (!packets::sizeExact(header.type, payload, header.size, m_commandGroups)) {
             m_badFrames++;
             skipBytes(1);
@@ -117,11 +118,14 @@ std::optional<SerialProtocol::Frame> SerialProtocol::parseFrame() {
             continue;
         }
 
-        // valid frame: copy it out and remove it from the buffer
+        // valid frame so copy it out and remove it from buffer
+        // construct a Frame inside the optional
         result.emplace();
         result->type = header.type;
         result->size = header.size;
+        // copy before skipBytes moves the data
         std::memcpy(result->payload, payload, header.size);
+        // now remove the whole frame
         skipBytes(frameSize);
         break;
     }
@@ -178,21 +182,24 @@ bool SerialProtocol::isValidPacketType(uint16_t type) {
 }
 
 int SerialProtocol::readBytes() {
-    // USB: read straight from stdin
+    // if USB read straight from stdin
     if (m_usb) {
+        // free space left in m_rxBuffer
         size_t space = m_rxBuffer.size() - m_rxBufferPos;
-        // PROS writes a 0 one byte past the end of what it reads, so always leave a spare byte
+        // PROS writes a 0 one byte past the end of what it reads, so leave a spare byte
         if (space < 2) {
             return 0;
         }
-        // waits (busy-polling) until at least one byte arrives, then returns what's there
+        // waits until at least one byte arrives, then returns what's there
         ssize_t n = ::read(STDIN_FILENO, m_rxBuffer.data() + m_rxBufferPos, space - 1);
         if (n <= 0) {
             return 0;
         }
+        // count the new bytes as buffered
         m_rxBufferPos += n;
         return static_cast<int>(n);
     }
+    //If smart port:
     // port not opened yet
     if (!m_port) {
         return 0;
@@ -205,7 +212,7 @@ int SerialProtocol::readBytes() {
     if (space == 0 || available <= 0 || available == PROS_ERR) {
         return 0;
     }
-    // read only what's available and fits, so the read never blocks
+    // read only what's available and fits
     int32_t toRead = std::min<int32_t>(available, static_cast<int32_t>(space));
     // append to the end of the buffered data
     int32_t read = m_port->read(m_rxBuffer.data() + m_rxBufferPos, toRead);
@@ -219,18 +226,23 @@ int SerialProtocol::readBytes() {
 }
 
 bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
-    // USB: write straight to stdout. PROS sends each write whole, so another task's printf can't land inside a frame
+    // if USB write straight to stdout
     if (m_usb) {
+        // keep writing until every byte is handed to PROS
         while (n > 0) {
+            // write the rest of the frame to stdout in one call
             ssize_t written = ::write(STDOUT_FILENO, data, n);
+            // write failed
             if (written <= 0) {
                 return false;
             }
+            // move past what was written
             data += written;
             n -= written;
         }
         return true;
     }
+    //If smart port:
     // port not opened yet
     if (!m_port) {
         return false;
@@ -243,14 +255,14 @@ bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
         if (freeSpace == PROS_ERR) {
             return false;
         }
-        // transmit buffer full, give 1 ms to drain
+        // transmit buffer full so give 1 ms to drain
         if (freeSpace <= 0) {
             pros::delay(1);
             continue;
         }
         // write only what fits right now
         int32_t toWrite = std::min<int32_t>(freeSpace, static_cast<int32_t>(n));
-        // PROS takes a non-const buffer but doesn't modify it
+        // cast away const to pass the bytes to the smart port
         int32_t written = m_port->write(const_cast<uint8_t*>(data), toWrite);
         // write failed
         if (written <= 0 || written == PROS_ERR) {
@@ -385,6 +397,7 @@ bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
     setDE(true);
     // keep writing until every byte is handed to the UART
     while (n > 0) {
+        // write the rest of the frame to the UART
         ssize_t written = write(m_fd, data, n);
         // write failed, release the bus before giving up
         if (written <= 0) {
@@ -397,7 +410,6 @@ bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
     }
     // wait for the UART to finish sending
     tcdrain(m_fd);
-    // tcdrain can return before the last stop bit is out.
     // hold the bus ~2 byte times before releasing it
     auto until = std::chrono::steady_clock::now() + std::chrono::microseconds(25);
     // busy-wait
