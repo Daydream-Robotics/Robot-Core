@@ -165,7 +165,10 @@ bool SerialProtocol::setUpVexSerial(uint8_t portNumber, int32_t baud) {
 
 bool SerialProtocol::setUpVexSerial() {
     // disable COBS encoding in the PROS serial layer (raw byte streaming mode), as the previous protocol did
-    pros::c::serctl(SERCTL_DISABLE_COBS, nullptr);
+    if (pros::c::serctl(SERCTL_DISABLE_COBS, nullptr) == PROS_ERR) {
+        // COBS still on: the Nano would get COBS-wrapped bytes it can't parse
+        return false;
+    }
     m_usb = true;
     return true;
 }

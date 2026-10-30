@@ -20,7 +20,7 @@
 #include "daydream/utils/serial/packets.hpp"
 
 // ! PLATFORM NOTE PUT THIS IN CONSTANTS.H and include it so that its the smae on nano vs brain
-#define __v5_brain__   // Nano copy: #define __jetson_nano__   ← the ONLY difference
+#define __v5_brain__   
 
 #ifdef __v5_brain__
     #include "pros/serial.hpp"
@@ -31,7 +31,7 @@
 #endif
 
 /**
- * @brief Sends and receives framed packets over the RS-485 link.
+ * @brief Sends and receives framed packets over the RS-485 link or USB link.
  *
  * receive() is only called by the reader and send() only by the writer. They
  * share no buffers, so the class needs no lock. midFrame() and the error
@@ -52,7 +52,7 @@ public:
     struct Frame {
         uint16_t type; ///< packets::PacketType
         uint16_t size; ///< payload size in bytes
-        uint8_t payload[packets::MAX_PAYLOAD]; ///< payload bytes. only the first `size` are valid
+        uint8_t payload[packets::MAX_PAYLOAD]; ///< payload bytes
     };
 
     static constexpr size_t HEADER_SIZE = sizeof(BinaryHeader); ///< bytes before the payload
@@ -63,14 +63,14 @@ public:
     static constexpr speed_t DEFAULT_BAUD = B921600; ///< link baud rate
     #endif
 
-    /// @brief Which physical link the protocol runs over.
+    /// @brief Which physical link the protocol uses.
     enum class Transport : uint8_t {
-        RS485, ///< brain smart port ⇄ Nano UART, through RS-485 transceivers (half-duplex)
-        USB ///< brain USB port (PROS stdin/stdout) ⇄ Nano /dev/ttyACM1, like the previous protocol
+        RS485, ///< brain smart port <-> Nano UART, through RS-485 transceivers
+        USB ///< brain USB port (PROS stdin/stdout) <-> Nano /dev/ttyACM1
     };
 
-    std::atomic<uint16_t> crcErrors{0}; ///< frames dropped for a bad CRC. reported in STATE.rxErrors.
-    std::atomic<uint16_t> badFrames{0}; ///< frames dropped for a bad type or size. reported in STATE.rxErrors
+    std::atomic<uint16_t> crcErrors{0}; ///< frames dropped for a bad CRC, reported in STATE.rxErrors.
+    std::atomic<uint16_t> badFrames{0}; ///< frames dropped for a bad type or size, reported in STATE.rxErrors
 
     /**
      * @brief Constructs the protocol without opening a port.
@@ -96,13 +96,11 @@ public:
     bool setUpVexSerial(uint8_t portNumber, int32_t baud);
 
     /**
-     * @brief Uses the brain's USB port (PROS stdin/stdout) for the link, like the previous protocol.
+     * @brief Uses the brain's USB port (PROS stdin/stdout) for the link.
      *
      * Turns off PROS's COBS stream framing so frames go out as raw bytes.
-     * Anything else the program prints to stdout or stderr goes out on the same
-     * wire, and the Nano's parser skips it.
      *
-     * @return bool Always true.
+     * @return bool False if PROS couldn't turn off COBS
      */
     bool setUpVexSerial();
     #endif
