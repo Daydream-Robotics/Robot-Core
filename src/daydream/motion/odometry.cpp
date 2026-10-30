@@ -7,39 +7,6 @@
 #include <vector>
 #include <atomic>
 
-OdomError Odometry::getOdomError() {
-	return m_lastOdomError.load();
-}
-
-double Odometry::averageMotorGroupPosition(const pros::MotorGroup& group) {
-    std::vector<double> positions = group.get_position_all();
-
-    if (positions.empty()) {
-        return NAN;
-    }
-
-    double sum = 0.0;
-    int valid = 0;
-
-    for (double pos : positions) {
-        if (pos == PROS_ERR_F || !std::isfinite(pos)) {
-            continue;
-        }
-        sum += pos;
-        valid++;
-    }
-
-    if (valid == 0) {
-        return NAN;
-    }
-
-    const double average = sum / static_cast<double>(valid);
-    return average;
-}
-
-
-
-
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
 void Odometry::updatePose(void) {
@@ -82,26 +49,27 @@ void Odometry::updatePose(void) {
 			}
 		}
 
-		m_lastOdomError = OdomError::NONE;
+		m_lastOdomError = m_usingIMEFallback ? OdomError::IMU_FALLBACK : OdomError::NONE;
 		m_initialized = true;
 		return;
 	}
 
 	// Calculate distance travelled by either drive encoders or tracking wheels
-	WheelLengths arcs;
+	WheelTravelResult wheelResult;
 	if (m_config.useMotorEncoders) {
-		arcs = getDriveEncoderTravel();
+		wheelResult = getDriveEncoderTravel();
 	} else {
-		WheelTravelResult wheelResult = getOdomWheelTravel();
-
-		if (wheelResult.error != OdomError::NONE) {
-			pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
-			return;
-		}
-
-		arcs = wheelResult.travel;
+		wheelResult = getOdomWheelTravel();
 	}
-	
+
+	if (wheelResult.error != OdomError::NONE) {
+		m_lastOdomError = wheelResult.error;
+		pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
+		return;
+	}
+
+	WheelLengths arcs = wheelResult.travel;
+
 	// Determine change in heading 
 	double del_theta = normalizeAngle(theta_rad - m_prevTheta);
 
@@ -144,7 +112,7 @@ void Odometry::updatePose(void) {
 
 	m_prevTheta = theta_rad;
 
-    m_lastOdomError = OdomError::NONE;
+    m_lastOdomError = m_usingIMEFallback ? OdomError::IMU_FALLBACK : OdomError::NONE;
 }
 
 Pose Odometry::getPose() {
@@ -182,6 +150,10 @@ double Odometry::getPosY() {
     double y = m_currentPosition.y;
     m_mutex.give();
     return y;
+}
+
+OdomError Odometry::getOdomError() {
+	return m_lastOdomError.load();
 }
 
 double Odometry::getEncoderHeading() {
@@ -233,7 +205,7 @@ YawResult Odometry::getIMEYaw(OdomError imuError) {
 	m_mutex.give();
 
 	double normalizedYaw = normalizeAngle(yaw);
-	return {normalizeAngle(yaw), OdomError::NONE};
+	return {normalizedYaw, OdomError::NONE};
 }
 
 YawResult Odometry::getIMUYaw(void)
@@ -270,19 +242,40 @@ YawResult Odometry::getYaw(void) {
 	YawResult imuResult = getIMUYaw();
 
 	if (imuResult.error == OdomError::NONE) {
-		// save reference so IME fallback continues from here without a jump
 		double encHeading = getEncoderHeading();
-		if (!std::isnan(encHeading)) {
-			m_mutex.take();
-			m_imuRefYaw = imuResult.yaw;
-			m_encRefHeading = encHeading;
-			m_mutex.give();
+
+		m_mutex.take();
+		if (m_usingIMEFallback) {
+			// IMU is back and was likely re-zeroed by recalibrating, rebase it onto the fallback heading so yaw doesn't jump
+			m_imuYawOffset = normalizeAngle(m_lastGoodYaw - imuResult.yaw);
+			m_usingIMEFallback = false;
 		}
-		return imuResult;
+		double yaw = normalizeAngle(imuResult.yaw + m_imuYawOffset);
+
+		// save reference so IME fallback continues from here without a jump
+		if (!std::isnan(encHeading)) {
+			m_imuRefYaw = yaw;
+			m_encRefHeading = encHeading;
+		}
+		m_lastGoodYaw = yaw;
+		m_mutex.give();
+
+		return {yaw, OdomError::NONE};
 	}
 
-	if (imuResult.error == OdomError::IMU_DISCONNECTED) {
-		return getIMEYaw(imuResult.error);
+	// keep using the encoders while the IMU recalibrates after a reconnect
+	bool recalibratingAfterDisconnect = imuResult.error == OdomError::IMU_CALIBRATING && m_usingIMEFallback;
+
+	if (imuResult.error == OdomError::IMU_DISCONNECTED || recalibratingAfterDisconnect) {
+		m_usingIMEFallback = true;
+
+		YawResult imeResult = getIMEYaw(imuResult.error);
+		if (imeResult.error == OdomError::NONE) {
+			m_mutex.take();
+			m_lastGoodYaw = imeResult.yaw;
+			m_mutex.give();
+		}
+		return imeResult;
 	}
 
 	// calibrating / communication error: report it, don't guess
@@ -350,22 +343,22 @@ VelocityResult Odometry::getParallelVel() {
 	return {velocity, OdomError::NONE};
 }
 
-WheelLengths Odometry::getDriveEncoderTravel(void) {
+WheelTravelResult Odometry::getDriveEncoderTravel(void) {
 	if (!m_initialized) {
-		return {0, 0};
+		return {{0, 0}, OdomError::NONE};
 	}
 
     double currLeft = averageMotorGroupPosition(leftMotors);
     double currRight = averageMotorGroupPosition(rightMotors);
 
 	if (std::isnan(currLeft) || std::isnan(currRight)) {
-		return {0, 0};
+		return {{0, 0}, OdomError::TRACKING_WHEEL_ERROR};
 	}
 
 	if (std::isnan(m_prevLeft) || std::isnan(m_prevRight)) {
 		m_prevLeft = currLeft;
 		m_prevRight = currRight;
-		return {0, 0};
+		return {{0, 0}, OdomError::NONE};
 	}
 
     double dLeft = currLeft - m_prevLeft;
@@ -378,7 +371,33 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
     m_prevRight = currRight;
 
     double forwardInches = (leftInches + rightInches) / 2.0;
-    return {forwardInches, 0.0};
+    return {{forwardInches, 0.0}, OdomError::NONE};
+}
+
+double Odometry::averageMotorGroupPosition(const pros::MotorGroup& group) {
+    std::vector<double> positions = group.get_position_all();
+
+    if (positions.empty()) {
+        return NAN;
+    }
+
+    double sum = 0.0;
+    int valid = 0;
+
+    for (double pos : positions) {
+        if (pos == PROS_ERR_F || !std::isfinite(pos)) {
+            continue;
+        }
+        sum += pos;
+        valid++;
+    }
+
+    if (valid == 0) {
+        return NAN;
+    }
+
+    const double average = sum / static_cast<double>(valid);
+    return average;
 }
 
 double Odometry::averageMotorGroupVelocities(const pros::MotorGroup& group){

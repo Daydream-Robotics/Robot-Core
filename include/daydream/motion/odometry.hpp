@@ -21,7 +21,8 @@ enum class OdomError {
     IMU_DISCONNECTED,
     IMU_CALIBRATING,
     IMU_COMMUNICATION_ERROR,
-    TRACKING_WHEEL_ERROR
+    TRACKING_WHEEL_ERROR,
+    IMU_FALLBACK // IMU is unavailable, heading is coming from the drive encoders
 };
 
 
@@ -123,15 +124,18 @@ public:
     double getPosY();
 
     /**
- * @brief Gets the most recent odometry error
- * @note task safe
- * @returns The latest OdomError, or OdomError::NONE if the last update succeeded
- */
+     * @brief Gets the most recent odometry error
+     * @note task safe
+     * @returns The latest OdomError, OdomError::IMU_FALLBACK if the pose is updating from
+     *          the drive encoders, or OdomError::NONE if the last update succeeded
+     */
     OdomError getOdomError();
 
     /**
      * @brief Gets yaw, falling back to the drive encoders if the IMU is disconnected
+     *        or recalibrating after a disconnect
      * @note Counter clockwise is positive
+     * @note When the IMU comes back it is rebased onto the fallback heading so yaw doesn't jump
      * @returns yaw/heading in radians and error status
      */
     YawResult getYaw(void);
@@ -144,8 +148,9 @@ public:
     
     /**
      * @brief Returns struct of distances travelled by drive encoders when using internal encoders
+     * @returns travel in inches, or OdomError::TRACKING_WHEEL_ERROR if either encoder group is invalid
      */
-    WheelLengths getDriveEncoderTravel(void);
+    WheelTravelResult getDriveEncoderTravel(void);
 
     /**
      * @brief Background task entry point
@@ -218,6 +223,10 @@ private:
     // reference values saved on each good IMU read so the IME fallback continues without a jump
     double m_imuRefYaw = 0.0;
     double m_encRefHeading = 0.0;
+
+    double m_imuYawOffset = 0.0; // added to the raw IMU yaw so it stays continuous after a reconnect
+    double m_lastGoodYaw = 0.0; // latest valid yaw from getYaw(), IMU or IME
+    std::atomic<bool> m_usingIMEFallback{false};
 
     // latest odom error, readable from any task
     std::atomic<OdomError> m_lastOdomError{OdomError::NONE};
