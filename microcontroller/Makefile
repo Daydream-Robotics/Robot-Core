@@ -3,7 +3,7 @@ include common.mk
 
 TARGET := MPCController
 
-SRC := src/microcontroller_main.cpp src/mpc.cpp src/daydream/utils/serial/serialProtocol.cpp
+SRC := src/microcontroller_main.cpp src/mpc.cpp src/daydream/utils/serial/serialProtocol.cpp src/daydream/utils/serial/serial.cpp
 
 all:
 	$(CXX) $(SRC) $(CXXFLAGS) $(LDFLAGS) -o $(TARGET)

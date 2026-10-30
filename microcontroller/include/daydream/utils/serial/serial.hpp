@@ -50,11 +50,10 @@
  * so no CONFIG is ever sent. A CONFIG only goes out when the Nano's copy
  * differs from what the brain is running.
  *
- * Change LINK_CONFIG_ID whenever anything in buildLinkConfig() changes.
+ * Its configId is computed from the config's own bytes, so any change to
+ * buildLinkConfig() gets a new ID automatically.
  */
 namespace packets {
-    constexpr uint8_t LINK_CONFIG_ID = 1; ///< configId of the built-in config. change whenever buildLinkConfig() changes
-
     constexpr uint8_t LEFT_DRIVE_SLOT = 0; ///< group slot of the left drive
     constexpr uint8_t RIGHT_DRIVE_SLOT = 1; ///< group slot of the right drive
     constexpr uint8_t PARALLEL_WHEEL_SLOT = 0; ///< rotation slot of the parallel tracking wheel
@@ -73,6 +72,9 @@ namespace packets {
     /**
      * @brief Builds the robot's built-in CONFIG payload.
      *
+     * The configId is derived from the rest of the payload, so it changes
+     * whenever the config does. Two different configs share an ID about 1 time in 255.
+     *
      * @return std::vector<uint8_t> CONFIG payload: fixed part, groups, then rotations.
      */
     inline std::vector<uint8_t> buildLinkConfig() {
@@ -82,7 +84,7 @@ namespace packets {
         PayloadWriter writer{config.data()};
 
         ConfigFixed fixed{};
-        fixed.configId = LINK_CONFIG_ID;
+        // configId is filled in last, from the finished payload
         fixed.statePeriodMs = 10;
         fixed.watchdogMs = 100;
         fixed.nGroups = GROUPS;
@@ -103,6 +105,10 @@ namespace packets {
         // tracking wheels, in slot order
         writer.put(RotationCfg{PARALLEL_TRACKING_WHEEL_PORT, 0});
         writer.put(RotationCfg{PERPENDICULAR_TRACKING_WHEEL_PORT, 0});
+
+        // configId (byte 0) = CRC of everything after it, folded into 1–255 since 0 means "not configured"
+        uint16_t crc = SerialProtocol::crc16(config.data() + 1, config.size() - 1);
+        config[0] = static_cast<uint8_t>(crc % 255 + 1);
         return config;
     }
 }
