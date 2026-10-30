@@ -1,6 +1,8 @@
 #pragma once
 
 #include "main.h"
+#include <vector>
+#include <optional>
 #include <atomic>
 
 struct OdomConfig {
@@ -10,6 +12,7 @@ struct OdomConfig {
     double perpendicularTrackingWheelOffset;
     bool useMotorEncoders = false;
     double driveWheelDiameter = 0.0;
+    double driveTrackWidth = TRACK_WIDTH;
 };
 
 /**
@@ -22,9 +25,9 @@ enum class OdomError {
     IMU_CALIBRATING,
     IMU_COMMUNICATION_ERROR,
     TRACKING_WHEEL_ERROR,
+    MOTOR_ENCODER_ERROR,
     IMU_FALLBACK // IMU is unavailable, heading is coming from the drive encoders
 };
-
 
 /**
  * @struct YawResult
@@ -47,6 +50,22 @@ struct WheelLengths {
 struct WheelTravelResult {
     WheelLengths travel{0.0, 0.0}; /**< The distances traveled by the parallel and perpendicular tracking wheels in inches */
     OdomError error{OdomError::NONE}; /**< The tracking wheel error status */
+    double currentParallelPosition{0.0};
+    double currentPerpendicularPosition{0.0};
+};
+
+/**
+ * @struct DriveTravelResult
+ * @brief Stores individual drive wheel travel and encoder error result
+ */
+struct DriveTravelResult {
+    double leftInches{0.0};
+    double rightInches{0.0};
+    OdomError error{OdomError::NONE};
+    double currentLeftPosition{0.0};
+    double currentRightPosition{0.0};
+    std::vector<std::optional<double>> currentLeftMotorPositions;
+    std::vector<std::optional<double>> currentRightMotorPositions;
 };
 
 /**
@@ -90,7 +109,7 @@ public:
      * @param config The physical odometry dimensions of the robot
      */
     Odometry(OdomConfig config);
-
+    
     /**
      * @brief Gets the robot's latest pose
      * @returns The latest Pose of the robot
@@ -132,10 +151,8 @@ public:
     OdomError getOdomError();
 
     /**
-     * @brief Gets yaw, falling back to the drive encoders if the IMU is disconnected
-     *        or recalibrating after a disconnect
+     * @brief Gets yaw, falling back to the drive encoder heading tracked by odometry if the IMU is unavailable
      * @note Counter clockwise is positive
-     * @note When the IMU comes back it is rebased onto the fallback heading so yaw doesn't jump
      * @returns yaw/heading in radians and error status
      */
     YawResult getYaw(void);
@@ -148,14 +165,18 @@ public:
     
     /**
      * @brief Returns struct of distances travelled by drive encoders when using internal encoders
-     * @returns travel in inches, or OdomError::TRACKING_WHEEL_ERROR if either encoder group is invalid
      */
-    WheelTravelResult getDriveEncoderTravel(void);
+    DriveTravelResult getDriveEncoderTravel(void);
 
     /**
      * @brief Background task entry point
      */
     static void odomTask();
+
+    /**
+     * @brief Calculates tracking wheel offsets by rotating the robot 
+     */
+    void calculateTrackingWheelOffsets();
 
 private:
     // the config for the robot
@@ -180,28 +201,10 @@ private:
     WheelTravelResult getOdomWheelTravel(void);
 
     /**
- * @brief Averages the position of all motors in a group, ignoring invalid readings
- * @returns Average position in degrees, or NAN if no motor is valid
- */
-    static double averageMotorGroupPosition(const pros::MotorGroup& group);
-
-    /**
      * @brief Yaw straight from the IMU
      * @returns yaw in radians (CCW positive) and IMU error status
      */
     YawResult getIMUYaw(void);
-
-    /**
-     * @brief Fallback yaw computed from drive encoders when the IMU is unavailable
-     * @param imuError The IMU error that triggered the fallback
-     */
-    YawResult getIMEYaw(OdomError imuError);
-
-    /**
-     * @brief Heading in radians computed from the left/right drive encoder difference
-     * @returns Heading in radians, or NAN if either encoder group is invalid
-     */
-    double getEncoderHeading();
 
     /**
      * @brief Averages the actual velocities of all motors in a motor group
@@ -216,17 +219,14 @@ private:
     double m_prevPerpendicular = 0;
     double m_prevLeft = 0;
     double m_prevRight = 0;
+    std::vector<std::optional<double>> m_prevLeftMotorPositions;
+    std::vector<std::optional<double>> m_prevRightMotorPositions;
+    bool m_driveEncodersReady = false;
     double m_headingOffset = 0.0; //field heading = raw IMU heading + offset
     double m_lastRawTheta = 0.0; //latest raw IMU heading, used by setPose()
     bool m_initialized = false;
-
-    // reference values saved on each good IMU read so the IME fallback continues without a jump
-    double m_imuRefYaw = 0.0;
-    double m_encRefHeading = 0.0;
-
-    double m_imuYawOffset = 0.0; // added to the raw IMU yaw so it stays continuous after a reconnect
-    double m_lastGoodYaw = 0.0; // latest valid yaw from getYaw(), IMU or IME
-    std::atomic<bool> m_usingIMEFallback{false};
+    std::atomic<bool> m_usingEncoderHeading{false}; // read by getYaw() from other tasks
+    bool m_imuNeedsRebase = false;
 
     // latest odom error, readable from any task
     std::atomic<OdomError> m_lastOdomError{OdomError::NONE};
