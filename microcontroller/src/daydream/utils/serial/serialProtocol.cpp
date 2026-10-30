@@ -1,6 +1,6 @@
 /**
  * @file serialProtocol.cpp
- * @brief Framing for the brain ⇄ Nano link. Shared code first, then one block per platform.
+ * @brief framing for the brain ⇄ Nano link. shared code first, then one block per platform
  */
 
 #include "daydream/utils/serial/serialProtocol.hpp"
@@ -57,7 +57,7 @@ bool SerialProtocol::send(uint16_t type, const void* payload, uint16_t size) {
 }
 
 std::optional<SerialProtocol::Frame> SerialProtocol::receive() {
-    // a frame may already be buffered, e.g. a STATE that arrived with a LOG.
+    // a frame may already be buffered, e.g. a STATE that arrived with a LOG
     // parse before reading
     if (std::optional<Frame> frame = parseFrame()) {
         return frame;
@@ -199,7 +199,7 @@ int SerialProtocol::readBytes() {
         m_rxBufferPos += n;
         return static_cast<int>(n);
     }
-    //If smart port:
+    //if smart port:
     // port not opened yet
     if (!m_port) {
         return 0;
@@ -242,7 +242,7 @@ bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
         }
         return true;
     }
-    //If smart port:
+    //if smart port:
     // port not opened yet
     if (!m_port) {
         return false;
@@ -280,10 +280,10 @@ bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
 #ifdef __jetson_nano__
 
 /**
- * @brief Writes a short string to a sysfs file.
+ * @brief writes a short string to a sysfs file
  *
- * @param path File to write, e.g. "/sys/class/gpio/export".
- * @param text Text to write. Failures are ignored.
+ * @param path file to write, e.g. "/sys/class/gpio/export"
+ * @param text text to write. failures are ignored
  */
 static void writeFile(const std::string& path, const std::string& text) {
     // open for writing only

@@ -1,14 +1,14 @@
 /**
  * @file packets.hpp
- * @brief Wire format for the V5 Brain ⇄ Jetson Nano serial protocol.
+ * @brief wire format for the V5 Brain ⇄ Jetson Nano serial protocol
  *
- * Both the brain and the Nano compile it, so it must 
+ * both the brain and the Nano compile it, so it must 
  * stay byte-for-byte identical on both sides.
- * It has no I/O and no platform #ifdefs.
+ * it has no I/O and no platform #ifdefs
  *
- * Every multi-byte field is little-endian, and every struct is packed with no
- * padding. Fields are often unaligned, so read and write them with memcpy,
- * never reinterpret_cast.
+ * every multi-byte field is little-endian, and every struct is packed with no
+ * padding. fields are often unaligned, so read and write them with memcpy,
+ * never reinterpret_cast
  */
 
 #pragma once
@@ -29,10 +29,10 @@ namespace packets {
 
 
     /**
-    * @brief Value of the frame header's `type` field.
+    * @brief value of the frame header's `type` field
     *
-    * Unscoped so it compares directly against the raw uint16_t
-    * read from the header. A receiver drops any type meant for the other side.
+    * unscoped so it compares directly against the raw uint16_t
+    * read from the header. A receiver drops any type meant for the other side
     */
     enum PacketType : uint16_t {
         CONFIG = 0, ///< nano → brain. sent instead of COMMAND until the config is applied
@@ -41,8 +41,8 @@ namespace packets {
         LOG = 3 ///< brain → nano. logging text only, at most one per tick, before STATE
     };
 
-    /// @brief GroupCmd::mode. The meaning of GroupCmd::value and ::aux depends on the mode.
-    /// An unknown mode is treated as STOP.
+    /// @brief GroupCmd::mode. the meaning of GroupCmd::value and ::aux depends on the mode
+    /// an unknown mode is treated as STOP
     enum class GroupMode : uint8_t {
         STOP = 0, ///< stop using the group's brakeMode. value and aux are ignored
         VOLTAGE = 1, ///< value = mV, −12000..12000
@@ -50,28 +50,28 @@ namespace packets {
         POSITION = 3 ///< value = absolute degrees, aux = max rpm
     };
 
-    /// @brief GroupCfg::gearset, the motor cartridge.
+    /// @brief GroupCfg::gearset, the motor cartridge
     enum class Gearset : uint8_t { 
         RED = 0, ///< 100 rpm
         GREEN = 1, ///< 200 rpm
         BLUE = 2 ///< 600 rpm
     };
 
-    /// @brief GroupCfg::brakeMode. Used by GroupMode::STOP and when the watchdog trips in autonomous.
+    /// @brief GroupCfg::brakeMode. used by GroupMode::STOP and when the watchdog trips in autonomous
     enum class BrakeMode : uint8_t { 
         COAST = 0, 
         BRAKE = 1, 
         HOLD = 2 
     };
 
-    /// @brief CommandFixed::requestType for one-shot requests.
+    /// @brief CommandFixed::requestType for one-shot requests
     enum class Request : uint8_t { 
         NONE = 0, 
         GROUP_TARE = 1, ///< target = group slot. zeroes each motor's absolute position for POSITION mode
         CONTROLLER_RUMBLE = 2 ///< value = pattern index from the shared rumble table
     };
 
-    /// @brief StateFixed::lastError. Holds the most recent error.
+    /// @brief StateFixed::lastError. holds the most recent error
     enum class Error : uint8_t {
         NONE = 0, 
         NOT_CONFIGURED = 1, ///< COMMAND arrived before any CONFIG
@@ -88,7 +88,7 @@ namespace packets {
         REQ_DEVICE = 12 ///< the device failed while running the request
     };
 
-    /// @brief Bits of StateFixed::status.
+    /// @brief bits of StateFixed::status
     namespace status {
         constexpr uint8_t DISABLED = 1 << 0; ///< robot disabled
         constexpr uint8_t AUTON = 1 << 1; ///< autonomous period
@@ -100,8 +100,8 @@ namespace packets {
         constexpr uint8_t BOOTED = 1 << 7; ///< brain program just started. set until its first valid COMMAND
     }
 
-    /// @brief Bits of GroupState::flags and RotationState::flags.
-    /// For a group, a fault bit is set if any motor in it reports that fault.
+    /// @brief bits of GroupState::flags and RotationState::flags
+    /// for a group, a fault bit is set if any motor in it reports that fault
     namespace fault {   
         constexpr uint8_t OVER_TEMP = 1 << 0;
         constexpr uint8_t DRIVER = 1 << 1;
@@ -113,7 +113,7 @@ namespace packets {
 
     #pragma pack(push, 1)
 
-    /// @brief CONFIG fixed part (13 bytes). Followed by GroupCfg[nGroups] and RotationCfg[nRotations].
+    /// @brief CONFIG fixed part (13 bytes). followed by GroupCfg[nGroups] and RotationCfg[nRotations]
     struct ConfigFixed {
         uint8_t configId; ///< 1–255. must change whenever the content changes. resending the same ID is ignored
         uint8_t statePeriodMs; ///< STATE interval, 5–50. default 10
@@ -126,7 +126,7 @@ namespace packets {
         uint16_t adiActiveLow; ///< bit k set = slot k inverts the logic level
     };
 
-    /// @brief One motor group in CONFIG (11 bytes). Its position in the array is its slot number.
+    /// @brief one motor group in CONFIG (11 bytes). its position in the array is its slot number
     struct GroupCfg {
         uint8_t nMotors; ///< 1–MAX_MOTORS
         uint8_t gearset; ///< Gearset
@@ -134,13 +134,13 @@ namespace packets {
         int8_t ports[MAX_MOTORS]; ///< smart ports 1–21. negative = reversed. unused entries must be 0
     };
 
-    /// @brief One tracking wheel in CONFIG (2 bytes).
+    /// @brief one tracking wheel in CONFIG (2 bytes)
     struct RotationCfg {
         uint8_t port; ///< smart port 1–21
         uint8_t flags; ///< bit0 = reversed
     };
 
-    /// @brief STATE fixed part (30 bytes). Followed by GroupState[nGroups] and RotationState[nRotations].
+    /// @brief STATE fixed part (30 bytes). followed by GroupState[nGroups] and RotationState[nRotations]
     struct StateFixed {
         uint32_t tUs; ///< brain µs clock, taken after device reads, just before sending. wraps every ~71.6 min
         uint32_t cmdAgeUs; ///< µs from the end of the last valid COMMAND to tUs. NO_COMMAND = none since config
@@ -159,20 +159,20 @@ namespace packets {
         uint8_t nRotations;
     };
 
-    /// @brief One group in STATE (9 bytes). Values are averaged over the group's working motors
+    /// @brief one group in STATE (9 bytes). values are averaged over the group's working motors
     struct GroupState {
         float imeDeltaRad; ///< IME change since deltaBaseSeq, in radians at the output shaft. reversal already applied
         float omegaRadS; ///< rad/s at the output shaft. multiply by the external gear ratio to get wheel ω
         uint8_t flags; ///< fault:: bits
     };
-    /// @brief One tracking wheel in STATE (5 bytes).
+    /// @brief one tracking wheel in STATE (5 bytes)
     struct RotationState {
         float deltaRad; ///< change since deltaBaseSeq, in radians
         uint8_t flags; ///< fault::MISSING only
     };
 
-    /// @brief COMMAND fixed part (17 bytes). Followed by GroupCmd[nGroups].
-    /// The newest COMMAND is taken. Each valid one resets the watchdog.
+    /// @brief COMMAND fixed part (17 bytes). followed by GroupCmd[nGroups]
+    /// the newest COMMAND is taken. each valid one resets the watchdog
     struct CommandFixed {
         uint16_t cmdSeq; ///< +1 per COMMAND. wraps
         uint16_t ackStateSeq; ///< newest stateSeq the nano has received and recorded. moves the brain's delta base
@@ -186,7 +186,7 @@ namespace packets {
         uint16_t adiOutState; ///< bit k = logical state of ADI slot k
     };
 
-    /// @brief One group's command (7 bytes). Every motor in the group gets the same command
+    /// @brief one group's command (7 bytes). every motor in the group gets the same command
     struct GroupCmd {
         uint8_t mode; ///< GroupMode. sets the units of value and aux
         int16_t aux; ///< max rpm in POSITION mode. unused otherwise
@@ -201,32 +201,32 @@ namespace packets {
     static_assert(sizeof(float) == 4, "float fields must be IEEE-754 binary32");
 
     /**
-     * @brief Payload size of a CONFIG with the given device counts.
+     * @brief payload size of a CONFIG with the given device counts
      *
-     * @param g Number of motor groups.
-     * @param r Number of rotation sensors.
-     * @return size_t Payload bytes: fixed part + g GroupCfg + r RotationCfg.
+     * @param g number of motor groups
+     * @param r number of rotation sensors
+     * @return size_t payload bytes: fixed part + g GroupCfg + r RotationCfg
      */
     constexpr size_t configSize(size_t g, size_t r) {
         return sizeof(ConfigFixed) + g * sizeof(GroupCfg) + r * sizeof(RotationCfg);
     }
 
      /**
-     * @brief Payload size of a STATE with the given device counts.
+     * @brief payload size of a STATE with the given device counts
      *
-     * @param g Number of motor groups.
-     * @param r Number of rotation sensors.
-     * @return size_t Payload bytes: fixed part + g GroupState + r RotationState.
+     * @param g number of motor groups
+     * @param r number of rotation sensors
+     * @return size_t payload bytes: fixed part + g GroupState + r RotationState
      */
     constexpr size_t stateSize(size_t g, size_t r) {
         return sizeof(StateFixed) + g * sizeof(GroupState) + r * sizeof(RotationState);
     }
 
     /**
-     * @brief Payload size of a COMMAND for the given group count.
+     * @brief payload size of a COMMAND for the given group count
      *
-     * @param g Number of motor groups in the applied config.
-     * @return size_t Payload bytes: fixed part + g GroupCmd.
+     * @param g number of motor groups in the applied config
+     * @return size_t payload bytes: fixed part + g GroupCmd
      */
     constexpr size_t commandSize(size_t g) { 
         return sizeof(CommandFixed) + g * sizeof(GroupCmd); 
@@ -238,16 +238,16 @@ namespace packets {
     static_assert(commandSize(MAX_GROUPS) <= MAX_PAYLOAD);
 
     /**
-     * @brief Rough size check, run as soon as the 6-byte header is in.
+     * @brief rough size check, run as soon as the 6-byte header is in
      *
-     * Rejects a frame whose `size` can't be valid for its type before
-     * reading payload. Exact size is checked later, once the counts in
-     * the fixed part are known (Error::SIZE).
+     * rejects a frame whose `size` can't be valid for its type before
+     * reading payload. exact size is checked later, once the counts in
+     * the fixed part are known (Error::SIZE)
      *
-     * @param type Header `type` field.
-     * @param size Header `size` field, in bytes.
-     * @return bool True if `size` is between the smallest and largest legal payload for `type`.
-     *         False for an unknown type.
+     * @param type header `type` field
+     * @param size header `size` field, in bytes
+     * @return bool true if `size` is between the smallest and largest legal payload for `type`.
+     *         false for an unknown type
      */
     constexpr bool sizeInRange(uint16_t type, uint16_t size) {
         switch (type) {
@@ -265,18 +265,18 @@ namespace packets {
     }
 
     /**
-     * @brief Exact size check
+     * @brief exact size check
      *
-     * Compares `size` against the size implied by the payload's counts.
-     * Call it only after sizeInRange() passes, which guarantees the fixed part
-     * is there to read. A mismatch is reported as Error::SIZE.
+     * compares `size` against the size implied by the payload's counts.
+     * call it only after sizeInRange() passes, which guarantees the fixed part
+     * is there to read. A mismatch is reported as Error::SIZE
      *
-     * @param type Header `type` field.
-     * @param p Start of the payload.
-     * @param size Header `size` field, in bytes.
-     * @param appliedGroups Group count of the applied config. Only used for COMMAND.
+     * @param type header `type` field
+     * @param p start of the payload
+     * @param size header `size` field, in bytes
+     * @param appliedGroups group count of the applied config. only used for COMMAND.
      *        0 = not configured
-     * @return bool True if `size` matches the counts. False for an unknown type.
+     * @return bool true if `size` matches the counts. false for an unknown type
      */
     inline bool sizeExact(uint16_t type, const uint8_t* p, uint16_t size, uint8_t appliedGroups) {
         switch (type) {
@@ -294,7 +294,7 @@ namespace packets {
                 return size == stateSize(f.nGroups, f.nRotations);
             }
             case COMMAND:
-                // the group count comes from the applied config, not payload.
+                // the group count comes from the applied config, not payload
                 // not configured (0) passes so the caller reports Error::NOT_CONFIGURED instead of SIZE
                 return appliedGroups == 0 || size == commandSize(appliedGroups);
             case LOG:
@@ -306,23 +306,23 @@ namespace packets {
     }
 
     /**
-     * @brief Write cursor for building a payload into a byte buffer.
+     * @brief write cursor for building a payload into a byte buffer
      *
-     * Copies each value in with memcpy.
-     * Does no bounds checking, so `buf` must be big enough for everything put.
+     * copies each value in with memcpy.
+     * does no bounds checking, so `buf` must be big enough for everything put
      */
     struct PayloadWriter {
         uint8_t* buf; ///< destination buffer
         size_t n = 0; ///< bytes written so far
 
         /**
-         * @brief Appends `v` at the cursor and advances it.
+         * @brief appends `v` at the cursor and advances it
          *
-         * @param v Value to write. Its bytes are copied as-is (little-endian on both sides).
+         * @param v value to write. its bytes are copied as-is (little-endian on both sides)
          */
         template <class T>
         void put(const T& v) {
-            // copy v's raw bytes to the cursor.
+            // copy v's raw bytes to the cursor
             std::memcpy(buf + n, &v, sizeof v);
             // move the cursor past what was just written, so the next put() lands right after it
             n += sizeof v;
@@ -330,9 +330,9 @@ namespace packets {
     };
 
     /**
-     * @brief Read cursor for parsing a received payload.
+     * @brief read cursor for parsing a received payload
      *
-     * Copies each value out with memcpy, since packed fields are unaligned.
+     * copies each value out with memcpy, since packed fields are unaligned
      */
     struct PayloadReader {
         const uint8_t* buf; ///< received payload
@@ -340,18 +340,18 @@ namespace packets {
         size_t n = 0; ///< bytes read so far
 
         /**
-         * @brief Reads the next value at the cursor and advances it.
+         * @brief reads the next value at the cursor and advances it
          *
-         * @param v Filled with the value read. Left unchanged on failure.
-         * @return bool False if fewer than sizeof(T) bytes are left. The cursor doesn't move.
+         * @param v filled with the value read. left unchanged on failure
+         * @return bool false if fewer than sizeof(T) bytes are left. the cursor doesn't move
          */
         template <class T>
         bool get(T& v) {
-            // not enough bytes left for a whole T.
+            // not enough bytes left for a whole T
             if (n + sizeof v > size) {
                 return false;
             }
-            // copy the bytes at the cursor into v.
+            // copy the bytes at the cursor into v
             std::memcpy(&v, buf + n, sizeof v);
             // move the cursor past what was just read, so the next get() starts right after it
             n += sizeof v;

@@ -1,14 +1,14 @@
 /**
  * @file serial.hpp
- * @brief Link layer for the V5 Brain ⇄ Jetson Nano serial link.
+ * @brief link layer for the V5 Brain ⇄ Jetson Nano serial link
  *
- * Runs the protocol's behavior on top of SerialProtocol
- * Both sides compile the same file. The platform define in serialProtocol.hpp 
- * picks the brain half or the Nano half.
+ * runs the protocol's behavior on top of SerialProtocol
+ * both sides compile the same file. the platform define in serialProtocol.hpp 
+ * picks the brain half or the Nano half
  *
- * Each side runs one global reader and one global writer:
+ * each side runs one global reader and one global writer:
  * - Brain: the writer sends STATE every tick, the reader applies CONFIG and COMMAND.
- * - Nano: the reader takes STATE and LOG, the writer replies to each STATE.
+ * - Nano: the reader takes STATE and LOG, the writer replies to each STATE
  */
 #pragma once
 
@@ -43,39 +43,38 @@
 #endif
 
 /*
- * Built-in CONFIG, shared by the brain and the Nano.
+ * built-in CONFIG, shared by the brain and the Nano
  *
- * The brain applies it at boot, and the Nano passes the same bytes to
- * SerialLink. When both are built from the same code their configId matches,
- * so no CONFIG is ever sent. A CONFIG only goes out when the Nano's copy
- * differs from what the brain is running.
+ * the brain applies it at boot, and the Nano passes the same bytes to
+ * SerialLink. A CONFIG only goes out when the Nano's copy
+ * differs from what the brain is running
  *
- * Its configId is computed from the config's own bytes, so any change to
- * buildLinkConfig() gets a new ID automatically.
+ * its configId is computed from the config's bytes so IDs are 
+ * automatically generated,
  */
 namespace packets {
-    constexpr uint8_t LEFT_DRIVE_SLOT = 0; ///< group slot of the left drive
-    constexpr uint8_t RIGHT_DRIVE_SLOT = 1; ///< group slot of the right drive
-    constexpr uint8_t PARALLEL_WHEEL_SLOT = 0; ///< rotation slot of the parallel tracking wheel
-    constexpr uint8_t PERPENDICULAR_WHEEL_SLOT = 1; ///< rotation slot of the perpendicular tracking wheel
+    constexpr uint8_t LEFT_DRIVE_SLOT = 0; ///< group packet slot of the left drive
+    constexpr uint8_t RIGHT_DRIVE_SLOT = 1; ///< group packet slot of the right drive
+    constexpr uint8_t PARALLEL_WHEEL_SLOT = 0; ///< rotation packet slot of the parallel tracking wheel
+    constexpr uint8_t PERPENDICULAR_WHEEL_SLOT = 1; ///< rotation packet slot of the perpendicular tracking wheel
 
     /**
-     * @brief ADI mask bit for one of the brain's own ports.
+     * @brief ADI mask bit for one of the brain's own ports
      *
-     * @param port Brain ADI port, 'A'–'H'.
-     * @return uint16_t The bit for that slot.
+     * @param port Brain ADI port, 'A'–'H'
+     * @return uint16_t the bit for that slot
      */
     constexpr uint16_t adiBit(char port) {
         return static_cast<uint16_t>(1u << (port - 'A'));
     }
 
     /**
-     * @brief Builds the robot's built-in CONFIG payload.
+     * @brief builds the robot's built-in CONFIG payload
      *
-     * The configId is derived from the rest of the payload, so it changes
-     * whenever the config does. Two different configs share an ID about 1 time in 255.
+     * the configId comes from the rest of the payload, so it changes
+     * whenever the config does
      *
-     * @return std::vector<uint8_t> CONFIG payload: fixed part, groups, then rotations.
+     * @return std::vector<uint8_t> CONFIG payload: fixed part, groups, then rotations
      */
     inline std::vector<uint8_t> buildLinkConfig() {
         constexpr uint8_t GROUPS = 2;
@@ -84,7 +83,6 @@ namespace packets {
         PayloadWriter writer{config.data()};
 
         ConfigFixed fixed{};
-        // configId is filled in last, from the finished payload
         fixed.statePeriodMs = 10;
         fixed.watchdogMs = 100;
         fixed.nGroups = GROUPS;
@@ -96,7 +94,7 @@ namespace packets {
                              adiBit(MATCHLOADER_PORT) | adiBit(DESCORE_PORT);
         writer.put(fixed);
 
-        // groups, in slot order. the intake isn't here yet: its port in constants.h is still a placeholder
+        // groups, in slot order
         const uint8_t blue = static_cast<uint8_t>(Gearset::BLUE);
         const uint8_t coast = static_cast<uint8_t>(BrakeMode::COAST);
         writer.put(GroupCfg{3, blue, coast, LEFT_DRIVE_WHEEL_PORTS});
@@ -106,7 +104,7 @@ namespace packets {
         writer.put(RotationCfg{PARALLEL_TRACKING_WHEEL_PORT, 0});
         writer.put(RotationCfg{PERPENDICULAR_TRACKING_WHEEL_PORT, 0});
 
-        // configId (byte 0) = CRC of everything after it, folded into 1–255 since 0 means "not configured"
+        // configId (byte 0) = CRC of everything after it
         uint16_t crc = SerialProtocol::crc16(config.data() + 1, config.size() - 1);
         config[0] = static_cast<uint8_t>(crc % 255 + 1);
         return config;
@@ -114,14 +112,14 @@ namespace packets {
 }
 
 /**
- * @brief Runs one side of the brain ⇄ Nano link.
+ * @brief runs one side of the brain ⇄ Nano link
  *
- * Create one global instance per side and call start() once.
+ * create one global instance per side and call start() once
  */
 class SerialLink {
 public:
     #ifdef __jetson_nano__
-    /// @brief One decoded STATE, with positions rebuilt from the deltas.
+    /// @brief one decoded STATE, with positions rebuilt from the deltas
     struct Sample {
         int64_t tNanoUs = 0; ///< when the brain sampled, on the Nano's steady_clock, in µs
         uint16_t stateSeq = 0; ///< StateFixed::stateSeq
@@ -136,7 +134,7 @@ public:
         uint8_t lastRequestId = 0; ///< last one-shot request the brain ran
         uint8_t lastError = 0; ///< packets::Error
         uint16_t batteryMv = 0; ///< battery voltage
-        int8_t ctrlAxes[4] = {}; ///< master controller LX, LY, RX, RY, −127..127
+        int8_t ctrlAxes[4] = {}; ///< master controller LX, LY, RX, RY
         uint16_t ctrlButtons = 0; ///< master controller buttons, see StateFixed::ctrlButtons
         uint16_t rxErrors = 0; ///< frames the brain dropped. wraps
     };
@@ -147,12 +145,12 @@ public:
 
     #ifdef __v5_brain__
     /**
-     * @brief Creates the link with nothing open until start().
+     * @brief creates the link with nothing open until start()
      *
-     * @param port Smart port wired to the RS-485 transceiver.
-     * @param baud Link baud rate, e.g. 921600.
-     * @param config Built-in CONFIG payload, applied by start(). Normally packets::buildLinkConfig().
-     * @param transport RS485 (the default) or USB. Over USB, `port` and `baud` are ignored.
+     * @param port smart port wired to the RS-485 transceiver
+     * @param baud link baud rate, e.g. 921600
+     * @param config built-in CONFIG payload, applied by start(). normally packets::buildLinkConfig()
+     * @param transport RS485 (the default) or USB. over USB, `port` and `baud` are ignored
      */
     SerialLink(uint8_t port, int32_t baud, std::vector<uint8_t> config,
                SerialProtocol::Transport transport = SerialProtocol::Transport::RS485);
@@ -160,106 +158,106 @@ public:
 
     #ifdef __jetson_nano__
     /**
-     * @brief Creates the link. Nothing is opened until start().
+     * @brief creates the link. nothing is opened until start()
      *
-     * @param port UART device: "/dev/ttyTHS1" for RS-485, or "/dev/ttyACM1" for the brain's USB port.
-     * @param baud Link baud rate, e.g. 921600. Over USB any supported rate works (115200, like the previous protocol).
-     * @param deGpio sysfs GPIO wired to the transceiver's DE and /RE pins. -1 = auto-direction transceiver or USB.
+     * @param port UART device: "/dev/ttyTHS1" for RS-485, or "/dev/ttyACM1" for the brain's USB port
+     * @param baud link baud rate, e.g. 921600. over USB any supported rate works
+     * @param deGpio sysfs GPIO wired to the transceiver's DE and /RE pins. -1 = auto-direction transceiver or USB
      * @param config CONFIG payload to apply on the brain, built with packets::PayloadWriter.
-     *        Its configId must not be 0.
-     * @param transport RS485 (the default) or USB. Over USB, time sync skips the airtime correction.
+     *        its configId must not be 0
+     * @param transport RS485 (the default) or USB. over USB, time sync skips the airtime correction
      */
     SerialLink(const char* port, int32_t baud, int deGpio, std::vector<uint8_t> config,
                SerialProtocol::Transport transport = SerialProtocol::Transport::RS485);
     #endif
 
-    /// @brief Stops the reader and writer.
+    /// @brief stops the reader and writer
     ~SerialLink();
 
     SerialLink(const SerialLink&) = delete;
     SerialLink& operator=(const SerialLink&) = delete;
 
     /**
-     * @brief Opens the port and starts the reader and writer.
+     * @brief opens the port and starts the reader and writer
      *
-     * Brain: call it from initialize(). It applies the built-in config, then
-     * starts sending STATE. The Nano only sends CONFIG if its config differs.
+     * Brain: call it from initialize(). it applies the built-in config, then
+     * starts sending STATE. the Nano only sends CONFIG if its config differs
      *
-     * @return bool false if the port couldn't be opened (Nano: or the baud or config is invalid).
+     * @return bool false if the port couldn't be opened (Nano: or the baud or config is invalid)
      */
     bool start();
 
     #ifdef __v5_brain__
     /**
-     * @brief Queues a line of text for the Nano. Sent as LOG, at most one per tick.
+     * @brief queues a line of text for the Nano. sent as LOG, at most one per tick
      *
-     * Safe to call from any task. Text past MAX_LOG_TEXT is cut off, and the
-     * line is dropped if LOG_QUEUE_SIZE lines are already waiting.
+     * safe to call from any task. text past MAX_LOG_TEXT is cut off, and the
+     * line is dropped if LOG_QUEUE_SIZE lines are already waiting
      *
-     * @param level Log level, passed through to the Nano as-is.
-     * @param format printf-style format string.
+     * @param level log level, passed through to the Nano as-is
+     * @param format printf-style format string
      */
     void log(uint8_t level, const char* format, ...);
     #endif
 
     #ifdef __jetson_nano__
     /**
-     * @brief Sets a group's command. Sent in every COMMAND until changed.
+     * @brief sets a group's command. sent in every COMMAND until changed
      *
-     * @param slot Group slot, the group's index in CONFIG.
-     * @param mode How `value` and `aux` are read.
-     * @param value See packets::GroupMode.
-     * @param aux Max rpm in POSITION mode. Unused otherwise.
+     * @param slot group slot, the group's index in CONFIG
+     * @param mode how `value` and `aux` are read
+     * @param value see packets::GroupMode
+     * @param aux max rpm in POSITION mode. unused otherwise
      */
     void setGroup(uint8_t slot, packets::GroupMode mode, float value, int16_t aux = 0);
 
     /**
-     * @brief Sets an ADI output. Re-sent in every COMMAND from then on.
+     * @brief sets an ADI output. re-sent in every COMMAND from then on
      *
-     * @param slot ADI slot, 0–7 brain A–H, 8–15 expander A–H.
-     * @param on Logical state. The brain applies adiActiveLow.
+     * @param slot ADI slot, 0–7 brain A–H, 8–15 expander A–H
+     * @param on logical state. the brain applies adiActiveLow
      */
     void setAdi(uint8_t slot, bool on);
 
     /**
-     * @brief Starts a one-shot request. Replaces any request still in flight.
+     * @brief starts a one-shot request. replaces any request still in flight
      *
-     * @param type What to run.
-     * @param target Group slot for GROUP_TARE. Unused for CONTROLLER_RUMBLE.
-     * @param value Pattern index for CONTROLLER_RUMBLE. Unused for GROUP_TARE.
-     * @return uint8_t The requestId. Pass it to requestDone().
+     * @param type what to run
+     * @param target group slot for GROUP_TARE. unused for CONTROLLER_RUMBLE
+     * @param value pattern index for CONTROLLER_RUMBLE. unused for GROUP_TARE
+     * @return uint8_t the requestId. pass it to requestDone()
      */
     uint8_t request(packets::Request type, uint8_t target, float value = 0);
 
     /**
-     * @brief Whether the brain has run a request.
+     * @brief whether the brain has run a request
      *
-     * @param id ID returned by request().
-     * @return bool true once the brain echoes the ID in StateFixed::lastRequestId.
+     * @param id ID returned by request()
+     * @return bool true once the brain echoes the ID in StateFixed::lastRequestId
      */
     bool requestDone(uint8_t id) const;
 
     /**
-     * @brief Registers a callback that runs on every new Sample.
+     * @brief registers a callback that runs on every new Sample
      *
-     * It runs on the reader thread, so keep it short or hand off to another
-     * thread. Calling any other SerialLink function from it is fine.
+     * it runs on the reader thread, so keep it short or hand off to another
+     * thread. calling any other SerialLink function from it is fine
      *
-     * @param callback Called with each Sample.
+     * @param callback called with each Sample
      */
     void onSample(std::function<void(const Sample&)> callback);
 
     /**
-     * @brief Returns the most recent Sample.
+     * @brief returns the most recent Sample
      *
-     * @return std::optional<Sample> The Sample, or std::nullopt before the first one.
+     * @return std::optional<Sample> the Sample, or std::nullopt before the first one
      */
     std::optional<Sample> latestSample() const;
 
     /**
-     * @brief Whether STATE is arriving.
+     * @brief whether STATE is arriving
      *
-     * @return bool false if no STATE arrived in the last 5 state periods.
+     * @return bool false if no STATE arrived in the last 5 state periods
      */
     bool linkUp() const;
     #endif
@@ -270,7 +268,7 @@ private:
     static constexpr size_t LOG_QUEUE_SIZE = 8; ///< LOG lines waiting to be sent
     static constexpr size_t MAX_CHANNELS = packets::MAX_GROUPS + packets::MAX_ROTATIONS; ///< delta channels: groups, then rotations
 
-    /// @brief One configured motor group.
+    /// @brief one configured motor group
     struct Group {
         std::unique_ptr<pros::MotorGroup> motors; ///< the group's motors
         std::vector<double> lastPos; ///< per motor: last good position, degrees
@@ -279,89 +277,89 @@ private:
         bool missing = false; ///< a port had no motor when the config was applied
     };
 
-    /// @brief One configured tracking wheel.
+    /// @brief one configured tracking wheel
     struct Wheel {
         std::unique_ptr<pros::Rotation> sensor; ///< the rotation sensor
         double last = 0; ///< last good reading, radians
         bool readFailed = false; ///< the last read failed and `last` was held
     };
 
-    /// @brief Every channel's position at one STATE.
+    /// @brief every channel's position at one STATE
     struct Snapshot {
         uint16_t seq = 0; ///< stateSeq. 0 = config origin, or an empty slot
         double ch[MAX_CHANNELS] = {}; ///< groups, then rotations, radians
     };
 
-    /// @brief One queued LOG line.
+    /// @brief one queued LOG line
     struct LogEntry {
         uint8_t level = 0; ///< log level
         uint8_t length = 0; ///< text bytes, 1–MAX_LOG_TEXT
         char text[packets::MAX_LOG_TEXT + 1] = {}; ///< text, +1 for vsnprintf's terminator
     };
 
-    /// @brief Reader task: applies every CONFIG and COMMAND as it arrives.
+    /// @brief reader task: applies every CONFIG and COMMAND as it arrives
     void readerLoop();
 
-    /// @brief Writer task: every tick, checks the watchdog, samples, sends one LOG if queued, then STATE.
+    /// @brief writer task: every tick, checks the watchdog, samples, sends one LOG if queued, then STATE
     void writerLoop();
 
     /**
-     * @brief Validates a CONFIG and, if valid, rebuilds every device.
+     * @brief validates a CONFIG and, if valid, rebuilds every device
      *
-     * @param payload CONFIG payload. Its size was already checked by SerialProtocol.
-     * @param size Payload size in bytes.
-     * @return packets::Error NONE if applied or already applied, otherwise why it was rejected.
+     * @param payload CONFIG payload. its size was already checked by SerialProtocol
+     * @param size payload size in bytes
+     * @return packets::Error NONE if applied or already applied, otherwise why it was rejected
      */
     packets::Error applyConfig(const uint8_t* payload, uint16_t size);
 
     /**
-     * @brief Validates a COMMAND and applies it to the groups, the ADI outputs and the delta base.
+     * @brief validates a COMMAND and applies it to the groups, the ADI outputs and the delta base
      *
-     * @param payload COMMAND payload. Its size was already checked by SerialProtocol.
-     * @param size Payload size in bytes.
-     * @return packets::Error NONE if applied, otherwise why it was rejected.
+     * @param payload COMMAND payload. its size was already checked by SerialProtocol
+     * @param size payload size in bytes
+     * @return packets::Error NONE if applied, otherwise why it was rejected
      */
     packets::Error applyCommand(const uint8_t* payload, uint16_t size);
 
     /**
-     * @brief Runs a one-shot request.
+     * @brief runs a one-shot request
      *
-     * @param command COMMAND carrying the request.
-     * @return packets::Error NONE, or REQ_TARGET / REQ_TYPE / REQ_DEVICE / RANGE.
+     * @param command COMMAND carrying the request
+     * @return packets::Error NONE, or REQ_TARGET / REQ_TYPE / REQ_DEVICE / RANGE
      */
     packets::Error runRequest(const packets::CommandFixed& command);
 
     /**
-     * @brief Reads every channel's current position.
+     * @brief reads every channel's current position
      *
-     * @param channels Filled with groups then rotations, radians. Must hold MAX_CHANNELS.
+     * @param channels filled with groups then rotations, radians. must hold MAX_CHANNELS
      */
     void sampleChannels(double* channels);
 
     /**
-     * @brief Trips when no valid COMMAND has arrived for watchdogMs.
+     * @brief trips when no valid COMMAND has arrived for watchdogMs
      *
-     * Sets packets::status::WATCHDOG in any mode, but only brakes every group
-     * (once) during autonomous. In driver control the groups are left alone.
+     * sets packets::status::WATCHDOG in any mode, but only brakes every group
+     * (once) during autonomous. in driver control the groups are left alone
      */
     void checkWatchdog();
 
     /**
-     * @brief Builds StateFixed::status.
+     * @brief builds StateFixed::status
      *
-     * @return uint8_t packets::status bits.
+     * @return uint8_t packets::status bits
      */
     uint8_t statusBits();
 
 
     /**
-     * @brief Copies the master controller's axes and buttons into STATE.
+     * @brief copies the master controller's axes and buttons into STATE
      *
-     * @param fixed STATE fixed part to fill.
+     * @param fixed STATE fixed part to fill
      */
     void readController(packets::StateFixed& fixed);
 
-    /// @brief Sends the oldest queued LOG line, if any.
+    /// @brief sends the oldest queued LOG line, if any
     void flushOneLog();
 
     SerialProtocol m_serial; ///< framing and the smart port
@@ -411,54 +409,54 @@ private:
     static constexpr int LINK_DOWN_PERIODS = 5; ///< state periods without STATE before the link is down
     static constexpr int64_t SYNC_WINDOW_US = 1000000; ///< how long time-sync samples are kept
 
-    /// @brief Rebuilt positions at one received STATE.
+    /// @brief rebuilt positions at one received STATE
     struct PosEntry {
         uint16_t seq = 0; ///< stateSeq. 0 = empty slot
         std::vector<double> pos; ///< groups, then rotations, radians
     };
 
-    /// @brief One NTP-style time-sync measurement.
+    /// @brief one NTP-style time-sync measurement
     struct SyncSample {
         int64_t t3; ///< when the STATE arrived, Nano µs
         int64_t rtt; ///< round trip minus the brain's hold time, µs
         int64_t offset; ///< brain clock − Nano clock, µs
     };
 
-    /// @brief Reader thread: takes STATE and LOG, wakes the writer on each STATE.
+    /// @brief reader thread: takes STATE and LOG, wakes the writer on each STATE
     void readerLoop();
 
-    /// @brief Writer thread: after each STATE, waits GUARD_US and sends CONFIG or the latest COMMAND.
+    /// @brief writer thread: after each STATE, waits GUARD_US and sends CONFIG or the latest COMMAND
     void writerLoop();
 
     /**
-     * @brief Decodes a STATE: session tracking, request echo, time sync, positions, then publishes a Sample.
+     * @brief decodes a STATE: session tracking, request echo, time sync, positions, then publishes a Sample
      *
-     * @param frame The STATE frame.
-     * @param end When the reader got the end of the frame.
+     * @param frame the STATE frame
+     * @param end when the reader got the end of the frame
      */
     void handleState(const SerialProtocol::Frame& frame, Clock::time_point end);
 
     /**
-     * @brief Prints a LOG line to stderr.
+     * @brief prints a LOG line to stderr
      *
-     * @param frame The LOG frame.
+     * @param frame the LOG frame
      */
     void handleLog(const SerialProtocol::Frame& frame);
 
     /**
-     * @brief Adds a time-sync measurement if this STATE closes a new round trip.
+     * @brief adds a time-sync measurement if this STATE closes a new round trip
      *
-     * @param fixed STATE fixed part.
-     * @param stateBytes STATE payload size in bytes.
-     * @param t3 When the STATE arrived, Nano µs.
-     * @return int64_t When the brain sampled, on the Nano clock, µs.
+     * @param fixed STATE fixed part
+     * @param stateBytes STATE payload size in bytes
+     * @param t3 when the STATE arrived, Nano µs
+     * @return int64_t when the brain sampled, on the Nano clock, µs
      */
     int64_t syncTime(const packets::StateFixed& fixed, uint16_t stateBytes, int64_t t3);
 
-    /// @brief Forgets everything tied to the brain's previous program run.
+    /// @brief forgets everything tied to the brain's previous program run
     void resetBrainSession();
 
-    /// @brief Restarts positions from the config origin.
+    /// @brief restarts positions from the config origin
     void resetPositions();
 
     SerialProtocol m_serial; ///< framing and the UART

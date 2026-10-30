@@ -1,6 +1,6 @@
 /**
  * @file serial.cpp
- * @brief Link layer for the brain ⇄ Nano link. One block per platform.
+ * @brief link layer for the brain ⇄ Nano link. one block per platform
  */
 
 #include "daydream/utils/serial/serial.hpp"
@@ -26,14 +26,14 @@
 
 #ifdef __v5_brain__
 
-/// @brief Rumble patterns for Request::CONTROLLER_RUMBLE, indexed by requestValue. Must match the Nano's table.
+/// @brief rumble patterns for Request::CONTROLLER_RUMBLE, indexed by requestValue. must match the Nano's table
 static const char* const RUMBLE_PATTERNS[] = {".", "-", "..", "--", ".-.", "-.-"};
 
 /**
- * @brief Converts GroupCfg::gearset to the PROS cartridge.
+ * @brief converts GroupCfg::gearset to the PROS cartridge
  *
- * @param gearset packets::Gearset value.
- * @return pros::MotorGears The cartridge.
+ * @param gearset packets::Gearset value
+ * @return pros::MotorGears the cartridge
  */
 static pros::MotorGears toGears(uint8_t gearset) {
     switch (static_cast<packets::Gearset>(gearset)) {
@@ -47,10 +47,10 @@ static pros::MotorGears toGears(uint8_t gearset) {
 }
 
 /**
- * @brief Converts GroupCfg::brakeMode to the PROS brake mode.
+ * @brief converts GroupCfg::brakeMode to the PROS brake mode
  *
- * @param brakeMode packets::BrakeMode value.
- * @return pros::MotorBrake The brake mode.
+ * @param brakeMode packets::BrakeMode value
+ * @return pros::MotorBrake the brake mode
  */
 static pros::MotorBrake toBrake(uint8_t brakeMode) {
     switch (static_cast<packets::BrakeMode>(brakeMode)) {
@@ -64,11 +64,11 @@ static pros::MotorBrake toBrake(uint8_t brakeMode) {
 }
 
 /**
- * @brief Whether sequence number `a` comes after `b`.
+ * @brief whether sequence number `a` comes after `b`
  *
- * @param a Sequence number to test.
- * @param b Sequence number to compare against. 0 = the config origin.
- * @return bool true if `a` is newer.
+ * @param a sequence number to test
+ * @param b sequence number to compare against. 0 = the config origin
+ * @return bool true if `a` is newer
  */
 static bool isNewer(uint16_t a, uint16_t b) {
     return b == 0 || static_cast<int16_t>(a - b) > 0;
@@ -98,7 +98,7 @@ bool SerialLink::start() {
     if (!opened) {
         return false;
     }
-    // apply the built-in config before any STATE goes out.
+    // apply the built-in config before any STATE goes out
     // if it's invalid, the brain runs unconfigured and the first STATE reports the issue
     {
         std::lock_guard<pros::Mutex> lock(m_mutex);
@@ -111,7 +111,7 @@ bool SerialLink::start() {
             m_lastError = error;
         }
     }
-    // high priority so the 1 ms reader and the tick writer aren't delayed by user tasks.
+    // high priority so the 1 ms reader and the tick writer aren't delayed by user tasks
     // over USB, PROS's stdin read busy-waits for data, so the reader runs at the lowest priority
     // instead and only uses CPU time nothing else wants
     uint32_t readerPriority = m_transport == SerialProtocol::Transport::USB ? TASK_PRIORITY_MIN + 1
@@ -524,7 +524,7 @@ packets::Error SerialLink::runRequest(const packets::CommandFixed& command) {
             if (group.motors->tare_position_all() == PROS_ERR) {
                 return packets::Error::REQ_DEVICE;
             }
-            // re-seed from the new readings so the tare doesn't show up as motion.
+            // re-seed from the new readings so the tare doesn't show up as motion
             // the accumulator is untouched, so the reported deltas don't jump
             std::vector<double> pos = group.motors->get_position_all();
             for (size_t i = 0; i < group.lastPos.size() && i < pos.size(); i++) {
@@ -681,9 +681,9 @@ void SerialLink::flushOneLog() {
 #ifdef __jetson_nano__
 
 /**
- * @brief Current steady_clock time.
+ * @brief current steady_clock time
  *
- * @return int64_t microseconds since a fixed point.
+ * @return int64_t microseconds since a fixed point
  */
 static int64_t nowUs() {
     return std::chrono::duration_cast<std::chrono::microseconds>(
@@ -691,20 +691,20 @@ static int64_t nowUs() {
 }
 
 /**
- * @brief Converts a steady_clock time point to microseconds.
+ * @brief converts a steady_clock time point to microseconds
  *
- * @param t Time point.
- * @return int64_t Microseconds on the same scale as nowUs().
+ * @param t time point
+ * @return int64_t microseconds on the same scale as nowUs()
  */
 static int64_t toUs(std::chrono::steady_clock::time_point t) {
     return std::chrono::duration_cast<std::chrono::microseconds>(t.time_since_epoch()).count();
 }
 
 /**
- * @brief Converts a numeric baud rate to a termios speed constant.
+ * @brief converts a numeric baud rate to a termios speed constant
  *
- * @param baud Baud rate, e.g. 921600.
- * @return speed_t The termios constant, or B0 if the rate isn't supported.
+ * @param baud baud rate, e.g. 921600
+ * @return speed_t the termios constant, or B0 if the rate isn't supported
  */
 static speed_t toSpeed(int32_t baud) {
     switch (baud) {
@@ -717,11 +717,11 @@ static speed_t toSpeed(int32_t baud) {
 }
 
 /**
- * @brief Time a frame takes on the wire, at 10 bits per byte (8N1).
+ * @brief time a frame takes on the wire, at 10 bits per byte (8N1)
  *
- * @param bytes Bytes on the wire, header and CRC included.
- * @param baud Baud rate. 0 = no wire to correct for (USB).
- * @return int64_t Microseconds.
+ * @param bytes bytes on the wire, header and CRC included
+ * @param baud baud rate. 0 = no wire to correct for (USB)
+ * @return int64_t microseconds
  */
 static int64_t airtimeUs(size_t bytes, int32_t baud) {
     if (baud <= 0) {
@@ -731,12 +731,12 @@ static int64_t airtimeUs(size_t bytes, int32_t baud) {
 }
 
 /**
- * @brief Gives a thread real-time (SCHED_FIFO) priority.
+ * @brief gives a thread real-time (SCHED_FIFO) priority
  *
- * Needs root or CAP_SYS_NICE.
+ * needs root or CAP_SYS_NICE
  *
- * @param thread Thread to change.
- * @param priority SCHED_FIFO priority, 1–99.
+ * @param thread thread to change
+ * @param priority SCHED_FIFO priority, 1–99
  */
 static void makeRealtime(std::thread& thread, int priority) {
     sched_param param{};
@@ -908,7 +908,7 @@ void SerialLink::writerLoop() {
             continue;
         }
 
-        // the brain doesn't have our config: send CONFIG instead of COMMAND, at most every 20 ticks.
+        // the brain doesn't have our config: send CONFIG instead of COMMAND, at most every 20 ticks
         // uses the previous STATE's configId if the reader hasn't decoded this one yet, which only delays by a tick
         if (m_brainConfigId != m_myConfigId) {
             if (++ticksSinceConfig >= CONFIG_RETRY_TICKS) {
