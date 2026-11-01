@@ -295,8 +295,11 @@ private:
     /// @brief one configured tracking wheel
     struct Wheel {
         std::unique_ptr<pros::Rotation> sensor; ///< the rotation sensor
-        double last = 0; ///< last good reading, radians
-        bool readFailed = false; ///< the last read failed and `last` was held
+        double last = 0; ///< last good raw reading, radians
+        bool readFailed = true; ///< the last read failed, or there was none yet. the next good read only re-seeds `last`
+        double accumRad = 0; ///< position since config, radians. only good-to-good read changes are added
+        bool reversed = false; ///< RotationCfg bit0, resent when the sensor comes back
+        bool missing = false; ///< no rotation sensor on the port. checked at config and every STATE
     };
 
     /// @brief every channel's position at one STATE
@@ -352,7 +355,7 @@ private:
     void sampleChannels(double* channels);
 
     /**
-     * @brief trips when no valid COMMAND has arrived for watchdogMs
+     * @brief trips when no valid COMMAND has arrived for watchdogMs, counted from the config if none since
      *
      * sets packets::status::WATCHDOG in any mode, but only brakes every group
      * (once) during autonomous. in driver control the groups are left alone
@@ -360,11 +363,11 @@ private:
     void checkWatchdog();
 
     /**
-     * @brief updates Group::missing and m_expanderMissing from what is plugged in now
+     * @brief updates Group::missing, Wheel::missing and m_expanderMissing from what is plugged in now
      *
      * a device that comes back gets its settings again, since settings sent
      * while it was gone never reached it: a group's cartridge, encoder units and
-     * brake mode, or the expander's outputs at their current level
+     * brake mode, a rotation sensor's direction, or the expander's outputs at their current level
      */
     void checkDevices();
 
@@ -425,7 +428,7 @@ private:
     bool m_booted = true; ///< no valid COMMAND since the program started. reported as status::BOOTED
     std::vector<uint8_t> m_bootConfig; ///< built-in CONFIG payload, applied by start()
     uint32_t m_cmdRxUs = 0; ///< when the last valid COMMAND arrived, pros::c::micros()
-    uint32_t m_cmdRxMs = 0; ///< when the last valid COMMAND arrived, pros::millis()
+    uint32_t m_cmdRxMs = 0; ///< when the last valid COMMAND arrived, or the config was applied if none since, pros::millis()
 
     std::atomic<bool> m_nanoControl{true}; ///< the Nano drives the motors and pneumatics. see setNanoControl()
 

@@ -126,7 +126,7 @@ bool SerialLink::start() {
 void SerialLink::log(uint8_t level, const char* format, ...) {
     LogEntry entry;
     entry.level = level;
-    // format into the entry. vsnprintf cuts it off at MAX_LOG_TEXT
+    // format into the entry
     va_list args;
     va_start(args, format);
     int length = std::vsnprintf(entry.text, sizeof(entry.text), format, args);
@@ -135,20 +135,22 @@ void SerialLink::log(uint8_t level, const char* format, ...) {
     if (length <= 0) {
         return;
     }
+    //set the length
     entry.length = static_cast<uint8_t>(std::min<int>(length, packets::MAX_LOG_TEXT));
 
+    // lock the queue so the writer can't take a line while this one is added
     std::lock_guard<pros::Mutex> lock(m_logMutex);
     // queue full so drop the line
     if (m_logCount == LOG_QUEUE_SIZE) {
         return;
     }
-    // append at the tail of the ring
+    // add to the back of the queue (ring)
     m_logQueue[(m_logHead + m_logCount) % LOG_QUEUE_SIZE] = entry;
     m_logCount++;
 }
 
 void SerialLink::setNanoControl(bool enabled) {
-    // switching off: tell the Nano once, before STATE stops
+    // switch flag and log to the Nano once, before STATE/COMMAND stops
     if (!enabled && m_nanoControl) {
         log(0, "nano control off: driver control on the brain");
     }
@@ -156,16 +158,16 @@ void SerialLink::setNanoControl(bool enabled) {
 }
 
 bool SerialLink::linkQuiet() const {
-    // driver control: brain code drives, so no STATE is sent (LOG still is). disabled always runs normally
+    // checks if STATE/COMMANDS are not being sent
     return !m_nanoControl && !pros::competition::is_disabled();
 }
 
 void SerialLink::readerLoop() {
     while (true) {
-        // handle every frame that has fully arrived
+        // handle frames that fully arrived
         while (std::optional<SerialProtocol::Frame> frame = m_serial.receive()) {
             std::lock_guard<pros::Mutex> lock(m_mutex);
-            // SerialProtocol only passes CONFIG and COMMAND through on the brain
+            // applies CONFIG or COMMAND based on frame type, or returns error if neither
             packets::Error error = frame->type == packets::CONFIG
                                        ? applyConfig(frame->payload, frame->size)
                                        : applyCommand(frame->payload, frame->size);
@@ -191,19 +193,19 @@ void SerialLink::writerLoop() {
         }
         pros::Task::delay_until(&wakeTime, period);
 
-        // don't start talking over a frame that's still coming in. wait at most 2 ms
+        // don't write over an incoming frame (wait <2ms)
         for (int i = 0; i < 2 && m_serial.midFrame(); i++) {
             pros::delay(1);
         }
 
-        // driver control: send a pending LOG but no STATE, so the Nano sends no COMMAND
+        // if driver control send a LOG but no STATE
         if (linkQuiet()) {
             flushOneLog();
             continue;
         }
 
         packets::StateFixed fixed{};
-        // leave room for the fixed part, it's copied in last once tUs is known
+        // prepare the state, it's copied in last once tUs is known
         packets::PayloadWriter writer{buf, sizeof(packets::StateFixed)};
         bool cmdSeen;
         uint32_t cmdTime;
@@ -220,7 +222,7 @@ void SerialLink::writerLoop() {
             size_t ch = 0;
             for (Group& group : m_groups) {
                 packets::GroupState state{};
-                // IME change since the delta base
+                // IME change since the delta base (last acked STATE)
                 state.imeDeltaRad = static_cast<float>(snap.ch[ch] - m_base.ch[ch]);
                 ch++;
                 // average the speed of the motors
@@ -242,20 +244,22 @@ void SerialLink::writerLoop() {
                         state.flags |= faults & 0x0F;
                     }
                 }
-                // a motor that was missing at config, or didn't read this tick
+                // flag MISSING if a motor is unplugged now (checkDevices) or its position didn't read this tick
                 bool anyFailed = std::find(group.lastValid.begin(), group.lastValid.end(), false) != group.lastValid.end();
                 if (group.missing || anyFailed) {
                     state.flags |= packets::fault::MISSING;
                 }
+                // write into the STATE payload
                 writer.put(state);
             }
             for (Wheel& wheel : m_wheels) {
                 packets::RotationState state{};
-                // rotation change since the delta base
+                // rotation change since the delta base (last acked STATE)
                 state.deltaRad = static_cast<float>(snap.ch[ch] - m_base.ch[ch]);
                 ch++;
-                // the last good reading was held
-                state.flags = wheel.readFailed ? packets::fault::MISSING : 0;
+                // if the last good reading was held
+                state.flags = wheel.readFailed || wheel.missing ? packets::fault::MISSING : 0;
+                // write into the STATE payload
                 writer.put(state);
             }
             
@@ -277,18 +281,19 @@ void SerialLink::writerLoop() {
             fixed.nGroups = static_cast<uint8_t>(m_groups.size());
             fixed.nRotations = static_cast<uint8_t>(m_wheels.size());
 
-            // the error is reported once
+            // the report error once
             m_lastError = packets::Error::NONE;
             cmdSeen = m_haveCmd;
             cmdTime = m_cmdRxUs;
         }
 
-        // at most one LOG, always before STATE
+        // LOG once
         flushOneLog();
 
-        // stamp the time last, right before sending, so tUs is as close to the send as possible
+        // stamp the time right before sending
         fixed.tUs = static_cast<uint32_t>(pros::c::micros());
         fixed.cmdAgeUs = cmdSeen ? fixed.tUs - cmdTime : packets::NO_COMMAND;
+        //copy to buffer and send
         std::memcpy(buf, &fixed, sizeof(fixed));
         m_serial.send(packets::STATE, writer);
 
@@ -298,30 +303,32 @@ void SerialLink::writerLoop() {
 }
 
 packets::Error SerialLink::applyConfig(const uint8_t* payload, uint16_t size) {
+    //fwd cursor
     packets::PayloadReader reader{payload, size};
     packets::ConfigFixed cfg;
     reader.get(cfg);
 
-    // already applied the Nano resends CONFIG until it sees our configId
+    // if already applied then do nothing and return
     if (cfg.configId == m_configId) {
         return packets::Error::NONE;
     }
-    // validate everything
+    // range validate everything
     if (cfg.configId == 0 || cfg.statePeriodMs < 5 || cfg.statePeriodMs > 50 ||
         cfg.watchdogMs < 20 || cfg.watchdogMs > 1000 ||
         cfg.nGroups < 1 || cfg.nGroups > packets::MAX_GROUPS || cfg.nRotations > packets::MAX_ROTATIONS) {
         return packets::Error::RANGE;
     }
-    // expander slots (8–15) need an expander
+    // if usee, expander slots (8–15) need an expander
     if (cfg.adiExpanderPort == 0 && (cfg.adiOutEnable & 0xFF00) != 0) {
         return packets::Error::CFG_PORT;
     }
 
-    // every smart port may be used once
+    // check every smart port is used once
     bool used[22] = {};
     if (m_transport == SerialProtocol::Transport::RS485 && m_linkPort <= 21) {
         used[m_linkPort] = true;
     }
+    //lambda to claim ports or return error
     auto claim = [&used](int port) {
         if (port < 1 || port > 21) {
             return packets::Error::CFG_PORT;
@@ -332,6 +339,7 @@ packets::Error SerialLink::applyConfig(const uint8_t* payload, uint16_t size) {
         used[port] = true;
         return packets::Error::NONE;
     };
+    //check validity of ADI expander port and claim it
     if (cfg.adiExpanderPort != 0) {
         if (packets::Error e = claim(cfg.adiExpanderPort); e != packets::Error::NONE) {
             return e;
@@ -340,6 +348,7 @@ packets::Error SerialLink::applyConfig(const uint8_t* payload, uint16_t size) {
 
     packets::GroupCfg groupCfgs[packets::MAX_GROUPS];
     int totalMotors = 0;
+    //check and claim all smart ports for all motor groups
     for (size_t i = 0; i < cfg.nGroups; i++) {
         packets::GroupCfg& g = groupCfgs[i];
         reader.get(g);
@@ -353,17 +362,18 @@ packets::Error SerialLink::applyConfig(const uint8_t* payload, uint16_t size) {
                 }
             } 
             else if (g.ports[m] != 0) {
-                // unused entries must be 0
+                // unused entries are 0
                 return packets::Error::RANGE;
             }
         }
         totalMotors += g.nMotors;
     }
-    // the brain only has 21 smart ports
+    // check number of smart ports used
     if (totalMotors > 21) {
         return packets::Error::CFG_LIMIT;
     }
 
+    //check and claim all smart ports for all rotation sensors
     packets::RotationCfg rotationCfgs[packets::MAX_ROTATIONS];
     for (size_t i = 0; i < cfg.nRotations; i++) {
         reader.get(rotationCfgs[i]);
@@ -372,32 +382,51 @@ packets::Error SerialLink::applyConfig(const uint8_t* payload, uint16_t size) {
         }
     }
 
-    // tear down the old devices
-    // stop the old groups before releasing them
-    for (Group& group : m_groups) {
-        group.motors->brake();
+    // mark the motor ports the new groups use
+    bool newMotorPort[22] = {};
+    for (size_t i = 0; i < cfg.nGroups; i++) {
+        for (size_t m = 0; m < groupCfgs[i].nMotors; m++) {
+            newMotorPort[std::abs(groupCfgs[i].ports[m])] = true;
+        }
     }
+    // brake the old motors on ports the new groups don't use. the rest keep their last command
+    for (Group& group : m_groups) {
+        for (int8_t port : group.motors->get_port_all()) {
+            if (!newMotorPort[std::abs(port)]) {
+                pros::c::motor_brake(std::abs(port));
+            }
+        }
+    }
+
+    // pin level of each new output: outputs that already exist on the same pin keep their level,
+    // new outputs start at adiInitial, flipped if active-low
+    uint16_t keepAdi = m_adiEnable & cfg.adiOutEnable;
+    if (cfg.adiExpanderPort != m_expanderPort) {
+        // the expander moved, so slots 8–15 are different pins
+        keepAdi &= 0x00FF;
+    }
+    uint16_t adiLevel = (keepAdi & m_adiLevel) | (~keepAdi & (cfg.adiInitial ^ cfg.adiActiveLow) & cfg.adiOutEnable);
+
     m_groups.clear();
     m_wheels.clear();
     for (auto& out : m_adi) {
         out.reset();
     }
 
-    // ---- build the new devices ----
+    // build the new motor groups
     for (size_t i = 0; i < cfg.nGroups; i++) {
         const packets::GroupCfg& g = groupCfgs[i];
         Group group;
         std::vector<int8_t> ports(g.ports, g.ports + g.nMotors);
         group.motors = std::make_unique<pros::MotorGroup>(ports, toGears(g.gearset));
-        // positions in degrees, converted to radians when sampled
         group.motors->set_encoder_units_all(pros::MotorEncoderUnits::degrees);
         group.motors->set_brake_mode_all(toBrake(g.brakeMode));
         group.gears = toGears(g.gearset);
         group.brake = toBrake(g.brakeMode);
-        // lastValid starts false so the first sample only seeds lastPos
+        // lastValid starts false so the first sample just seeds lastPos
         group.lastPos.assign(g.nMotors, 0.0);
         group.lastValid.assign(g.nMotors, false);
-        // don't reject config if a motor is missing and set a flag
+        // if a motor is missing set a flag
         for (int8_t port : ports) {
             if (pros::Device::get_plugged_type(std::abs(port)) != pros::DeviceType::motor) {
                 group.missing = true;
@@ -406,40 +435,46 @@ packets::Error SerialLink::applyConfig(const uint8_t* payload, uint16_t size) {
         m_groups.push_back(std::move(group));
     }
 
+    //build the new rotation sensors
     for (size_t i = 0; i < cfg.nRotations; i++) {
         Wheel wheel;
         wheel.sensor = std::make_unique<pros::Rotation>(rotationCfgs[i].port);
-        wheel.sensor->set_reversed(rotationCfgs[i].flags & 0x01);
+        wheel.reversed = rotationCfgs[i].flags & 0x01;
+        wheel.sensor->set_reversed(wheel.reversed);
+        // if the sensor is missing set a flag
+        wheel.missing = pros::Device::get_plugged_type(rotationCfgs[i].port) != pros::DeviceType::rotation;
         m_wheels.push_back(std::move(wheel));
     }
 
-    // don't reject config if a expander is missing and set a flag
-    m_expanderMissing = cfg.adiExpanderPort != 0 &&
-                       pros::Device::get_plugged_type(cfg.adiExpanderPort) != pros::DeviceType::adi;
+    // if an expander is missing set a flag
+    m_expanderMissing = cfg.adiExpanderPort != 0 && pros::Device::get_plugged_type(cfg.adiExpanderPort) != pros::DeviceType::adi;
 
+    //build ADI devices
     for (int k = 0; k < packets::MAX_ADI; k++) {
+        // skip slots that aren't enabled as outputs
         if (((cfg.adiOutEnable >> k) & 1) == 0) {
             continue;
         }
-        // physical level = logical state XOR active-low
-        bool level = ((cfg.adiInitial ^ cfg.adiActiveLow) >> k) & 1;
+        // pin level for the slot, worked out above
+        bool level = (adiLevel >> k) & 1;
         if (k < 8) {
-            // brain ports A–H
+            // slots 0–7: output on brain port A–H, set to that level
             m_adi[k] = std::make_unique<pros::adi::DigitalOut>(static_cast<uint8_t>('A' + k), level);
-        } 
+        }
         else {
-            // expander ports A–H
+            // slots 8–15: output on expander port A–H, set to that level
             pros::adi::ext_adi_port_pair_t pair{cfg.adiExpanderPort, static_cast<uint8_t>('A' + k - 8)};
             m_adi[k] = std::make_unique<pros::adi::DigitalOut>(pair, level);
         }
     }
+    // store which slots are outputs and which are active-low, used by applyCommand
     m_adiEnable = cfg.adiOutEnable;
     m_adiActiveLow = cfg.adiActiveLow;
-    m_adiLevel = (cfg.adiInitial ^ cfg.adiActiveLow) & cfg.adiOutEnable;
+    // store the pin level of every output and the expander port, used by checkDevices
+    m_adiLevel = adiLevel;
     m_expanderPort = cfg.adiExpanderPort;
 
-    // reset the deltas to this moment
-    // the first sample seeds every motor's lastPos, so the groups start at 0
+    // reset the deltas to this point
     m_base = Snapshot{};
     sampleChannels(m_base.ch);
     m_history.fill(Snapshot{});
@@ -448,7 +483,8 @@ packets::Error SerialLink::applyConfig(const uint8_t* payload, uint16_t size) {
     m_statePeriodMs = cfg.statePeriodMs;
     m_watchdogMs = cfg.watchdogMs;
     m_serial.setCommandGroups(cfg.nGroups);
-    // the watchdog holds every group stopped until the first COMMAND
+    // the watchdog counts from now: with no COMMAND within watchdogMs it trips, and brakes every group once in autonomous
+    m_cmdRxMs = pros::millis();
     m_haveCmd = false;
     m_watchdogTripped = false;
     m_watchdogBraked = false;
@@ -609,12 +645,19 @@ void SerialLink::sampleChannels(double* channels) {
     for (Wheel& wheel : m_wheels) {
         // in centidegrees
         int32_t pos = wheel.sensor->get_position();
-        wheel.readFailed = pos == PROS_ERR;
-        // hold the last good reading on a failed read
-        if (!wheel.readFailed) {
-            wheel.last = pos * CDEG_TO_RAD;
+        bool valid = pos != PROS_ERR;
+        if (valid) {
+            double rad = pos * CDEG_TO_RAD;
+            // add the change since the last good read. after a failed read only re-seed,
+            // so a sensor whose count restarted on reconnect can't cause a jump
+            if (!wheel.readFailed) {
+                wheel.accumRad += rad - wheel.last;
+            }
+            wheel.last = rad;
         }
-        channels[c++] = wheel.last;
+        // on a failed read accumRad holds
+        wheel.readFailed = !valid;
+        channels[c++] = wheel.accumRad;
     }
 }
 
@@ -623,7 +666,8 @@ void SerialLink::checkWatchdog() {
     if (m_configId == 0) {
         return;
     }
-    m_watchdogTripped = !m_haveCmd || pros::millis() - m_cmdRxMs > m_watchdogMs;
+    // m_cmdRxMs is the last valid COMMAND, or when the config was applied if none since
+    m_watchdogTripped = pros::millis() - m_cmdRxMs > m_watchdogMs;
     // a valid COMMAND re-arms the brake for the next trip
     if (!m_watchdogTripped) {
         m_watchdogBraked = false;
@@ -653,6 +697,15 @@ void SerialLink::checkDevices() {
             group.motors->set_brake_mode_all(group.brake);
         }
         group.missing = missing;
+    }
+
+    for (Wheel& wheel : m_wheels) {
+        bool missing = pros::Device::get_plugged_type(wheel.sensor->get_port()) != pros::DeviceType::rotation;
+        // the sensor is back: set its direction again
+        if (wheel.missing && !missing) {
+            wheel.sensor->set_reversed(wheel.reversed);
+        }
+        wheel.missing = missing;
     }
 
     if (m_expanderPort == 0) {
