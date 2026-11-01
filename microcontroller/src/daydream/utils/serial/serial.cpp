@@ -99,21 +99,21 @@ bool SerialLink::start() {
         return false;
     }
     // apply the built-in config before any STATE goes out
-    // if it's invalid, the brain runs unconfigured and the first STATE reports the issue
     {
         std::lock_guard<pros::Mutex> lock(m_mutex);
         const uint8_t* payload = m_bootConfig.data();
         auto size = static_cast<uint16_t>(m_bootConfig.size());
+        //check payload for size errors
         if (!packets::sizeInRange(packets::CONFIG, size) || !packets::sizeExact(packets::CONFIG, payload, size, 0)) {
             m_lastError = packets::Error::SIZE;
         } 
+        //check payload for applying errors
         else if (packets::Error error = applyConfig(payload, size); error != packets::Error::NONE) {
             m_lastError = error;
         }
     }
-    // high priority so the 1 ms reader and the tick writer aren't delayed by user tasks
-    // over USB, PROS's stdin read busy-waits for data, so the reader runs at the lowest priority
-    // instead and only uses CPU time nothing else wants
+    // nano has high priority so the 1 ms reader and the tick writer aren't delayed by user tasks
+    // USB has low priority because PROS's stdin read busy-waits for data, at low it only gets CPU
     uint32_t readerPriority = m_transport == SerialProtocol::Transport::USB ? TASK_PRIORITY_MIN + 1
                                                                             : TASK_PRIORITY_MAX - 2;
     m_readerTask = std::make_unique<pros::Task>([this] { readerLoop(); },
@@ -210,6 +210,7 @@ void SerialLink::writerLoop() {
         {
             std::lock_guard<pros::Mutex> lock(m_mutex);
             checkWatchdog();
+            checkDevices();
 
             // read every channel for this STATE
             Snapshot snap;
@@ -391,6 +392,8 @@ packets::Error SerialLink::applyConfig(const uint8_t* payload, uint16_t size) {
         // positions in degrees, converted to radians when sampled
         group.motors->set_encoder_units_all(pros::MotorEncoderUnits::degrees);
         group.motors->set_brake_mode_all(toBrake(g.brakeMode));
+        group.gears = toGears(g.gearset);
+        group.brake = toBrake(g.brakeMode);
         // lastValid starts false so the first sample only seeds lastPos
         group.lastPos.assign(g.nMotors, 0.0);
         group.lastValid.assign(g.nMotors, false);
@@ -432,6 +435,8 @@ packets::Error SerialLink::applyConfig(const uint8_t* payload, uint16_t size) {
     }
     m_adiEnable = cfg.adiOutEnable;
     m_adiActiveLow = cfg.adiActiveLow;
+    m_adiLevel = (cfg.adiInitial ^ cfg.adiActiveLow) & cfg.adiOutEnable;
+    m_expanderPort = cfg.adiExpanderPort;
 
     // reset the deltas to this moment
     // the first sample seeds every motor's lastPos, so the groups start at 0
@@ -519,7 +524,10 @@ packets::Error SerialLink::applyCommand(const uint8_t* payload, uint16_t size) {
         for (int k = 0; k < packets::MAX_ADI; k++) {
             if ((mask >> k) & 1) {
                 // physical level = logical state XOR active-low
-                m_adi[k]->set_value(((command.adiOutState ^ m_adiActiveLow) >> k) & 1);
+                bool level = ((command.adiOutState ^ m_adiActiveLow) >> k) & 1;
+                m_adi[k]->set_value(level);
+                // remembered so checkDevices() can restore it
+                m_adiLevel = level ? m_adiLevel | (1 << k) : m_adiLevel & ~(1 << k);
             }
         }
     }
@@ -628,6 +636,39 @@ void SerialLink::checkWatchdog() {
         }
         m_watchdogBraked = true;
     }
+}
+
+void SerialLink::checkDevices() {
+    for (Group& group : m_groups) {
+        bool missing = false;
+        for (int8_t port : group.motors->get_port_all()) {
+            if (pros::Device::get_plugged_type(std::abs(port)) != pros::DeviceType::motor) {
+                missing = true;
+            }
+        }
+        // every motor is back: send the settings again
+        if (group.missing && !missing) {
+            group.motors->set_gearing_all(group.gears);
+            group.motors->set_encoder_units_all(pros::MotorEncoderUnits::degrees);
+            group.motors->set_brake_mode_all(group.brake);
+        }
+        group.missing = missing;
+    }
+
+    if (m_expanderPort == 0) {
+        return;
+    }
+    bool missing = pros::Device::get_plugged_type(m_expanderPort) != pros::DeviceType::adi;
+    // the expander is back: rebuild its outputs so their ports are set up again at the last level
+    if (m_expanderMissing && !missing) {
+        for (int k = 8; k < packets::MAX_ADI; k++) {
+            if (m_adi[k]) {
+                pros::adi::ext_adi_port_pair_t pair{m_expanderPort, static_cast<uint8_t>('A' + k - 8)};
+                m_adi[k] = std::make_unique<pros::adi::DigitalOut>(pair, (m_adiLevel >> k) & 1);
+            }
+        }
+    }
+    m_expanderMissing = missing;
 }
 
 uint8_t SerialLink::statusBits() {

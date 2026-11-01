@@ -287,7 +287,9 @@ private:
         std::vector<double> lastPos; ///< per motor: last good position, degrees
         std::vector<bool> lastValid; ///< per motor: whether the last read worked
         double accumRad = 0; ///< averaged IME position since config, radians
-        bool missing = false; ///< a port had no motor when the config was applied
+        bool missing = false; ///< a port has no motor. checked at config and every STATE
+        pros::MotorGears gears = pros::MotorGears::green; ///< cartridge, resent when a motor comes back
+        pros::MotorBrake brake = pros::MotorBrake::coast; ///< brake mode, resent when a motor comes back
     };
 
     /// @brief one configured tracking wheel
@@ -358,6 +360,15 @@ private:
     void checkWatchdog();
 
     /**
+     * @brief updates Group::missing and m_expanderMissing from what is plugged in now
+     *
+     * a device that comes back gets its settings again, since settings sent
+     * while it was gone never reached it: a group's cartridge, encoder units and
+     * brake mode, or the expander's outputs at their current level
+     */
+    void checkDevices();
+
+    /**
      * @brief builds StateFixed::status
      *
      * @return uint8_t packets::status bits
@@ -396,7 +407,9 @@ private:
     std::array<std::unique_ptr<pros::adi::DigitalOut>, packets::MAX_ADI> m_adi; ///< ADI outputs by slot. null = not enabled
     uint16_t m_adiEnable = 0; ///< ConfigFixed::adiOutEnable
     uint16_t m_adiActiveLow = 0; ///< ConfigFixed::adiActiveLow
-    bool m_expanderMissing = false; ///< the configured ADI expander wasn't detected
+    uint16_t m_adiLevel = 0; ///< physical level last set on each enabled output, by slot
+    uint8_t m_expanderPort = 0; ///< ConfigFixed::adiExpanderPort. 0 = none
+    bool m_expanderMissing = false; ///< the configured ADI expander isn't plugged in. checked at config and every STATE
     std::array<Snapshot, HISTORY_SIZE> m_history; ///< recent STATE snapshots, by stateSeq % HISTORY_SIZE
     Snapshot m_base; ///< what the deltas are measured from
     uint8_t m_configId = 0; ///< applied config. 0 = not configured
