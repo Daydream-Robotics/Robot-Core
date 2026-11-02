@@ -211,13 +211,13 @@ void MPCController<V, F>::buildStageModels() {
         m_exp.template block<n_states, m_inputs>(0, n_states) = m_Bc;
         m_exp *= m_params.h;
         auto m_d = m_exp.exp().eval();
-        m_A_k[k] = m_d.template block<n_states, n_states>(0, 0);
-        m_B_k[k] = m_d.template block<n_states, m_inputs>(0, n_states);
+        m_A_k[i] = m_d.template block<n_states, n_states>(0, 0);
+        m_B_k[i] = m_d.template block<n_states, m_inputs>(0, n_states);
 
         //affine term  d_k = x_ref[k+1] - A_k*x_ref[k] - B_k*u_ref[k]
-        m_d_k[k] = m_x_ref.col(k + 1)
-                 - m_A_k[k] * m_x_ref.col(k)
-                 - m_B_k[k] * m_u_ref.col(k);
+        m_d_k[i] = m_x_ref.col(i + 1)
+                 - m_A_k[i] * m_x_ref.col(i)
+                 - m_B_k[i] * m_u_ref.col(i);
     }
 }
 
@@ -239,7 +239,7 @@ void MPCController<V, F>::buildReferenceStates() {
         double theta_one = m_z_desired(3*(i+1) + 2);
 
         //signed forward speed: displacement projected onto heading
-        double v = ((x_one - x_zero) * std::cos(theta_zero) + (y_one - y_zero) * std::sin(th)) / h;
+        double v = ((x_one - x_zero) * std::cos(theta_zero) + (y_one - y_zero) * std::sin(theta_zero)) / h;
         //heading rate from finite difference
         double w = wrapAngle(theta_one - theta_zero) / h;
 
@@ -247,9 +247,9 @@ void MPCController<V, F>::buildReferenceStates() {
         double w_l = (v - w * L / 2.0) / r;
         double w_r = (v + w * L / 2.0) / r;
 
-        m_x_ref.col(k) << x_zero, y_zero, theta_zero, w_l, w_r;
+        m_x_ref.col(i) << x_zero, y_zero, theta_zero, w_l, w_r;
         //steady-state feedforward voltage
-        m_u_ref.col(k) << (m_params.a / m_params.b) * w_l,
+        m_u_ref.col(i) << (m_params.a / m_params.b) * w_l,
                           (m_params.a / m_params.b) * w_r;
     }
     //terminal reference state: last pose, hold last wheel speeds
@@ -580,18 +580,11 @@ auto MPCController<V, F>::unpackZDesired(const float* z_raw) {
     return z;
 }
 
-//function to recieve update packet: compute voltages: send control packet
+//function to take an update packet: compute voltages: return control packet
+//TODO: fix the MPC to use the new brain/Nano split. this still takes the old update packet (pose, reference,
+//battery, current) that the brain used to build. build the pose and reference on the Nano from SerialLink::Sample instead
 template<std::size_t V, std::size_t F>
-void MPCController<V, F>::MPCControl(SerialProtocol& serial, MPCController& mpc) {
-    //wait for state packet from vex brain
-std::optional<MPCUpdatePacket> packet_opt = serial.receive<MPCUpdatePacket>(SerialProtocol::PacketType::MPC_UPDATE);
-    //timeout or bad packet
-    if(!packet_opt.has_value()) {
-        return;
-    }
-
-    const MPCUpdatePacket& packet = *packet_opt;
-
+typename MPCController<V, F>::MPCControlPacket MPCController<V, F>::MPCControl(const MPCUpdatePacket& packet, MPCController& mpc) {
     //unpack pose
     Pose pose{
         packet.pose_x,
@@ -615,9 +608,9 @@ std::optional<MPCUpdatePacket> packet_opt = serial.receive<MPCUpdatePacket>(Seri
         //MPC failed: log error and send zero volts
         std::cerr << "MPC ERROR: " << e.what() << ", sending zero volts\n";
     }
-    //send optimal voltages
-    serial.send(SerialProtocol::PacketType::MPC_CONTROL, response);
-    std::cerr << "sent V_L=" << response.V_left << " V_R=" << response.V_right<<  std::endl;
+    //return optimal voltages for the caller to send
+    std::cerr << "computed V_L=" << response.V_left << " V_R=" << response.V_right<<  std::endl;
+    return response;
 }
 
 template<std::size_t V, std::size_t F>

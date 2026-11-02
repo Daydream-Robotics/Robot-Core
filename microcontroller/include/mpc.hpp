@@ -74,8 +74,6 @@ class MPCController : public MotionController {
         ~MPCController() override;
         //clears dynamic state for a new path
         void reset() override;
-        //serial loop body where we receive update packet, run MPC, send control packet
-        static void MPCControl(SerialProtocol& serial, MPCController& mpc);
 
         //! Unused base-class override (always returns 0V)
         WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) override;
@@ -101,6 +99,7 @@ class MPCController : public MotionController {
                 double omega_L;
                 double omega_R;
             };
+        public:
             #pragma pack(push, 1)
 
             struct MPCUpdatePacket {
@@ -122,6 +121,13 @@ class MPCController : public MotionController {
                 float V_right;
             };
             #pragma pack(pop)
+
+            //takes an update packet, runs MPC, and returns the control packet (0V if the solve fails)
+            //TODO: fix the MPC to use the new brain/Nano split. the brain now only sends raw sensors, so the Nano
+            //has to run odometry and path following itself, take a SerialLink::Sample in and send voltages with setGroup
+            static MPCControlPacket MPCControl(const MPCUpdatePacket& packet, MPCController& mpc);
+
+        private:
 
             //interpolated path sample (pose + speed) at an arbitrary arc length
             struct InterpSample {
