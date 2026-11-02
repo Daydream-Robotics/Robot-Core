@@ -20,7 +20,7 @@
 #include "daydream/utils/serial/packets.hpp"
 
 // ! PLATFORM NOTE PUT THIS IN CONSTANTS.H and include it so that its the smae on nano vs brain
-#define __jetson_nano__   
+#define __v5_brain__   
 
 #ifdef __v5_brain__
     #include "pros/serial.hpp"

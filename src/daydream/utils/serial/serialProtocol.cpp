@@ -18,6 +18,7 @@
 #ifdef __jetson_nano__
     #include <chrono>
     #include <string>
+    #include <thread>
     #include <fcntl.h>
     #include <unistd.h>
 #endif
@@ -283,18 +284,20 @@ bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
  * @brief writes a short string to a sysfs file
  *
  * @param path file to write, e.g. "/sys/class/gpio/export"
- * @param text text to write. failures are ignored
+ * @param text text to write
+ * @return bool false if the file couldn't be opened or the write failed
  */
-static void writeFile(const std::string& path, const std::string& text) {
+static bool writeFile(const std::string& path, const std::string& text) {
     // open for writing only
     int file = open(path.c_str(), O_WRONLY);
     // file doesn't exist or no permission
     if (file < 0) {
-        return;
+        return false;
     }
     // sysfs takes the whole value in one write
-    (void)write(file, text.data(), text.size());
+    ssize_t written = write(file, text.data(), text.size());
     close(file);
+    return written == static_cast<ssize_t>(text.size());
 }
 
 SerialProtocol::~SerialProtocol() {
@@ -353,8 +356,19 @@ bool SerialProtocol::setUpMicrocontrollerSerial(const char* port, speed_t baud, 
         std::string dir = "/sys/class/gpio/gpio" + gpio;
         // fails harmlessly if already exported
         writeFile("/sys/class/gpio/export", gpio);
-        // output, starting low = receive
-        writeFile(dir + "/direction", "low");
+        // make it an output, starting low = receive. right after export udev may not have set
+        // the permissions on direction yet, so retry every 10 ms for up to 1 s
+        bool isOutput = false;
+        for (int attempt = 0; attempt < 100 && !isOutput; attempt++) {
+            isOutput = writeFile(dir + "/direction", "low");
+            if (!isOutput) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+        // still not an output, so DE can't be driven
+        if (!isOutput) {
+            return false;
+        }
         // keep the value file open so setDE() is a single write
         m_deFd = open((dir + "/value").c_str(), O_WRONLY);
         // GPIO missing or no permission
