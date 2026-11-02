@@ -6,7 +6,8 @@
 
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
- #include <stdio.h>
+#include <stdio.h>
+#include <stdint.h>
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
@@ -27,6 +28,10 @@ constexpr char BALL_BLOCKER_PORT = 'A';
 constexpr char SCORING_LIFTER = 'B';
 constexpr char MATCHLOADER_PORT = 'C';
 constexpr char DESCORE_PORT = 'D'; 
+
+constexpr uint8_t NANO_LINK_PORT = 20;     // placeholder
+constexpr int32_t NANO_LINK_BAUD = 921600;
+
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 

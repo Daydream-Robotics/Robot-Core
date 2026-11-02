@@ -5,7 +5,7 @@
 #include <chrono>
 #include <thread>
 #include "mpc.hpp"
-#include "daydream/utils/serial/serialProtocol.hpp"
+#include "daydream/utils/serial/serial.hpp"
 
 int main() {
     //initiailizes prediction and control horizon (compile-time)
@@ -39,43 +39,42 @@ int main() {
     MPCController<V::value, F::value> mpc(params);
     mpc.reset();
 
-    //open serial to communicate for vex brain
-    int fd = SerialProtocol::setUpMicrocontrollerSerial("/dev/ttyACM1", B115200);
-    if (fd < 0) {
-        std::cerr << "Failed to open serial\n";
+    // link to the brain over its USB port. -1 = no DE pin
+    SerialLink link("/dev/ttyACM1", 115200, -1, packets::buildLinkConfig(), SerialProtocol::Transport::USB);
+    // link to the brain over RS-485 on the Jetson's UART. -1 = auto-direction transceiver, otherwise the DE gpio number
+    // SerialLink link("/dev/ttyTHS1", NANO_LINK_BAUD, -1, packets::buildLinkConfig());
+
+    // open the port and start the reader and writer threads
+    if (!link.start()) {
+        std::cerr << "failed to open the brain link\n";
         return 1;
     }
+    std::cerr << "waiting for the brain...\n";
 
-    // disable buffering (this might not be needed anymore because it is done in setUp...)
-    setbuf(stdin,  NULL);
-    setbuf(stdout, NULL);
-    setvbuf(stdin,  NULL, _IONBF, 0);
-    setvbuf(stdout, NULL, _IONBF, 0);
+    // stateSeq of the last Sample handled
+    uint16_t lastSeq = 0;
+    bool haveSample = false;
 
-    //initialize 8 kB binary link
-    SerialProtocol serial(8192, SerialProtocol::Mode::BINARY);
-
-    std::cerr << "MPC micro waiting for VEX...\n";
-
-    //wait for vex brain to boot
-    std::this_thread::sleep_for(std::chrono::milliseconds(3000));
-
-    std::cerr << "Ready\n";
-    //background heartbeat which send a null wakeup byte every 500 ms so the brain knows the coprocessor is alive
-	std::thread wakeupTask([&serial]() {
+    // control loop: one pass per new Sample
     while (true) {
-        serial.sendWakeup(std::string(1, '\0'));
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
-});
+        std::optional<SerialLink::Sample> sample = link.latestSample();
+        // no Sample yet, link down, or nothing new since the last pass
+        if (!sample || !link.linkUp() || (haveSample && sample->stateSeq == lastSeq)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
+        }
+        haveSample = true;
+        lastSeq = sample->stateSeq;
 
-//heartbeat runs independently for the life of the process
-wakeupTask.detach();
-    //50 Hz control loop
-    while (true) {
-        //recieve update packet: compute voltages: send control packet
-        MPCController<V::value, F::value>::MPCControl(serial, mpc);
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        // enabled autonomous: the Nano is in control
+        bool auton = (sample->status & packets::status::AUTON) && !(sample->status & packets::status::DISABLED);
+
+        // TODO: in auton, run odometry and the MPC here and send its voltages (mV) with
+        // link.setGroup(packets::LEFT_DRIVE_SLOT, packets::GroupMode::VOLTAGE, ...)
+        // until then the drive is held stopped in every mode
+        (void)auton;
+        link.setGroup(packets::LEFT_DRIVE_SLOT, packets::GroupMode::STOP, 0);
+        link.setGroup(packets::RIGHT_DRIVE_SLOT, packets::GroupMode::STOP, 0);
     }
 }
 

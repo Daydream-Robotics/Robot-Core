@@ -7,28 +7,36 @@
 
 #include "daydream/motion/pathing/paths.hpp"
 
-#include "daydream/motion/control/mpcSerial.hpp"
 #include "daydream/motion/control/purePursuit.hpp"
 #include "daydream/motion/control/ramsete.hpp"
 #include "daydream/motion/control/stanley.hpp"
+#include "daydream/motion/control/mpcSerial.hpp"
 
 #include "daydream/utils/fieldLogger.hpp"
 #include "daydream/utils/sd_card_logging.hpp"
+#include "daydream/utils/serial/serial.hpp"
 
-StanleyController stan = StanleyController();
 Autonomous auton = Autonomous();
 
 // Declare pointers globally so they are visible to both initialize and autonomous
+StanleyController stan = StanleyController();
 MPCSerial* mpc_serial_controller = nullptr;
 PathFollower* pathFollower = nullptr;
 RamseteController ramsete = RamseteController(0.007, 0.7, 10.1875, 4); // 0.003 - 0.01
 PurePursuitController purePursuit = PurePursuitController();
 
+// link to the Nano over the brain's USB port (stdin/stdout). port and baud are unused over USB
+SerialLink nanoLink(0, 0, packets::buildLinkConfig(), SerialProtocol::Transport::USB);
+// link to the Nano over RS-485 on NANO_LINK_PORT
+// SerialLink nanoLink(NANO_LINK_PORT, NANO_LINK_BAUD, packets::buildLinkConfig());
 std::vector<ALS_Path> paths;
 
 void initialize() {
-    SerialProtocol::setUpVexSerial();
     pros::lcd::initialize();
+    // open the link, apply the built-in config and start sending state
+    if (!nanoLink.start()) {
+        pros::lcd::print(3, "nano link failed to open");
+    }
     pros::lcd::print(0, "MPC Serial Initialization");
 
     Logger::getInstance().init("/usd/log.txt");
@@ -68,6 +76,7 @@ void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
+    nanoLink.setNanoControl(true);
 	// while (true){
 	// 	odom.updatePose();
 	// 	pros::delay(20);
@@ -145,7 +154,8 @@ void autonomous() {
 }
 
 void opcontrol() {
-	// MPCSerial::identifyMotorModel(450.0/600.0);                                                      
+    nanoLink.setNanoControl(false);
+	// MPCSerial::identifyMotorModel(450.0/600.0);
     leftMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     rightMotors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
     descorer.set_value(true);
