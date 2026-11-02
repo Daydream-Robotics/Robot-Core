@@ -606,11 +606,13 @@ packets::Error SerialLink::runRequest(const packets::CommandFixed& command) {
             return packets::Error::NONE;
         }
         case packets::Request::CONTROLLER_RUMBLE: {
-            // check if requestValue is in the pattern table
-            size_t index = static_cast<size_t>(command.requestValue);
-            if (command.requestValue < 0 || index >= std::size(RUMBLE_PATTERNS)) {
+            // check if requestValue is a number from 0 up to the last pattern in the table
+            if (!std::isfinite(command.requestValue) || command.requestValue < 0 ||
+                command.requestValue >= static_cast<float>(std::size(RUMBLE_PATTERNS))) {
                 return packets::Error::RANGE;
             }
+            // convert it to the pattern index
+            size_t index = static_cast<size_t>(command.requestValue);
             if (m_controller.rumble(RUMBLE_PATTERNS[index]) == PROS_ERR) {
                 return packets::Error::REQ_DEVICE;
             }

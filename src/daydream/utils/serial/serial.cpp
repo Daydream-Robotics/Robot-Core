@@ -606,11 +606,13 @@ packets::Error SerialLink::runRequest(const packets::CommandFixed& command) {
             return packets::Error::NONE;
         }
         case packets::Request::CONTROLLER_RUMBLE: {
-            // check if requestValue is in the pattern table
-            size_t index = static_cast<size_t>(command.requestValue);
-            if (command.requestValue < 0 || index >= std::size(RUMBLE_PATTERNS)) {
+            // check if requestValue is a number from 0 up to the last pattern in the table
+            if (!std::isfinite(command.requestValue) || command.requestValue < 0 ||
+                command.requestValue >= static_cast<float>(std::size(RUMBLE_PATTERNS))) {
                 return packets::Error::RANGE;
             }
+            // convert it to the pattern index
+            size_t index = static_cast<size_t>(command.requestValue);
             if (m_controller.rumble(RUMBLE_PATTERNS[index]) == PROS_ERR) {
                 return packets::Error::REQ_DEVICE;
             }
@@ -1147,7 +1149,7 @@ void SerialLink::handleState(const SerialProtocol::Frame& frame, Clock::time_poi
     packets::PayloadReader reader{frame.payload, frame.size};
     packets::StateFixed fixed;
     reader.get(fixed);
-    // arrival time in µs stored for linkUp()
+    // store arrival time in µs for linkUp()
     int64_t t3 = toUs(end);
     m_lastStateUs = t3;
 
@@ -1163,7 +1165,7 @@ void SerialLink::handleState(const SerialProtocol::Frame& frame, Clock::time_poi
     if (fixed.configId != m_brainConfigId) {
         resetPositions();
     }
-    // store the brain's config id (read by the writer) and last request id (read by request() and requestDone())
+    // store the brain's config id and last request id
     m_brainConfigId = fixed.configId;
     m_brainRequestId = fixed.lastRequestId;
 
@@ -1179,7 +1181,7 @@ void SerialLink::handleState(const SerialProtocol::Frame& frame, Clock::time_poi
     // update the time sync and get the sample time on the Nano clock
     int64_t tNano = syncTime(fixed, frame.size, t3);
 
-    // the state isn't for our config, stop here with no Sample and no ack
+    // if the state isn't for our config, return with no Sample and no ack
     if (fixed.configId != m_myConfigId || fixed.nGroups != m_nGroups) {
         return;
     }
@@ -1215,14 +1217,14 @@ void SerialLink::handleState(const SerialProtocol::Frame& frame, Clock::time_poi
         sample.wheelFlags.push_back(state.flags);
     }
 
-    // find the base positions. base seq 0 = all zeros, otherwise the recorded state with that seq
+    // find the base positions (base seq 0 = all zeros otherwise the recorded state with that seq)
     std::vector<double> zeros(channels, 0.0);
     const std::vector<double>* base = nullptr;
     if (fixed.deltaBaseSeq == 0) {
         base = &zeros;
     }
     else {
-        // search the history for that seq with the same channel count. not found leaves base null
+        // search the history for that seq with the same channel count if not found leaves base null
         for (const PosEntry& entry : m_posHistory) {
             if (entry.seq == fixed.deltaBaseSeq && entry.pos.size() == channels) {
                 base = &entry.pos;
@@ -1231,7 +1233,7 @@ void SerialLink::handleState(const SerialProtocol::Frame& frame, Clock::time_poi
         }
     }
 
-    // previous Sample's positions, or zeros if there's none with this channel count
+    // previous Sample's positions (or zeros if there's none with this channel count)
     const std::vector<double>& prev = m_lastPos.size() == channels ? m_lastPos : zeros;
 
     // pos[stateSeq] = pos[base] + delta
@@ -1243,7 +1245,7 @@ void SerialLink::handleState(const SerialProtocol::Frame& frame, Clock::time_poi
         }
     }
     else {
-        // base not found, keep the previous positions and count it
+        // base not found, keep the previous positions and increment counter
         now = prev;
         unknownBases++;
     }
@@ -1261,7 +1263,7 @@ void SerialLink::handleState(const SerialProtocol::Frame& frame, Clock::time_poi
         }
     }
 
-    // record this state's positions, then ack it so the brain can move its base here
+    // record this state's positions, then ack it
     m_posHistory[fixed.stateSeq % POS_HISTORY_SIZE] = PosEntry{fixed.stateSeq, now};
     // keep the positions as the previous ones for the next Sample
     m_lastPos = std::move(now);
@@ -1289,7 +1291,7 @@ void SerialLink::handleLog(const SerialProtocol::Frame& frame) {
 }
 
 int64_t SerialLink::syncTime(const packets::StateFixed& fixed, uint16_t stateBytes, int64_t t3) {
-    // tUs went down since the last state, so the brain's 32-bit µs clock wrapped. add 2^32 to the high part
+    // if tUs went down since the last state, (the brain's 32-bit µs clock wrapped) add 2^32 to the high part
     if (m_haveBrainTime && fixed.tUs < m_lastBrainTUs) {
         m_brainTimeHigh += int64_t(1) << 32;
     }
@@ -1297,25 +1299,25 @@ int64_t SerialLink::syncTime(const packets::StateFixed& fixed, uint16_t stateByt
     m_lastBrainTUs = fixed.tUs;
     m_haveBrainTime = true;
 
-    // t2 is when the brain sent this state, brain clock, unwrapped to 64 bits
+    // store t2 which is when the brain sent this state, brain clock, unwrapped to 64 bits
     int64_t t2 = m_brainTimeHigh + fixed.tUs;
-    // baud used for airtime, 0 over USB so no airtime is taken off
+    // store baud used for airtime, 0 over USB so no airtime is taken off
     int32_t wireBaud = m_transport == SerialProtocol::Transport::USB ? 0 : m_baud;
-    // when the state started arriving, end time minus the frame's airtime
+    // store when the state started arriving = end time minus the frame's airtime
     int64_t t3Start = t3 - airtimeUs(SerialProtocol::HEADER_SIZE + stateBytes + SerialProtocol::CRC_SIZE, wireBaud);
 
-    // the brain reports a command that isn't used yet, so take a time-sync sample from it
+    // if the brain reports a command that isn't used yet, take a time-sync sample from it
     if (fixed.cmdAgeUs != packets::NO_COMMAND && fixed.lastCmdSeq != m_lastSyncedCmd) {
         // mark this command as used
         m_lastSyncedCmd = fixed.lastCmdSeq;
-        // t0 is when we started sending that command (Nano clock)
+        // store t0, when we started sending that command (Nano clock)
         int64_t t0 = m_cmdSentUs[fixed.lastCmdSeq % CMD_TIMES_SIZE];
-        // t1 is when the brain started receiving it (brain clock), t2 minus cmdAgeUs minus the command's airtime
+        // store t1, when the brain started receiving it (brain clock), t2 minus cmdAgeUs minus the command's airtime
         size_t commandBytes = SerialProtocol::HEADER_SIZE + packets::commandSize(m_nGroups) + SerialProtocol::CRC_SIZE;
         int64_t t1 = t2 - fixed.cmdAgeUs - airtimeUs(commandBytes, wireBaud);
-        // round trip minus the time the brain held the command
+        // store round trip minus the time the brain held the command
         int64_t rtt = (t3Start - t0) - (t2 - t1);
-        // brain clock minus Nano clock
+        // store brain clock minus Nano clock
         int64_t offset = ((t1 - t0) + (t2 - t3Start)) / 2;
         // keep the sample only with a send time and a round trip of 0–50 ms
         if (t0 != 0 && rtt >= 0 && rtt < 50000) {
@@ -1334,11 +1336,11 @@ int64_t SerialLink::syncTime(const packets::StateFixed& fixed, uint16_t stateByt
         m_bestOffset = best->offset;
         m_haveOffset = true;
     }
-    // no offset yet, return when the state started arriving
+    // if no offset yet, return when the state started arriving
     if (!m_haveOffset) {
         return t3Start;
     }
-    // the brain's send time converted to the Nano clock
+    // return the brain's send time converted to the Nano clock
     return t2 - m_bestOffset;
 }
 
