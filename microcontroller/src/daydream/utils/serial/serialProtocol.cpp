@@ -57,7 +57,7 @@ bool SerialProtocol::send(uint16_t type, const void* payload, uint16_t size) {
 }
 
 std::optional<SerialProtocol::Frame> SerialProtocol::receive() {
-    // a frame may already be buffered, e.g. a STATE that arrived with a LOG
+    // a frame may already be buffered, e.g. a state that arrived with a log
     // parse before reading
     if (std::optional<Frame> frame = parseFrame()) {
         return frame;
@@ -199,7 +199,7 @@ int SerialProtocol::readBytes() {
         m_rxBufferPos += n;
         return static_cast<int>(n);
     }
-    //if smart port:
+    // if smart port:
     // port not opened yet
     if (!m_port) {
         return 0;
@@ -242,7 +242,7 @@ bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
         }
         return true;
     }
-    //if smart port:
+    // if smart port:
     // port not opened yet
     if (!m_port) {
         return false;

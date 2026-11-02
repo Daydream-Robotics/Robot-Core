@@ -7,8 +7,8 @@
  * picks the brain half or the Nano half
  *
  * each side runs one global reader and one global writer:
- * - Brain: the writer sends STATE every tick, the reader applies CONFIG and COMMAND.
- * - Nano: the reader takes STATE and LOG, the writer replies to each STATE
+ * - Brain: the writer sends state every tick, the reader applies config and command.
+ * - Nano: the reader takes state and log, the writer replies to each state
  */
 #pragma once
 
@@ -43,13 +43,13 @@
 #endif
 
 /*
- * built-in CONFIG, shared by the brain and the Nano
+ * built-in config, shared by the brain and the Nano
  *
  * the brain applies it at boot, and the Nano passes the same bytes to
- * SerialLink. A CONFIG only goes out when the Nano's copy
+ * SerialLink. A config only goes out when the Nano's copy
  * differs from what the brain is running
  *
- * its configId is computed from the config's bytes so IDs are 
+ * its configId is computed from the config's bytes so ids are 
  * automatically generated,
  */
 namespace packets {
@@ -69,12 +69,12 @@ namespace packets {
     }
 
     /**
-     * @brief builds the robot's built-in CONFIG payload
+     * @brief builds the robot's built-in config payload
      *
      * the configId comes from the rest of the payload, so it changes
      * whenever the config does
      *
-     * @return std::vector<uint8_t> CONFIG payload: fixed part, groups, then rotations
+     * @return std::vector<uint8_t> config payload: fixed part, groups, then rotations
      */
     inline std::vector<uint8_t> buildLinkConfig() {
         constexpr uint8_t GROUPS = 2;
@@ -119,7 +119,7 @@ namespace packets {
 class SerialLink {
 public:
     #ifdef __jetson_nano__
-    /// @brief one decoded STATE, with positions rebuilt from the deltas
+    /// @brief one decoded state, with positions rebuilt from the deltas
     struct Sample {
         int64_t tNanoUs = 0; ///< when the brain sampled, on the Nano's steady_clock, in µs
         uint16_t stateSeq = 0; ///< StateFixed::stateSeq
@@ -140,7 +140,7 @@ public:
     };
 
     std::atomic<uint32_t> skippedReplies{0}; ///< ticks where the reply couldn't start within REPLY_START_MAX_US
-    std::atomic<uint32_t> unknownBases{0}; ///< STATEs whose delta base wasn't in the history
+    std::atomic<uint32_t> unknownBases{0}; ///< states whose delta base wasn't in the history
     #endif
 
     #ifdef __v5_brain__
@@ -149,7 +149,7 @@ public:
      *
      * @param port smart port wired to the RS-485 transceiver
      * @param baud link baud rate, e.g. 921600
-     * @param config built-in CONFIG payload, applied by start(). normally packets::buildLinkConfig()
+     * @param config built-in config payload, applied by start(). normally packets::buildLinkConfig()
      * @param transport RS485 (the default) or USB. over USB, `port` and `baud` are ignored
      */
     SerialLink(uint8_t port, int32_t baud, std::vector<uint8_t> config,
@@ -163,7 +163,7 @@ public:
      * @param port UART device: "/dev/ttyTHS1" for RS-485, or "/dev/ttyACM1" for the brain's USB port
      * @param baud link baud rate, e.g. 921600. over USB any supported rate works
      * @param deGpio sysfs GPIO wired to the transceiver's DE and /RE pins. -1 = auto-direction transceiver or USB
-     * @param config CONFIG payload to apply on the brain, built with packets::PayloadWriter.
+     * @param config config payload to apply on the brain, built with packets::PayloadWriter.
      *        its configId must not be 0
      * @param transport RS485 (the default) or USB. over USB, time sync skips the airtime correction
      */
@@ -181,7 +181,7 @@ public:
      * @brief opens the port and starts the reader and writer
      *
      * Brain: call it from initialize(). it applies the built-in config, then
-     * starts sending STATE. the Nano only sends CONFIG if its config differs
+     * starts sending state. the Nano only sends config if its config differs
      *
      * @return bool false if the port couldn't be opened (Nano: or the baud or config is invalid)
      */
@@ -189,7 +189,7 @@ public:
 
     #ifdef __v5_brain__
     /**
-     * @brief queues a line of text for the Nano. sent as LOG, at most one per tick, in every mode including driver control
+     * @brief queues a line of text for the Nano. sent as log, at most one per tick, in every mode including driver control
      *
      * safe to call from any task. text past MAX_LOG_TEXT is cut off, and the
      * line is dropped if LOG_QUEUE_SIZE lines are already waiting
@@ -202,10 +202,10 @@ public:
     /**
      * @brief sets whether the Nano drives the motors and pneumatics
      *
-     * true (the default): the Nano drives them through COMMAND, for autonomous.
+     * true (the default): the Nano drives them through command, for autonomous.
      * false: brain code drives them, for driver control. switching to false sends
-     * the Nano a one-line LOG notice. after that, while the robot is enabled, the
-     * link goes quiet: no STATE, so no COMMAND. LOG lines from log() still go out.
+     * the Nano a one-line log notice. after that, while the robot is enabled, the
+     * link goes quiet: no state, so no command. log lines from log() still go out.
      * while the robot is disabled the link runs normally either way
      *
      * @param enabled true = the Nano is in control
@@ -215,17 +215,17 @@ public:
 
     #ifdef __jetson_nano__
     /**
-     * @brief sets a group's command. sent in every COMMAND until changed
+     * @brief sets a group's command. sent in every command until changed
      *
-     * @param slot group slot, the group's index in CONFIG
+     * @param slot group slot, the group's index in config
      * @param mode how `value` and `aux` are read
      * @param value see packets::GroupMode
-     * @param aux max rpm in POSITION mode. unused otherwise
+     * @param aux max rpm in position mode. unused otherwise
      */
     void setGroup(uint8_t slot, packets::GroupMode mode, float value, int16_t aux = 0);
 
     /**
-     * @brief sets an ADI output. re-sent in every COMMAND from then on
+     * @brief sets an ADI output. re-sent in every command from then on
      *
      * @param slot ADI slot, 0–7 brain A–H, 8–15 expander A–H
      * @param on logical state. the brain applies adiActiveLow
@@ -245,8 +245,8 @@ public:
     /**
      * @brief whether the brain has run a request
      *
-     * @param id ID returned by request()
-     * @return bool true once the brain echoes the ID in StateFixed::lastRequestId
+     * @param id id returned by request()
+     * @return bool true once the brain echoes the id in StateFixed::lastRequestId
      */
     bool requestDone(uint8_t id) const;
 
@@ -268,17 +268,17 @@ public:
     std::optional<Sample> latestSample() const;
 
     /**
-     * @brief whether STATE is arriving
+     * @brief whether state is arriving
      *
-     * @return bool false if no STATE arrived in the last 5 state periods
+     * @return bool false if no state arrived in the last 5 state periods
      */
     bool linkUp() const;
     #endif
 
 private:
     #ifdef __v5_brain__
-    static constexpr size_t HISTORY_SIZE = 8; ///< STATE snapshots kept for moving the delta base
-    static constexpr size_t LOG_QUEUE_SIZE = 8; ///< LOG lines waiting to be sent
+    static constexpr size_t HISTORY_SIZE = 8; ///< state snapshots kept for moving the delta base
+    static constexpr size_t LOG_QUEUE_SIZE = 8; ///< log lines waiting to be sent
     static constexpr size_t MAX_CHANNELS = packets::MAX_GROUPS + packets::MAX_ROTATIONS; ///< delta channels: groups, then rotations
 
     /// @brief one configured motor group
@@ -287,7 +287,7 @@ private:
         std::vector<double> lastPos; ///< per motor: last good position, degrees
         std::vector<bool> lastValid; ///< per motor: whether the last read worked
         double accumRad = 0; ///< averaged IME position since config, radians
-        bool missing = false; ///< a port has no motor. checked at config and every STATE
+        bool missing = false; ///< a port has no motor. checked at config and every state
         pros::MotorGears gears = pros::MotorGears::green; ///< cartridge, resent when a motor comes back
         pros::MotorBrake brake = pros::MotorBrake::coast; ///< brake mode, resent when a motor comes back
     };
@@ -299,41 +299,41 @@ private:
         bool readFailed = true; ///< the last read failed, or there was none yet. the next good read only re-seeds `last`
         double accumRad = 0; ///< position since config, radians. only good-to-good read changes are added
         bool reversed = false; ///< RotationCfg bit0, resent when the sensor comes back
-        bool missing = false; ///< no rotation sensor on the port. checked at config and every STATE
+        bool missing = false; ///< no rotation sensor on the port. checked at config and every state
     };
 
-    /// @brief every channel's position at one STATE
+    /// @brief every channel's position at one state
     struct Snapshot {
         uint16_t seq = 0; ///< stateSeq. 0 = config origin, or an empty slot
         double ch[MAX_CHANNELS] = {}; ///< groups, then rotations, radians
     };
 
-    /// @brief one queued LOG line
+    /// @brief one queued log line
     struct LogEntry {
         uint8_t level = 0; ///< log level
         uint8_t length = 0; ///< text bytes, 1–MAX_LOG_TEXT
         char text[packets::MAX_LOG_TEXT + 1] = {}; ///< text, +1 for vsnprintf's terminator
     };
 
-    /// @brief reader task: applies every CONFIG and COMMAND as it arrives
+    /// @brief reader task: applies every config and command as it arrives
     void readerLoop();
 
-    /// @brief writer task: every tick, checks the watchdog, samples, sends one LOG if queued, then STATE. in driver control only the LOG
+    /// @brief writer task: every tick, checks the watchdog, samples, sends one log if queued, then state. in driver control only the log
     void writerLoop();
 
     /**
-     * @brief validates a CONFIG and, if valid, rebuilds every device
+     * @brief validates a config and, if valid, rebuilds every device
      *
-     * @param payload CONFIG payload. its size was already checked by SerialProtocol
+     * @param payload config payload. its size was already checked by SerialProtocol
      * @param size payload size in bytes
      * @return packets::Error NONE if applied or already applied, otherwise why it was rejected
      */
     packets::Error applyConfig(const uint8_t* payload, uint16_t size);
 
     /**
-     * @brief validates a COMMAND and applies it to the groups, the ADI outputs and the delta base
+     * @brief validates a command and applies it to the groups, the ADI outputs and the delta base
      *
-     * @param payload COMMAND payload. its size was already checked by SerialProtocol
+     * @param payload command payload. its size was already checked by SerialProtocol
      * @param size payload size in bytes
      * @return packets::Error NONE if applied, otherwise why it was rejected
      */
@@ -342,7 +342,7 @@ private:
     /**
      * @brief runs a one-shot request
      *
-     * @param command COMMAND carrying the request
+     * @param command command carrying the request
      * @return packets::Error NONE, or REQ_TARGET / REQ_TYPE / REQ_DEVICE / RANGE
      */
     packets::Error runRequest(const packets::CommandFixed& command);
@@ -355,7 +355,7 @@ private:
     void sampleChannels(double* channels);
 
     /**
-     * @brief trips when no valid COMMAND has arrived for watchdogMs, counted from the config if none since
+     * @brief trips when no valid command has arrived for watchdogMs, counted from the config if none since
      *
      * sets packets::status::WATCHDOG in any mode, but only brakes every group
      * (once) during autonomous. in driver control the groups are left alone
@@ -380,19 +380,19 @@ private:
 
 
     /**
-     * @brief copies the master controller's axes and buttons into STATE
+     * @brief copies the master controller's axes and buttons into state
      *
-     * @param fixed STATE fixed part to fill
+     * @param fixed state fixed part to fill
      */
     void readController(packets::StateFixed& fixed);
 
-    /// @brief sends the oldest queued LOG line, if any
+    /// @brief sends the oldest queued log line, if any
     void flushOneLog();
 
     /**
      * @brief whether the link is quiet: Nano control is off and the robot is enabled (driver control)
      *
-     * @return bool true = send no STATE (LOG lines still go out)
+     * @return bool true = send no state (log lines still go out)
      */
     bool linkQuiet() const;
 
@@ -400,7 +400,7 @@ private:
     uint8_t m_linkPort; ///< smart port of the link. no device may use it
     int32_t m_baud; ///< link baud rate
     SerialProtocol::Transport m_transport; ///< what the link runs over
-    pros::Controller m_controller; ///< master controller, read into every STATE
+    pros::Controller m_controller; ///< master controller, read into every state
     std::unique_ptr<pros::Task> m_readerTask; ///< runs readerLoop()
     std::unique_ptr<pros::Task> m_writerTask; ///< runs writerLoop()
 
@@ -412,23 +412,23 @@ private:
     uint16_t m_adiActiveLow = 0; ///< ConfigFixed::adiActiveLow
     uint16_t m_adiLevel = 0; ///< physical level last set on each enabled output, by slot
     uint8_t m_expanderPort = 0; ///< ConfigFixed::adiExpanderPort. 0 = none
-    bool m_expanderMissing = false; ///< the configured ADI expander isn't plugged in. checked at config and every STATE
-    std::array<Snapshot, HISTORY_SIZE> m_history; ///< recent STATE snapshots, by stateSeq % HISTORY_SIZE
+    bool m_expanderMissing = false; ///< the configured ADI expander isn't plugged in. checked at config and every state
+    std::array<Snapshot, HISTORY_SIZE> m_history; ///< recent state snapshots, by stateSeq % HISTORY_SIZE
     Snapshot m_base; ///< what the deltas are measured from
     uint8_t m_configId = 0; ///< applied config. 0 = not configured
-    uint8_t m_statePeriodMs = 10; ///< STATE interval
+    uint8_t m_statePeriodMs = 10; ///< state interval
     uint16_t m_watchdogMs = 100; ///< watchdog timeout
-    uint16_t m_stateSeq = 1; ///< stateSeq of the next STATE. never 0
-    uint16_t m_lastCmdSeq = 0; ///< cmdSeq of the last COMMAND applied
-    uint8_t m_lastRequestId = 0; ///< ID of the last request run
-    packets::Error m_lastError = packets::Error::NONE; ///< latest error since the previous STATE
-    bool m_haveCmd = false; ///< a valid COMMAND arrived since the config was applied
-    bool m_watchdogTripped = false; ///< no valid COMMAND for watchdogMs
+    uint16_t m_stateSeq = 1; ///< stateSeq of the next state. never 0
+    uint16_t m_lastCmdSeq = 0; ///< cmdSeq of the last command applied
+    uint8_t m_lastRequestId = 0; ///< id of the last request run
+    packets::Error m_lastError = packets::Error::NONE; ///< latest error since the previous state
+    bool m_haveCmd = false; ///< a valid command arrived since the config was applied
+    bool m_watchdogTripped = false; ///< no valid command for watchdogMs
     bool m_watchdogBraked = false; ///< the watchdog has braked the groups since it tripped
-    bool m_booted = true; ///< no valid COMMAND since the program started. reported as status::BOOTED
-    std::vector<uint8_t> m_bootConfig; ///< built-in CONFIG payload, applied by start()
-    uint32_t m_cmdRxUs = 0; ///< when the last valid COMMAND arrived, pros::c::micros()
-    uint32_t m_cmdRxMs = 0; ///< when the last valid COMMAND arrived, or the config was applied if none since, pros::millis()
+    bool m_booted = true; ///< no valid command since the program started. reported as status::BOOTED
+    std::vector<uint8_t> m_bootConfig; ///< built-in config payload, applied by start()
+    uint32_t m_cmdRxUs = 0; ///< when the last valid command arrived, pros::c::micros()
+    uint32_t m_cmdRxMs = 0; ///< when the last valid command arrived, or the config was applied if none since, pros::millis()
 
     std::atomic<bool> m_nanoControl{true}; ///< the Nano drives the motors and pneumatics. see setNanoControl()
 
@@ -442,12 +442,12 @@ private:
     using Clock = std::chrono::steady_clock;
 
     static constexpr size_t POS_HISTORY_SIZE = 16; ///< received positions kept, by stateSeq
-    static constexpr size_t CMD_TIMES_SIZE = 64; ///< COMMAND send times kept, by cmdSeq
-    static constexpr int CONFIG_RETRY_TICKS = 20; ///< ticks between CONFIG resends
-    static constexpr int LINK_DOWN_PERIODS = 5; ///< state periods without STATE before the link is down
+    static constexpr size_t CMD_TIMES_SIZE = 64; ///< command send times kept, by cmdSeq
+    static constexpr int CONFIG_RETRY_TICKS = 20; ///< ticks between config resends
+    static constexpr int LINK_DOWN_PERIODS = 5; ///< state periods without state before the link is down
     static constexpr int64_t SYNC_WINDOW_US = 1000000; ///< how long time-sync samples are kept
 
-    /// @brief rebuilt positions at one received STATE
+    /// @brief rebuilt positions at one received state
     struct PosEntry {
         uint16_t seq = 0; ///< stateSeq. 0 = empty slot
         std::vector<double> pos; ///< groups, then rotations, radians
@@ -455,38 +455,38 @@ private:
 
     /// @brief one NTP-style time-sync measurement
     struct SyncSample {
-        int64_t t3; ///< when the STATE arrived, Nano µs
+        int64_t t3; ///< when the state arrived, Nano µs
         int64_t rtt; ///< round trip minus the brain's hold time, µs
         int64_t offset; ///< brain clock − Nano clock, µs
     };
 
-    /// @brief reader thread: takes STATE and LOG, wakes the writer on each STATE
+    /// @brief reader thread: takes state and log, wakes the writer on each state
     void readerLoop();
 
-    /// @brief writer thread: after each STATE, waits GUARD_US and sends CONFIG or the latest COMMAND
+    /// @brief writer thread: after each state, waits GUARD_US and sends config or the latest command
     void writerLoop();
 
     /**
      * @brief decodes a STATE: session tracking, request echo, time sync, positions, then publishes a Sample
      *
-     * @param frame the STATE frame
+     * @param frame the state frame
      * @param end when the reader got the end of the frame
      */
     void handleState(const SerialProtocol::Frame& frame, Clock::time_point end);
 
     /**
-     * @brief prints a LOG line to stderr
+     * @brief prints a log line to stderr
      *
-     * @param frame the LOG frame
+     * @param frame the log frame
      */
     void handleLog(const SerialProtocol::Frame& frame);
 
     /**
-     * @brief adds a time-sync measurement if this STATE closes a new round trip
+     * @brief adds a time-sync measurement if this state closes a new round trip
      *
-     * @param fixed STATE fixed part
-     * @param stateBytes STATE payload size in bytes
-     * @param t3 when the STATE arrived, Nano µs
+     * @param fixed state fixed part
+     * @param stateBytes state payload size in bytes
+     * @param t3 when the state arrived, Nano µs
      * @return int64_t when the brain sampled, on the Nano clock, µs
      */
     int64_t syncTime(const packets::StateFixed& fixed, uint16_t stateBytes, int64_t t3);
@@ -502,7 +502,7 @@ private:
     int32_t m_baud; ///< link baud rate
     SerialProtocol::Transport m_transport; ///< what the link runs over
     int m_deGpio; ///< DE GPIO, -1 = none
-    std::vector<uint8_t> m_config; ///< CONFIG payload
+    std::vector<uint8_t> m_config; ///< config payload
     uint8_t m_myConfigId = 0; ///< configId inside `m_config`
     uint8_t m_nGroups = 0; ///< group count inside `m_config`
     uint8_t m_statePeriodMs = 10; ///< state period inside `m_config`
@@ -512,22 +512,22 @@ private:
     std::thread m_writer; ///< runs writerLoop()
 
     std::mutex m_replyMutex; ///< guards the reply handoff
-    std::condition_variable m_replyCv; ///< wakes the writer on each STATE
-    Clock::time_point m_stateEnd; ///< end of the latest STATE
-    bool m_statePending = false; ///< a STATE arrived that the writer hasn't replied to
+    std::condition_variable m_replyCv; ///< wakes the writer on each state
+    Clock::time_point m_stateEnd; ///< end of the latest state
+    bool m_statePending = false; ///< a state arrived that the writer hasn't replied to
 
     std::mutex m_commandMutex; ///< guards the command mailbox
-    packets::CommandFixed m_commandFixed{}; ///< latest COMMAND fixed part, minus the sequence fields
+    packets::CommandFixed m_commandFixed{}; ///< latest command fixed part, minus the sequence fields
     std::vector<packets::GroupCmd> m_groupCmds; ///< latest command per group
     uint8_t m_nextRequestId = 0; ///< last requestId handed out
-    uint16_t m_cmdSeq = 0; ///< cmdSeq of the last COMMAND sent. writer only
+    uint16_t m_cmdSeq = 0; ///< cmdSeq of the last command sent. writer only
 
-    std::atomic<uint8_t> m_brainConfigId{0}; ///< StateFixed::configId of the latest STATE
-    bool m_brainBooted = false; ///< status::BOOTED of the latest STATE. reader thread only
-    std::atomic<uint8_t> m_brainRequestId{0}; ///< StateFixed::lastRequestId of the latest STATE
+    std::atomic<uint8_t> m_brainConfigId{0}; ///< StateFixed::configId of the latest state
+    bool m_brainBooted = false; ///< status::BOOTED of the latest state. reader thread only
+    std::atomic<uint8_t> m_brainRequestId{0}; ///< StateFixed::lastRequestId of the latest state
     std::atomic<uint16_t> m_ackStateSeq{0}; ///< newest stateSeq recorded, sent as COMMAND::ackStateSeq
-    std::atomic<int64_t> m_lastStateUs{0}; ///< when the latest STATE arrived, Nano µs. 0 = never
-    std::array<std::atomic<int64_t>, CMD_TIMES_SIZE> m_cmdSentUs{}; ///< COMMAND send times by cmdSeq % CMD_TIMES_SIZE
+    std::atomic<int64_t> m_lastStateUs{0}; ///< when the latest state arrived, Nano µs. 0 = never
+    std::array<std::atomic<int64_t>, CMD_TIMES_SIZE> m_cmdSentUs{}; ///< command send times by cmdSeq % CMD_TIMES_SIZE
 
     // reader thread only
     std::array<PosEntry, POS_HISTORY_SIZE> m_posHistory; ///< rebuilt positions by stateSeq % POS_HISTORY_SIZE
@@ -535,7 +535,7 @@ private:
     std::deque<SyncSample> m_syncWindow; ///< time-sync samples from the last SYNC_WINDOW_US
     int64_t m_bestOffset = 0; ///< offset of the best recent sample
     bool m_haveOffset = false; ///< m_bestOffset is valid
-    uint16_t m_lastSyncedCmd = 0; ///< cmdSeq of the last COMMAND used for time sync
+    uint16_t m_lastSyncedCmd = 0; ///< cmdSeq of the last command used for time sync
     uint32_t m_lastBrainTUs = 0; ///< previous StateFixed::tUs, for unwrapping
     int64_t m_brainTimeHigh = 0; ///< wraps of StateFixed::tUs so far, × 2^32
     bool m_haveBrainTime = false; ///< m_lastBrainTUs is valid

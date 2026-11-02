@@ -18,14 +18,14 @@
 
 namespace packets {
     constexpr uint16_t MAX_PAYLOAD = 1024; ///< largest legal frame `size`, in bytes
-    constexpr uint8_t MAX_GROUPS = 21; ///< max motor groups in one CONFIG
+    constexpr uint8_t MAX_GROUPS = 21; ///< max motor groups in one config
     constexpr uint8_t MAX_MOTORS = 8; ///< max motors per group (length of GroupCfg::ports)
     constexpr uint8_t MAX_ROTATIONS = 21; ///< max tracking-wheel rotation sensors
     constexpr uint8_t MAX_ADI = 16; ///< ADI output slots: 0–7 brain A–H, 8–15 expander A–H
-    constexpr uint8_t MAX_LOG_TEXT = 62; ///< max LOG text bytes (payload = 1 level byte + text)
-    constexpr uint32_t GUARD_US = 200; ///< minimum wait after STATE ends before the nano may transmit
+    constexpr uint8_t MAX_LOG_TEXT = 62; ///< max log text bytes (payload = 1 level byte + text)
+    constexpr uint32_t GUARD_US = 200; ///< minimum wait after state ends before the nano may transmit
     constexpr uint32_t REPLY_START_MAX_US = 2000; ///< latest the nano may start its reply. if it's later, it skips the tick
-    constexpr uint32_t NO_COMMAND = 0xFFFFFFFF; ///< StateFixed::cmdAgeUs value meaning "no COMMAND since config"
+    constexpr uint32_t NO_COMMAND = 0xFFFFFFFF; ///< StateFixed::cmdAgeUs value meaning "no command since config"
 
 
     /**
@@ -35,14 +35,14 @@ namespace packets {
     * read from the header. A receiver drops any type meant for the other side
     */
     enum PacketType : uint16_t {
-        CONFIG = 0, ///< nano → brain. sent instead of COMMAND until the config is applied
+        CONFIG = 0, ///< nano → brain. sent instead of command until the config is applied
         STATE = 1, ///< brain → nano. sent every tick. once it finishes sending, the nano may reply
-        COMMAND = 2, ///< nano → brain. the reply to every STATE
-        LOG = 3 ///< brain → nano. logging text only, at most one per tick, before STATE
+        COMMAND = 2, ///< nano → brain. the reply to every state
+        LOG = 3 ///< brain → nano. logging text only, at most one per tick, before state
     };
 
     /// @brief GroupCmd::mode. the meaning of GroupCmd::value and ::aux depends on the mode
-    /// an unknown mode is treated as STOP
+    /// an unknown mode is treated as stop
     enum class GroupMode : uint8_t {
         STOP = 0, ///< stop using the group's brakeMode. value and aux are ignored
         VOLTAGE = 1, ///< value = mV, −12000..12000
@@ -67,17 +67,17 @@ namespace packets {
     /// @brief CommandFixed::requestType for one-shot requests
     enum class Request : uint8_t { 
         NONE = 0, 
-        GROUP_TARE = 1, ///< target = group slot. zeroes each motor's absolute position for POSITION mode
+        GROUP_TARE = 1, ///< target = group slot. zeroes each motor's absolute position for position mode
         CONTROLLER_RUMBLE = 2 ///< value = pattern index from the shared rumble table
     };
 
     /// @brief StateFixed::lastError. holds the most recent error
     enum class Error : uint8_t {
         NONE = 0, 
-        NOT_CONFIGURED = 1, ///< COMMAND arrived before any CONFIG
+        NOT_CONFIGURED = 1, ///< command arrived before any config
         SIZE = 2, ///< payload size didn't match what its counts imply
-        CONFIG_ID = 3, ///< COMMAND configId didn't match the applied config
-        GROUP_COUNT = 4, ///< COMMAND nGroups didn't match the applied config
+        CONFIG_ID = 3, ///< command configId didn't match the applied config
+        GROUP_COUNT = 4, ///< command nGroups didn't match the applied config
         RANGE = 5, ///< a field was out of range
         UNKNOWN_TYPE = 6, 
         CFG_PORT = 7, ///< port out of range, or an expander slot enabled with no expander
@@ -94,10 +94,10 @@ namespace packets {
         constexpr uint8_t AUTON = 1 << 1; ///< autonomous period
         constexpr uint8_t COMP = 1 << 2; ///< competition switch or field connected
         constexpr uint8_t FIELD = 1 << 3; ///< field control connected
-        constexpr uint8_t WATCHDOG = 1 << 4; ///< watchdog tripped. cleared by the next valid COMMAND
+        constexpr uint8_t WATCHDOG = 1 << 4; ///< watchdog tripped. cleared by the next valid command
         constexpr uint8_t CONTROLLER = 1 << 5; ///< master controller connected
         constexpr uint8_t NO_EXPANDER = 1 << 6; ///< ADI expander configured but not detected
-        constexpr uint8_t BOOTED = 1 << 7; ///< brain program just started. set until its first valid COMMAND
+        constexpr uint8_t BOOTED = 1 << 7; ///< brain program just started. set until its first valid command
     }
 
     /// @brief bits of GroupState::flags and RotationState::flags
@@ -113,11 +113,11 @@ namespace packets {
 
     #pragma pack(push, 1)
 
-    /// @brief CONFIG fixed part (13 bytes). followed by GroupCfg[nGroups] and RotationCfg[nRotations]
+    /// @brief config fixed part (13 bytes). followed by GroupCfg[nGroups] and RotationCfg[nRotations]
     struct ConfigFixed {
-        uint8_t configId; ///< 1–255. must change whenever the content changes. resending the same ID is ignored
-        uint8_t statePeriodMs; ///< STATE interval, 5–50. default 10
-        uint16_t watchdogMs; ///< in autonomous, stop all groups after this long with no valid COMMAND. 20–1000, default 100
+        uint8_t configId; ///< 1–255. must change whenever the content changes. resending the same id is ignored
+        uint8_t statePeriodMs; ///< state interval, 5–50. default 10
+        uint16_t watchdogMs; ///< in autonomous, stop all groups after this long with no valid command. 20–1000, default 100
         uint8_t nGroups; ///< 1–MAX_GROUPS
         uint8_t nRotations; ///< 0–MAX_ROTATIONS
         uint8_t adiExpanderPort; ///< smart port of the 3-wire expander. 0 = none
@@ -126,7 +126,7 @@ namespace packets {
         uint16_t adiActiveLow; ///< bit k set = slot k inverts the logic level
     };
 
-    /// @brief one motor group in CONFIG (11 bytes). its position in the array is its slot number
+    /// @brief one motor group in config (11 bytes). its position in the array is its slot number
     struct GroupCfg {
         uint8_t nMotors; ///< 1–MAX_MOTORS
         uint8_t gearset; ///< Gearset
@@ -134,21 +134,21 @@ namespace packets {
         int8_t ports[MAX_MOTORS]; ///< smart ports 1–21. negative = reversed. unused entries must be 0
     };
 
-    /// @brief one tracking wheel in CONFIG (2 bytes)
+    /// @brief one tracking wheel in config (2 bytes)
     struct RotationCfg {
         uint8_t port; ///< smart port 1–21
         uint8_t flags; ///< bit0 = reversed
     };
 
-    /// @brief STATE fixed part (30 bytes). followed by GroupState[nGroups] and RotationState[nRotations]
+    /// @brief state fixed part (30 bytes). followed by GroupState[nGroups] and RotationState[nRotations]
     struct StateFixed {
         uint32_t tUs; ///< brain µs clock, taken after device reads, just before sending. wraps every ~71.6 min
-        uint32_t cmdAgeUs; ///< µs from the end of the last valid COMMAND to tUs. NO_COMMAND = none since config
-        uint16_t stateSeq; ///< +1 per STATE. runs 1–65535, then wraps to 1 (0 is never used)
-        uint16_t deltaBaseSeq; ///< the STATE the deltas are measured from. 0 = when the config was applied
-        uint16_t lastCmdSeq; ///< cmdSeq of the last COMMAND applied
+        uint32_t cmdAgeUs; ///< µs from the end of the last valid command to tUs. NO_COMMAND = none since config
+        uint16_t stateSeq; ///< +1 per state. runs 1–65535, then wraps to 1 (0 is never used)
+        uint16_t deltaBaseSeq; ///< the state the deltas are measured from. 0 = when the config was applied
+        uint16_t lastCmdSeq; ///< cmdSeq of the last command applied
         uint8_t configId; ///< applied config. 0 = not configured, or the brain program restarted
-        uint8_t lastRequestId; ///< ID of the last one-shot request executed
+        uint8_t lastRequestId; ///< id of the last one-shot request executed
         uint8_t lastError; ///< Error
         uint8_t status; ///< status:: bits
         uint16_t batteryMv; ///< battery voltage
@@ -159,22 +159,22 @@ namespace packets {
         uint8_t nRotations;
     };
 
-    /// @brief one group in STATE (9 bytes). values are averaged over the group's working motors
+    /// @brief one group in state (9 bytes). values are averaged over the group's working motors
     struct GroupState {
         float imeDeltaRad; ///< IME change since deltaBaseSeq, in radians at the output shaft. reversal already applied
         float omegaRadS; ///< rad/s at the output shaft. multiply by the external gear ratio to get wheel ω
         uint8_t flags; ///< fault:: bits
     };
-    /// @brief one tracking wheel in STATE (5 bytes)
+    /// @brief one tracking wheel in state (5 bytes)
     struct RotationState {
         float deltaRad; ///< change since deltaBaseSeq, in radians
         uint8_t flags; ///< fault::MISSING only
     };
 
-    /// @brief COMMAND fixed part (17 bytes). followed by GroupCmd[nGroups]
-    /// the newest COMMAND is taken. each valid one resets the watchdog
+    /// @brief command fixed part (17 bytes). followed by GroupCmd[nGroups]
+    /// the newest command is taken. each valid one resets the watchdog
     struct CommandFixed {
-        uint16_t cmdSeq; ///< +1 per COMMAND. wraps
+        uint16_t cmdSeq; ///< +1 per command. wraps
         uint16_t ackStateSeq; ///< newest stateSeq the nano has received and recorded. moves the brain's delta base
         uint8_t configId; ///< must equal StateFixed::configId, or the frame is ignored
         uint8_t nGroups; ///< must equal the configured group count
@@ -189,7 +189,7 @@ namespace packets {
     /// @brief one group's command (7 bytes). every motor in the group gets the same command
     struct GroupCmd {
         uint8_t mode; ///< GroupMode. sets the units of value and aux
-        int16_t aux; ///< max rpm in POSITION mode. unused otherwise
+        int16_t aux; ///< max rpm in position mode. unused otherwise
         float value; ///< see GroupMode
     };
     #pragma pack(pop)
@@ -201,7 +201,7 @@ namespace packets {
     static_assert(sizeof(float) == 4, "float fields must be IEEE-754 binary32");
 
     /**
-     * @brief payload size of a CONFIG with the given device counts
+     * @brief payload size of a config with the given device counts
      *
      * @param g number of motor groups
      * @param r number of rotation sensors
@@ -212,7 +212,7 @@ namespace packets {
     }
 
      /**
-     * @brief payload size of a STATE with the given device counts
+     * @brief payload size of a state with the given device counts
      *
      * @param g number of motor groups
      * @param r number of rotation sensors
@@ -223,7 +223,7 @@ namespace packets {
     }
 
     /**
-     * @brief payload size of a COMMAND for the given group count
+     * @brief payload size of a command for the given group count
      *
      * @param g number of motor groups in the applied config
      * @return size_t payload bytes: fixed part + g GroupCmd
@@ -232,7 +232,7 @@ namespace packets {
         return sizeof(CommandFixed) + g * sizeof(GroupCmd); 
     }
 
-    // the largest possible CONFIG and STATE must still fit in one frame
+    // the largest possible config and state must still fit in one frame
     static_assert(configSize(MAX_GROUPS, MAX_ROTATIONS) <= MAX_PAYLOAD);
     static_assert(stateSize(MAX_GROUPS, MAX_ROTATIONS) <= MAX_PAYLOAD);
     static_assert(commandSize(MAX_GROUPS) <= MAX_PAYLOAD);
@@ -274,7 +274,7 @@ namespace packets {
      * @param type header `type` field
      * @param p start of the payload
      * @param size header `size` field, in bytes
-     * @param appliedGroups group count of the applied config. only used for COMMAND.
+     * @param appliedGroups group count of the applied config. only used for command.
      *        0 = not configured
      * @return bool true if `size` matches the counts. false for an unknown type
      */

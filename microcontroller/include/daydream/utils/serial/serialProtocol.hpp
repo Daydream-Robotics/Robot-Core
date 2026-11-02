@@ -92,8 +92,8 @@ private:
     static constexpr speed_t DEFAULT_BAUD = B921600; ///< link baud rate
     #endif
 
-    std::atomic<uint16_t> m_crcErrors{0}; ///< frames dropped for a bad CRC, reported in STATE.rxErrors
-    std::atomic<uint16_t> m_badFrames{0}; ///< frames dropped for a bad type or size, reported in STATE.rxErrors
+    std::atomic<uint16_t> m_crcErrors{0}; ///< frames dropped for a bad CRC, reported in state.rxErrors
+    std::atomic<uint16_t> m_badFrames{0}; ///< frames dropped for a bad type or size, reported in state.rxErrors
 
     /**
      * @brief constructs the protocol without opening a port
@@ -188,7 +188,7 @@ private:
     }
 
     /**
-     * @brief sets the group count used for the exact COMMAND size check
+     * @brief sets the group count used for the exact command size check
      *
      * @param groups Group count of the applied config. 0 = not configured
      */
@@ -206,7 +206,7 @@ private:
     /**
      * @brief whether this side accepts a packet type
      *
-     * Brain: CONFIG and COMMAND. Nano: STATE and LOG
+     * Brain: config and command. Nano: state and log
      *
      * @param type header `type` field
      * @return bool true if the type is sent by the other side
