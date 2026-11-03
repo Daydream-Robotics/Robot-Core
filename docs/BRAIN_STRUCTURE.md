@@ -25,13 +25,15 @@ v5-brain/
 └── src/
     ├── main.cpp                       PROS lifecycle callbacks
     ├── utils/shared.cpp               Shared implementation aggregation point
+    ├── link/                          Incoming Brain serial transport
     └── brain/                         Matching implementation files
 
 shared/include/
 ├── robotConfig.hpp                    Platform-neutral robot geometry
 ├── odometry.hpp                       Platform-neutral pose integration
-└── serial/
+└── protocol/
     ├── packets.hpp                    Shared Brain-Nano wire packet definitions
+    ├── serial.hpp                     SerialLink interface
     └── serialProtocol.hpp             Shared serial transport interface
 ```
 
@@ -129,7 +131,7 @@ not a physical sensor.
   the result of one exchange.
 - **`brain::CommunicationTask`** periodically performs link exchanges and
   publishes received Nano commands through `NanoCommandMailbox`.
-- **`packets`** in `shared/include/serial/packets.hpp` defines the common wire
+- **`packets`** in `shared/include/protocol/packets.hpp` defines the common wire
   structures. Transport and packet definitions are shared so each project
   uses the same protocol contract.
 

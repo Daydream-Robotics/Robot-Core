@@ -6,7 +6,7 @@
 
 #include "brain/configuration.hpp"
 #include "brain/types.hpp"
-#include "serial/serialProtocol.hpp"
+#include "protocol/serialProtocol.hpp"
 
 namespace brain {
 

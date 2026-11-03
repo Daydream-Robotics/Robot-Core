@@ -5,7 +5,7 @@
 #pragma once
 
 #include "robotConfig.hpp"
-#include "serial/packets.hpp"
+#include "protocol/packets.hpp"
 
 #include <array>
 

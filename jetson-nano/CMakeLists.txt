@@ -38,7 +38,6 @@ add_library(robotcore_mpc STATIC
     src/motion/control/mpc.cpp
     src/motion/pathing/arclengthSplining.cpp
     src/motion/control/mpcReference.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/src/odometry.cpp
 )
 target_include_directories(robotcore_mpc PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -62,10 +61,13 @@ option(ROBOTCORE_BUILD_NANO_EXE "Build the Nano's MPCController serial program" 
 
 # serial link to the brain uses termios + /dev/ttyACM, so Linux (the Nano) only
 if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(Threads REQUIRED)
     add_executable(MPCController
         src/main.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/../shared/src/serial/serialProtocol.cpp
+        src/link/serial.cpp
+        src/link/serialProtocol.cpp
+        ../shared/src/protocol/serialProtocol.cpp
     )
-    target_compile_definitions(MPCController PRIVATE __microcontroller__)
-    target_link_libraries(MPCController PRIVATE robotcore_mpc m)
+    target_compile_definitions(MPCController PRIVATE __jetson_nano__)
+    target_link_libraries(MPCController PRIVATE robotcore_mpc Threads::Threads m)
 endif()

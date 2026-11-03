@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "serial/packets.hpp"
+#include "protocol/packets.hpp"
 
 #include <array>
 #include <cstdint>

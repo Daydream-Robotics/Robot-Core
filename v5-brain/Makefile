@@ -15,7 +15,7 @@ EXTRA_INCDIR+=../shared/include
 
 WARNFLAGS+=
 EXTRA_CFLAGS=
-EXTRA_CXXFLAGS=-D__vexbrain__
+EXTRA_CXXFLAGS=-D__v5_brain__
 
 # Set to 1 to enable hot/cold linking
 USE_PACKAGE:=1
@@ -42,7 +42,16 @@ TEMPLATE_FILES=$(INCDIR)/$(LIBNAME)/*.h $(INCDIR)/$(LIBNAME)/*.hpp
 
 .DEFAULT_GOAL=quick
 
+# Shared protocol framing is compiled once for the Brain alongside its transport.
+ELF_DEPS += $(BINDIR)/shared/serialProtocol.cpp.o
+
 ################################################################################
 ################################################################################
 ########## Nothing below this line should be edited by typical users ###########
 -include ./common.mk
+
+$(BINDIR)/shared/serialProtocol.cpp.o: ../shared/src/protocol/serialProtocol.cpp
+	@mkdir -p $(dir $@) $(DEPDIR)/shared
+	$(CXX) -c $(INCLUDE) $(CXXFLAGS) $(EXTRA_CXXFLAGS) -MMD -MP -MF $(DEPDIR)/shared/serialProtocol.d -o $@ $<
+
+-include $(DEPDIR)/shared/serialProtocol.d
