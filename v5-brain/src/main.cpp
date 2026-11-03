@@ -2,18 +2,9 @@
 
 #include "autonomous/autonomous.hpp"
 #include "config/subsystems.hpp"
-#include "motion/control/mpcSerial.hpp"
-#include "motion/pathFollower.hpp"
 #include "motion/pathing/paths.hpp"
 #include "subsystems/drivetrain.hpp"
 #include "subsystems/pneumatics.hpp"
-
-namespace {
-
-MPCSerial* mpc_serial_controller = nullptr;
-PathFollower* pathFollower = nullptr;
-
-} // namespace
 
 void initialize() {
     pros::lcd::initialize();
@@ -41,11 +32,6 @@ void initialize() {
 
     
 
-
-    // period, motor a/b, a_max come from shared/include/mpc/mpcConfig.hpp (shared with the Nano); track width from config/constants.h
-    MPCSerial::Params mpc_serial_params(DRIVE_GEAR_RATIO, TRACK_WIDTH);
-    mpc_serial_controller = new MPCSerial(mpc_serial_params);
-    pathFollower = new PathFollower(*mpc_serial_controller);
 
     // object handler setup
 	// pros::Task frame_task(UpdateFrame_task_fn, (void*)"PROS_Task_Param", TASK_PRIORITY_DEFAULT, TASK_STACK_DEPTH_DEFAULT, "Vision Frame Update");

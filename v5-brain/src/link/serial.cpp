@@ -3,7 +3,7 @@
  * @brief link layer for the brain ⇄ Nano link. one block per platform
  */
 
-#include "daydream/utils/serial/serial.hpp"
+#include "protocol/serial.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -25,6 +25,10 @@
 
 
 #ifdef __v5_brain__
+
+static constexpr double RPM_TO_RAD_S = 2.0 * 3.14159265358979323846 / 60.0;
+static constexpr double DEG_TO_RAD = 3.14159265358979323846 / 180.0;
+static constexpr double CDEG_TO_RAD = DEG_TO_RAD / 100.0;
 
 /// @brief rumble patterns for Request::CONTROLLER_RUMBLE, indexed by requestValue. must match the Nano's table
 static const char* const RUMBLE_PATTERNS[] = {".", "-", "..", "--", ".-.", "-.-"};

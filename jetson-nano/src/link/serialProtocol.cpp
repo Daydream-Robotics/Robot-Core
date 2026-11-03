@@ -3,7 +3,10 @@
  * @brief framing for the brain ⇄ Nano link. shared code first, then one block per platform
  */
 
-#include "daydream/utils/serial/serialProtocol.hpp"
+#ifdef __v5_brain__
+#include "api.h"
+#endif
+#include "protocol/serialProtocol.hpp"
 
 #include <algorithm>
 #include <cstring>

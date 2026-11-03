@@ -3,8 +3,7 @@
  * @brief framing layer for the V5 Brain ⇄ Jetson Nano serial link
  *
  * turns payloads into frames and frames back into payloads
- * both sides compile the same file. the
- * only difference is the platform define below
+ * both sides compile the same file using their build's platform define
  *
  * Frame format: [0x55][0xAA][type u16][size u16][payload][CRC-16 u16], all little-endian
  */
@@ -17,10 +16,11 @@
 #include <optional>
 #include <vector>
 
-#include "daydream/utils/serial/packets.hpp"
+#include "protocol/packets.hpp"
 
-// ! PLATFORM NOTE PUT THIS IN CONSTANTS.H and include it so that its the smae on nano vs brain
-#define __v5_brain__   
+#if defined(__v5_brain__) == defined(__jetson_nano__)
+#error "Define exactly one serial link platform"
+#endif
 
 #ifdef __v5_brain__
     #include "pros/serial.hpp"

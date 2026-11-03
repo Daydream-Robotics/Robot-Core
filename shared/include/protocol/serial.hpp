@@ -3,8 +3,7 @@
  * @brief link layer for the V5 Brain ⇄ Jetson Nano serial link
  *
  * runs the protocol's behavior on top of SerialProtocol
- * both sides compile the same file. the platform define in serialProtocol.hpp 
- * picks the brain half or the Nano half
+ * both sides compile the same file. the build selects the Brain or Nano half
  *
  * each side runs one global reader and one global writer:
  * - Brain: the writer sends state every tick, the reader applies config and command.
@@ -20,9 +19,9 @@
 #include <optional>
 #include <vector>
 
-#include "daydream/config/constants.h"
-#include "daydream/utils/serial/packets.hpp"
-#include "daydream/utils/serial/serialProtocol.hpp"
+#include "config/linkConstants.hpp"
+#include "protocol/packets.hpp"
+#include "protocol/serialProtocol.hpp"
 
 #ifdef __v5_brain__
     #include "pros/adi.hpp"
