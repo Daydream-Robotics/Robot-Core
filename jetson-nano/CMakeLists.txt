@@ -66,6 +66,7 @@ if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/main.cpp
         src/link/serial.cpp
         src/link/serialProtocol.cpp
+        ../shared/src/protocol/serialProtocol.cpp
     )
     target_compile_definitions(MPCController PRIVATE __jetson_nano__)
     target_link_libraries(MPCController PRIVATE robotcore_mpc Threads::Threads m)
