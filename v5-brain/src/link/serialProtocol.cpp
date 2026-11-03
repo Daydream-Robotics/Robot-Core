@@ -1,231 +1,125 @@
+/** Brain-side serial transport. */
+#include "api.h"
 #include "protocol/serialProtocol.hpp"
 
-#include <cstdio>
-#include <cstring>
-#include <chrono>
-#include <thread>
+#include <algorithm>
+#include <unistd.h>
+#include "pros/apix.h"
+#include "pros/error.h"
+#include "pros/rtos.hpp"
 
-//constructor
-SerialProtocol::SerialProtocol(int bufferSize, Mode mode)
-    : buffer_size(bufferSize),
-      mode(mode),
-      rx_buffer(8192),
-      rx_buffer_pos(0) {}
+SerialProtocol::~SerialProtocol() = default;
 
-//function to serialize packet into string then write to USB serial
-bool SerialProtocol::sendASCII(const Packet& packet) {
-    //converts packet struct into raw string packet
-    std::string data = serializePacket(packet);
-    //write to serial
-    std::fwrite(data.c_str(), 1, data.size(), stdout);
-    //force serial output immediately
-    std::fflush(stdout);
+bool SerialProtocol::setUpVexSerial(uint8_t portNumber, int32_t baud) {
+    m_port = std::make_unique<pros::Serial>(portNumber, baud);
+    // PROS_ERR here means the port number is bad or the port is in use
+    return m_port->get_read_avail() != PROS_ERR;
+}
 
+bool SerialProtocol::setUpVexSerial() {
+    // disable COBS encoding in the PROS serial layer (raw byte streaming mode), as the previous protocol did
+    if (pros::c::serctl(SERCTL_DISABLE_COBS, nullptr) == PROS_ERR) {
+        // COBS still on: the Nano would get COBS-wrapped bytes it can't parse
+        return false;
+    }
+    m_usb = true;
     return true;
 }
 
-std::optional<SerialProtocol::Packet> SerialProtocol::receiveASCII() {
-    //temporary recieve buffer
-    char buffer[1024];
-    //keep reading lines until we find a valid packet (skip debug messages)
-     while (std::fgets(buffer, sizeof(buffer), stdin)) {
-        std::string line(buffer);
-        auto packet = deserializePacket(line);
-        //only return if it's a valid packet type (not debug output)
-        if (packet.has_value() && isValidPacketType(packet->type)) {
-            return packet;
-        }
-    }
-    return std::nullopt;
+bool SerialProtocol::isValidPacketType(uint16_t type) {
+    return type == packets::CONFIG || type == packets::COMMAND;
 }
 
-//converts packet struct into packet string
-std::string SerialProtocol::serializePacket(const Packet& packet) {
-    const char field_sep   = ',';
-    const char message_sep = ';';
-    const char end_char    = '\n';
-
-    //declares final output string
-    std::string out = packet.type;
-
-    //if no packet message just return packet type and newline
-    if (packet.message.empty()) {
-        out += end_char;
-        return out;
-    }
-
-    //add seperator between type and body
-    out += field_sep;
-
-    //loop through each message block
-    for (size_t i = 0; i < packet.message.size(); ++i) {
-        //stores current message block
-        const auto& block = packet.message[i];
-        //loop through fields in message
-        for (size_t j = 0; j < block.size(); ++j) {
-            //add field contents
-            out += block[j];
-            //add field seperator between fields (except for final field)
-            if (j + 1 < block.size()) {
-                out += field_sep;
-            }
+int SerialProtocol::readBytes() {
+    // if USB read straight from stdin
+    if (m_usb) {
+        // free space left in m_rxBuffer
+        size_t space = m_rxBuffer.size() - m_rxBufferPos;
+        // PROS writes a 0 one byte past the end of what it reads, so leave a spare byte
+        if (space < 2) {
+            return 0;
         }
-        //add message seperator between messages (except for final block)
-        if (i + 1 < packet.message.size()) {
-            out += message_sep;
+        // waits until at least one byte arrives, then returns what's there
+        ssize_t n = ::read(STDIN_FILENO, m_rxBuffer.data() + m_rxBufferPos, space - 1);
+        if (n <= 0) {
+            return 0;
         }
+        // count the new bytes as buffered
+        m_rxBufferPos += n;
+        return static_cast<int>(n);
     }
-
-    //add final packet terminator
-    out += end_char;
-
-    return out;
+    // if smart port:
+    // port not opened yet
+    if (!m_port) {
+        return 0;
+    }
+    // free space left in m_rxBuffer
+    size_t space = m_rxBuffer.size() - m_rxBufferPos;
+    // bytes waiting in the PROS receive buffer
+    int32_t available = m_port->get_read_avail();
+    // nothing to read, no room, or the port errored
+    if (space == 0 || available <= 0 || available == PROS_ERR) {
+        return 0;
+    }
+    // read only what's available and fits
+    int32_t toRead = std::min<int32_t>(available, static_cast<int32_t>(space));
+    // append to the end of the buffered data
+    int32_t read = m_port->read(m_rxBuffer.data() + m_rxBufferPos, toRead);
+    // read failed
+    if (read <= 0 || read == PROS_ERR) {
+        return 0;
+    }
+    // count the new bytes as buffered
+    m_rxBufferPos += read;
+    return read;
 }
 
-//convert packet string into packet struct
-std::optional<SerialProtocol::Packet> SerialProtocol::deserializePacket(
-    const std::string& line) {
-    const char field_sep   = ',';
-    const char message_sep = ';';
-
-    //if the packet is empty return nullptr
-    if (line.empty()) {
-        return std::nullopt;
-    }
-
-    //makes a copy of line to safely modify
-    std::string trimmed = line;
-
-    //removes trailing newline
-    if(!trimmed.empty() && trimmed.back() == '\n') {
-        trimmed.pop_back();
-    }
-    //removes carriage return (artifact)
-    if(!trimmed.empty() && trimmed.back() == '\r') {
-        trimmed.pop_back();
-    }
-
-
-    Packet packet;
-    //find first field seperator
-    size_t sep_pos = trimmed.find(field_sep);
-    //if there isn't a seperator, that means packet only contains type (and return)
-    if (sep_pos == std::string::npos) {
-        packet.type = trimmed;
-        return packet;
-    }
-
-    //extracts packet type
-    packet.type = trimmed.substr(0, sep_pos);
-    //extracts packet body
-    std::string body = trimmed.substr(sep_pos + 1);
-
-    //store current parsing position
-    size_t start = 0;
-    //parse each message block
-    while (start < body.size()) {
-        //find next message seperator
-        size_t msg_end = body.find(message_sep, start);
-        //extract one message block
-        std::string block_str = body.substr(start, msg_end - start);
-
-        //store fields for current message block
-        std::vector<std::string> fields;
-        //store current field parsing position
-        size_t field_start = 0;
-        //parse fields inside message block
-        while (field_start < block_str.size()) {
-            //find next field seperator
-            size_t field_end = block_str.find(field_sep, field_start);
-            //extract field text
-            fields.push_back(block_str.substr(field_start, field_end - field_start));
-            
-            //if no more field seperators it means that final field is reached and we break
-            if (field_end == std::string::npos) {
-                break;
-            }
-
-            //move parser after field seperator
-            field_start = field_end + 1;
-        }
-
-        //store parsed fields into packet
-        if (!fields.empty()) {
-            packet.message.push_back(std::move(fields));
-        }
-
-        //if no more message seperators it means that final message block is reached and we break
-        if (msg_end == std::string::npos) {
-            break;
-        }
-
-        //mover parser after message separator
-        start = msg_end + 1;
-    }
-
-    return packet;
-}
-
-//reads n bytes from serial with timeout support
-bool SerialProtocol::readBytes(void* dest, size_t n, int timeout_ms) {
-    uint8_t* out = reinterpret_cast<uint8_t*>(dest);
-    std::size_t remaining = n;
-
-    auto start_time = std::chrono::steady_clock::now();
-    while (remaining>0) {
-        //use any buffered data before reading from serial
-        if (rx_buffer_pos > 0) {
-            std::size_t to_copy = std::min(remaining, rx_buffer_pos);
-            memcpy(out, rx_buffer.data(), to_copy);
-            if (rx_buffer_pos > to_copy) {
-                //shifts remaining buffer data to the front
-                memmove(rx_buffer.data(), rx_buffer.data() + to_copy, rx_buffer_pos - to_copy);
-            }
-            rx_buffer_pos -= to_copy;
-            out+= to_copy;
-            remaining -= to_copy;
-            continue;
-        }
-        //check timeout before reading more data
-        if (timeout_ms > 0) {
-            auto now = std::chrono::steady_clock::now();
-            if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() > timeout_ms) {
+bool SerialProtocol::writeBytes(const uint8_t* data, size_t n) {
+    // if USB write straight to stdout
+    if (m_usb) {
+        // keep writing until every byte is handed to PROS
+        while (n > 0) {
+            // write the rest of the frame to stdout in one call
+            ssize_t written = ::write(STDOUT_FILENO, data, n);
+            // write failed
+            if (written <= 0) {
                 return false;
             }
+            // move past what was written
+            data += written;
+            n -= written;
         }
-
-        //read 1 byte so fread never blocks waiting to fill a large buffer
-        int byte = std::fread(rx_buffer.data(), 1, 1, stdin);
-        if (byte <= 0) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            continue;
-        }
-        rx_buffer_pos = byte;
-    }
-
-    return true;
-}
-
-//send wakeup string
-bool SerialProtocol::sendWakeup(const std::string& wakeup) {
-    //write wakeup string to serial
-    std::fwrite(wakeup.c_str(), 1, wakeup.size(), stdout);
-    //force immediate output
-    std::fflush(stdout);
-    return true;
-}
-
-//returns true if the packet type is valid.
-//its valid type if its either empty or is only alphanumeric chars and underscores.
-bool SerialProtocol::isValidPacketType(const std::string& type) {
-    if (type.empty()) {
         return true;
     }
-    for (char c : type) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') {
+    // if smart port:
+    // port not opened yet
+    if (!m_port) {
+        return false;
+    }
+    // keep writing until every byte is handed to PROS
+    while (n > 0) {
+        // space left in the PROS transmit buffer
+        int32_t freeSpace = m_port->get_write_free();
+        // port errored
+        if (freeSpace == PROS_ERR) {
             return false;
         }
+        // transmit buffer full so give 1 ms to drain
+        if (freeSpace <= 0) {
+            pros::delay(1);
+            continue;
+        }
+        // write only what fits right now
+        int32_t toWrite = std::min<int32_t>(freeSpace, static_cast<int32_t>(n));
+        // cast away const to pass the bytes to the smart port
+        int32_t written = m_port->write(const_cast<uint8_t*>(data), toWrite);
+        // write failed
+        if (written <= 0 || written == PROS_ERR) {
+            return false;
+        }
+        // move past what was written
+        data += written;
+        n -= written;
     }
     return true;
 }
-

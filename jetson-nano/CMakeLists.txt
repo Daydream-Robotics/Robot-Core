@@ -61,9 +61,13 @@ option(ROBOTCORE_BUILD_NANO_EXE "Build the Nano's MPCController serial program" 
 
 # serial link to the brain uses termios + /dev/ttyACM, so Linux (the Nano) only
 if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(Threads REQUIRED)
     add_executable(MPCController
         src/main.cpp
+        src/link/serial.cpp
         src/link/serialProtocol.cpp
+        ../shared/src/protocol/serialProtocol.cpp
     )
-    target_link_libraries(MPCController PRIVATE robotcore_mpc m)
+    target_compile_definitions(MPCController PRIVATE __jetson_nano__)
+    target_link_libraries(MPCController PRIVATE robotcore_mpc Threads::Threads m)
 endif()

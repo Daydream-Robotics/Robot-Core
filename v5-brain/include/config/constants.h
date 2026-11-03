@@ -7,13 +7,10 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#include "config/linkConstants.hpp"
+
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
 
-constexpr int PARALLEL_TRACKING_WHEEL_PORT = 6;
-constexpr int PERPENDICULAR_TRACKING_WHEEL_PORT = 10;
-
-#define LEFT_DRIVE_WHEEL_PORTS {-14, -12, -13}
-#define RIGHT_DRIVE_WHEEL_PORTS {17, 18, 19}
 
 constexpr int INITIAL_INTAKE_PORT = 22;
 constexpr int INITIAL_INTAKE_PORT2 = -22;
@@ -22,10 +19,6 @@ constexpr int LEVER_TWO_PORT = 22;
 
 constexpr int IMU_PORT = 1; 
 
-constexpr char BALL_BLOCKER_PORT = 'A';
-constexpr char SCORING_LIFTER = 'B';
-constexpr char MATCHLOADER_PORT = 'C';
-constexpr char DESCORE_PORT = 'D'; 
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 
