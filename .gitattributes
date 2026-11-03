@@ -1,2 +1,19 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+v5-brain/include/gradient.c linguist-vendored
+v5-brain/include/liblvgl/**/*.h linguist-vendored
+v5-brain/include/pros/**/*.h linguist-vendored
+v5-brain/include/pros/**/*.hpp linguist-vendored
+v5-brain/include/gif-pros/**/*.h linguist-vendored
+v5-brain/include/gif-pros/**/*.hpp linguist-vendored
+v5-brain/include/okapi/**/*.h linguist-vendored
+v5-brain/include/okapi/**/*.hpp linguist-vendored
+v5-brain/include/VOSS/**/*.h linguist-vendored
+v5-brain/include/VOSS/**/*.hpp linguist-vendored
+v5-brain/include/EZ-Template/**/*.h linguist-vendored
+v5-brain/include/EZ-Template/**/*.hpp linguist-vendored
+v5-brain/common.mk linguist-vendored
+v5-brain/Makefile linguist-vendored
+
+jetson-nano/external/** linguist-vendored
