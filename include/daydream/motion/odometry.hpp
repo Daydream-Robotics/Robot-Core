@@ -12,6 +12,7 @@ struct OdomConfig {
     bool useMotorEncoders = false;
     double driveWheelDiameter = 0.0;
     double driveTrackWidth = TRACK_WIDTH;
+    double driveEncoderOffset = 0.0;
 };
 
 /**
