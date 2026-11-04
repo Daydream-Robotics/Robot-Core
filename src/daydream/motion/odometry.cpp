@@ -299,12 +299,17 @@ void Odometry::updatePose(void) {
 	// Determine change in heading 
 	double del_theta = normalizeAngle(theta_rad - m_prevTheta);
 
-	// Determine change in local x and in local y
-	double dx_local = arcs.parallel;
+	// Select the correct parallel offset for the active movement source
+	const double activeParallelOffset = m_config.useMotorEncoders
+		? m_config.driveEncoderOffset
+		: m_config.parallelTrackingWheelOffset;
+
+	// Determine change in local x and local y
+	double dx_local = arcs.parallel - (del_theta * activeParallelOffset);
 	double dy_local = arcs.perpendicular;
 
+	// Perpendicular offset correction applies only to tracking wheels
 	if (!m_config.useMotorEncoders) {
-		dx_local -= del_theta * m_config.parallelTrackingWheelOffset;
 		dy_local += del_theta * m_config.perpendicularTrackingWheelOffset;
 	}
 
