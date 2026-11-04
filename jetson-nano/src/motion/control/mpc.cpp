@@ -1,6 +1,7 @@
 #include <iomanip>
 #include <iostream>
 #include "motion/control/mpc.hpp"
+#include "utils/mathHelpers.hpp"
 #include <unsupported/Eigen/MatrixFunctions>
 #include <cmath>
 #include <algorithm>
@@ -8,9 +9,6 @@
 #include <array>
 #include <vector>
 #include <stdexcept>
-
-//M_PI isn't standard C++ (MSVC needs _USE_MATH_DEFINES), so define it locally
-static constexpr double PI = 3.14159265358979323846;
 
 template<std::size_t V, std::size_t F>
 MPCController<V, F>::Params::Params(
@@ -178,13 +176,6 @@ MPCController<V, F>::MPCController(const Params& params)
     m_u_prev << m_params.V_left_applied, m_params.V_right_applied;
 }
 
-//w_rap angle to (-pi, pi]
-static inline double wrapAngle(double angle) {
-    while (angle >  PI) angle -= 2.0 * PI;
-    while (angle < -PI) angle += 2.0 * PI;
-    return angle;
-}
-
 //build per-stage LTV models: linearize + discretize about each ref state
 template<std::size_t V, std::size_t F>
 void MPCController<V, F>::buildStageModels() {
@@ -246,7 +237,7 @@ void MPCController<V, F>::buildReferenceStates() {
         //signed forward speed: displacement projected onto heading
         double v = ((x_one - x_zero) * std::cos(theta_zero) + (y_one - y_zero) * std::sin(theta_zero)) / h;
         //heading rate from finite difference
-        double w = wrapAngle(theta_one - theta_zero) / h;
+        double w = utils::wrapAngle(theta_one - theta_zero) / h;
 
         //diff-drive inverse kinematics: wheel omegas from (v, w)
         double w_l = (v - w * L / 2.0) / r;
@@ -391,7 +382,7 @@ void MPCController<V, F>::assembleQP() {
     m_s.noalias() = m_z_desired.template segment<r_states * F>(r_states) - m_O * m_x_hat - m_D_z;
     //wrap every heading error to (-pi, pi]
     for (std::size_t i = 0; i < F; i++) {
-        m_s(i * r_states + 2) = wrapAngle(m_s(i * r_states + 2));
+        m_s(i * r_states + 2) = utils::wrapAngle(m_s(i * r_states + 2));
     }
     //P = M^T*W_4*M (Hessian)
     Eigen::Matrix<double, r_states*F, m_inputs*V> m_W_four_M;

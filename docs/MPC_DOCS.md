@@ -1,6 +1,6 @@
 ## Steps
 1. Run MPCSerial::identifyMotorModel() in opcontrol to get the a and b values, then set MOTOR_A and MOTOR_B in shared/include/mpc/mpcConfig.hpp
-2. set the other shared parameters in shared/include/mpc/mpcConfig.hpp, specifically WHEEL_RADIUS (the brain and the Nano both read this file, so they can't disagree). Set TRACK_WIDTH in v5-brain/include/config/constants.h; the brain sends it to the Nano in every update packet. omega_motor_max and the tuning weights are in jetson-nano/src/main.cpp
+2. set the other shared parameters in shared/include/mpc/mpcConfig.hpp, specifically WHEEL_RADIUS (the brain and the Nano both read this file, so they can't disagree). Set TRACK_WIDTH in shared/include/config/constants.h; the brain sends it to the Nano in every update packet. omega_motor_max and the tuning weights are in jetson-nano/src/main.cpp
 3. If wanted change p_x, p_y, p_theta, q_u, q_zero_mult, q_final_mult, p_final_mult, delta_u_max, delta_u_min in jetson-nano/src/main.cpp (tuning steps below)
 4. read over jetson-nano/README.md to set up the Nano
 5. copy over jetson-nano/ and shared/ to the Nano (or clone the repo there)

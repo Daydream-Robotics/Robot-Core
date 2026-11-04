@@ -75,5 +75,12 @@ enum class DriveType {
     TANK
 };
 
+/* - - - - - - - - - - - - - - [LIDAR] - - - - - - - - - - - - - - */
+// starting values from the LiDAR plan's parameter table; tune with the simulator and robot logs
+
+constexpr double LIDAR_TAU_0 = 6.0;       // starting ICP max match distance before any data (in)
+constexpr double LIDAR_DELTA_MIN = 0.5;   // ICP corrections smaller than this are ignored by the adaptive threshold (in)
+constexpr double LIDAR_R_MAX = 204.0;     // max range considered, ~ diagonal of a 12 ft field (in)
+
 
 #endif
