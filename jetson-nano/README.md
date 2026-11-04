@@ -32,7 +32,12 @@ git submodule update --init --recursive
 cd jetson-nano
 cmake -B build
 cmake --build build -j4
-./build/MPCController
+./build/MPCController /dev/ttyACM1 usb paths.jerryio.txt
+
+Arguments: <device> <usb|rs485> <paths.jerryio.txt> [baud] [deGpio]
+(baud defaults to 921600 and is ignored over USB; deGpio defaults to -1, no DE pin)
+The program runs the file's paths in order during each enabled autonomous period.
+It needs a pose source: latestPose() in src/main.cpp has to return the EKF pose (until then the drive holds 0 V).
 
 Only rebuild after code changes; the program stays in build/.
 For a clean rebuild: rm -rf build

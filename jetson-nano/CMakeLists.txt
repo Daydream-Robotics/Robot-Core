@@ -37,6 +37,7 @@ add_subdirectory(${EXTERNAL}/osqp ${CMAKE_CURRENT_BINARY_DIR}/osqp EXCLUDE_FROM_
 add_library(robotcore_mpc STATIC
     src/motion/control/mpc.cpp
     src/motion/pathing/arclengthSplining.cpp
+    src/motion/pathing/paths.cpp
     src/motion/control/mpcReference.cpp
 )
 target_include_directories(robotcore_mpc PUBLIC
@@ -47,6 +48,8 @@ target_include_directories(robotcore_mpc PUBLIC
 target_link_libraries(robotcore_mpc PUBLIC osqpstatic)
 if(MSVC)
     target_compile_options(robotcore_mpc PRIVATE /bigobj)
+    # MSVC only defines M_PI with _USE_MATH_DEFINES (public: the MPC headers use it too)
+    target_compile_definitions(robotcore_mpc PUBLIC _USE_MATH_DEFINES)
 endif()
 
 # - - - - - - - - - - - - - - [NANO EXECUTABLE] - - - - - - - - - - - - - -
@@ -57,13 +60,14 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 else()
     set(_robotcore_top_level OFF)
 endif()
-option(ROBOTCORE_BUILD_NANO_EXE "Build the Nano's MPCController serial program" ${_robotcore_top_level})
+option(ROBOTCORE_BUILD_NANO_EXE "Build the Nano's MPCController program (MPC over the brain link)" ${_robotcore_top_level})
 
 # serial link to the brain uses termios + /dev/ttyACM, so Linux (the Nano) only
 if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(Threads REQUIRED)
     add_executable(MPCController
         src/main.cpp
+        src/motion/pathFollower.cpp
         src/link/serial.cpp
         src/link/serialProtocol.cpp
         ../shared/src/protocol/serialProtocol.cpp

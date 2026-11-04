@@ -2,7 +2,7 @@
 
 ## Current status
 
-The Brain and Nano serial link implementations are present and both projects build. The link is **not started by either application**. The Nano `MPCController` executable currently prints `Serial link is not configured; runtime startup is disabled.` and exits with status 1. The MPC library is still built, but the executable does not run the solver or control the robot. The former MPC-specific serial adapter and Nano entry point are retained under `archive/`.
+The Brain and Nano serial link implementations are present and both projects build. The Brain application does **not** start the link yet. The Nano `MPCController` executable starts it (`MPCController <device> <usb|rs485> <paths.jerryio.txt> [baud] [deGpio]`), and during an enabled autonomous period runs the MPC on each path and sends drive voltages in `COMMAND`; outside autonomous it sends `STOP`. It has no pose source yet: `latestPose()` in `jetson-nano/src/main.cpp` returns nothing until the EKF is connected, so the drive holds 0 V. See [`MPC_DOCS.md`](MPC_DOCS.md). The former MPC-specific serial adapter and Nano entry point are retained under `archive/`.
 
 Hardware communication, pin selection, timing, and recovery have not been verified on the robot. The examples below show how to use the existing API when integrating it; they are not active application code or a confirmed wiring configuration.
 

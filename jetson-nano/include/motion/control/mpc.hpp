@@ -2,8 +2,10 @@
 #define _MPC_HPP_
 
 #include "motion/control/motionController.hpp"
+#include "motion/control/mpcReference.hpp"
 #include "localization/odometry.hpp"
 #include "motion/pathing/arclengthSplining.hpp"
+#include "config/constants.h"
 #include "osqp.h"
 
 #include <cstddef>
@@ -15,6 +17,8 @@
 #include <Eigen/Sparse>
 
 //LTV MPC controller: V = control horizon, F = prediction horizon
+//pose frame: +x forward, +y left; theta = 0 along +y, pi/2 along +x (see Pose)
+//diff-drive model: v = r*(omega_L + omega_R)/2, x_dot = v*sin(theta), y_dot = v*cos(theta), theta_dot = r*(omega_L - omega_R)/L
 template<std::size_t V, std::size_t F>
 class MPCController : public MotionController {
     public:
@@ -33,7 +37,6 @@ class MPCController : public MotionController {
             double q_final_multiplier; //multiplier for last Q_i
             double p_final_multiplier; //multiplier for last P_i
             double V_max; //voltage max
-            double R_internal; //internal resistance of battery
             double delta_u_max; //max positive change in voltage between steps
             double delta_u_min; //max negative change in voltage between steps
             double x_field_max; //max allowed x position on field
@@ -41,6 +44,9 @@ class MPCController : public MotionController {
             double omega_motor_max; //max allowed rpm
             double V_left_applied; //starting Voltage left
             double V_right_applied; //starting Voltage right
+
+            //from the [MPC] and [ROBOT DIMS] constants in config/constants.h, starting at 0 V
+            Params();
 
             Params(
                 double wheelRadius,
@@ -56,7 +62,6 @@ class MPCController : public MotionController {
                 double qFinalMultiplier,
                 double pFinalMultiplier,
                 double maxVoltage,
-                double rBattery,
                 double maxDeltaU,
                 double minDeltaU,
                 double maxFieldX,
@@ -72,17 +77,19 @@ class MPCController : public MotionController {
         static constexpr std::size_t r_states = 3; //tracked outputs: x, y, theta
         static constexpr std::size_t num_constr = 5; //number of constraint types
 
-        explicit MPCController(const Params& params);
+        explicit MPCController(const Params& params = Params());
         //frees the OSQP workspace
         ~MPCController() override;
-        //full reset to just-constructed state for a new path (u_prev, OSQP warm start)
+        //full reset to just-constructed state for a new path (u_prev, OSQP warm start, reference speed)
+        //also call it after the drive was stopped from outside, so the delta-u limit restarts from 0 V
         void reset() override;
 
-        //! Unused base-class override (always returns 0V)
-        WheelVelocities compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) override;
-        
-        //full MPC solve from state + reference trajectory, returns optimal voltages
-        WheelVelocities compute(const Pose& currentPose, const Eigen::Matrix<double, r_states * (F + 1), 1>& z_desired, double omega_L, double omega_R, double V_battery, double I_total);
+        //builds the reference from the path and solves. returns INPUT_VOLTAGE in mV (0 mV if the solve fails)
+        WheelVelocities compute(const Pose& currentPose, const DriveState& drive, const ALS_Path& als_path, std::size_t& closestSampleIdx, PathFlag flag) override;
+
+        //full MPC solve from state + reference trajectory, returns optimal voltages (V). throws if the solve fails
+        //omega_L, omega_R: wheel speeds (rad/s). V_battery: battery voltage measured under load (V), caps the input voltage
+        WheelVelocities compute(const Pose& currentPose, const Eigen::Matrix<double, r_states * (F + 1), 1>& z_desired, double omega_L, double omega_R, double V_battery);
        
         //sync m_u_prev with the voltage actually applied (for delta-u constraint)
         //call every cycle before compute(), after any reset()
@@ -115,13 +122,12 @@ class MPCController : public MotionController {
             };
 
             Params m_params;
+            //reference trajectory along the path, built with the same model params
+            MPCReference<F> m_reference;
 
             //precomputed model ratios used in jacobian
             const double R_L = m_params.r/m_params.L;
             const double R_TWO = m_params.r/2;
-
-            double battery_voltage;
-            double total_current; 
 
             //vars to store 1st stage voltages from the latest solve
             double m_u_left;
@@ -221,10 +227,10 @@ class MPCController : public MotionController {
             void buildPredictionMatrices();
             
             //assemble all into m_G and m_b
-            void assembleConstraints(double V_batt, double I_total, const Eigen::Matrix<double, m_inputs, 1> u_prev);
+            void assembleConstraints(double V_batt, const Eigen::Matrix<double, m_inputs, 1> u_prev);
             //helper methods to build each constraint type
             void buildConstraintDelta(const Eigen::Matrix<double, m_inputs, 1> u_prev);       
-            void buildConstraintBattery(double V_battery, double I_total);  
+            void buildConstraintBattery(double V_battery);  
             void buildConstraintPosition(); 
             void buildConstraintOmega();
 
@@ -239,6 +245,10 @@ class MPCController : public MotionController {
             //solve the QP cost with OSQP
             void solveQP();
 };
+
+//the MPC with the horizons in config/constants.h
+using MPC = MPCController<MPC_CONTROL_HORIZON, MPC_PREDICTION_HORIZON>;
+
 #endif
 
 

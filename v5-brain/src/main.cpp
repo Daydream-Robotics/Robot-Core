@@ -2,7 +2,6 @@
 
 #include "autonomous/autonomous.hpp"
 #include "config/subsystems.hpp"
-#include "motion/pathing/paths.hpp"
 #include "subsystems/drivetrain.hpp"
 #include "subsystems/pneumatics.hpp"
 
@@ -16,19 +15,6 @@ void initialize() {
     while (imu.is_calibrating()) {
         pros::delay(20);
     }
-
-    printf("[MAIN] Loading paths...\n");
-	paths = Path::buildAllPathsFromJerryIO("/usd/path.jerryio.txt");
-	printf("[MAIN] Paths loaded: %zu\n", paths.size());
-
-	if (paths.size() != PathName::COUNT) {
-		printf("[MAIN] ERROR: Path count mismatch\n");
-		pros::lcd::print(1, "EsRROR: Path count mismatch");
-		pros::lcd::print(2, "Expected: %d, Actual: %zu", PathName::COUNT, paths.size());
-	} else {
-		printf("[MAIN] Trajectories Loaded successfully\n");
-		pros::lcd::print(1, "Trajectories Loaded");
-	}
 
     
 

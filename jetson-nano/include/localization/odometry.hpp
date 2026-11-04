@@ -19,7 +19,8 @@ struct Position {
 
 /**
  * @brief stores a pose of the robot
- * @note Made for the frame: +X forward, +Y left, CCW positive
+ * @note frame: +X forward, +Y left. heading 0 points along +Y and pi/2 (90 deg) along +X,
+ *       so it increases turning from +Y toward +X. this matches JerryIO's field coordinates and headings
  */
 struct Pose {
     // x-position of bot (inches)
@@ -28,7 +29,7 @@ struct Pose {
     // y-position of bot (inches)
     double y;
 
-    // Heading of bot (rads)
+    // Heading of bot (rads): 0 along +Y, pi/2 along +X
     double theta;
 };
 

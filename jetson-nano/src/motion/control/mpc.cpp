@@ -2,6 +2,7 @@
 #include <iostream>
 #include "motion/control/mpc.hpp"
 #include "utils/mathHelpers.hpp"
+#include "config/constants.h"
 #include <unsupported/Eigen/MatrixFunctions>
 #include <cmath>
 #include <algorithm>
@@ -25,7 +26,6 @@ MPCController<V, F>::Params::Params(
     double qFinalMultiplier,
     double pFinalMultiplier,
     double maxVoltage,
-    double rBattery,
     double maxDeltaU,
     double minDeltaU,
     double maxFieldX,
@@ -47,7 +47,6 @@ MPCController<V, F>::Params::Params(
     q_final_multiplier(qFinalMultiplier),
     p_final_multiplier(pFinalMultiplier),
     V_max(maxVoltage),
-    R_internal(rBattery),
     delta_u_max(maxDeltaU),
     delta_u_min(minDeltaU),
     x_field_max(maxFieldX),
@@ -57,10 +56,48 @@ MPCController<V, F>::Params::Params(
     V_right_applied(voltageRight) {}
 
 
+template<std::size_t V, std::size_t F>
+MPCController<V, F>::Params::Params()
+    : Params(
+        DRIVE_WHEEL_DIAMETER_INCHES / 2.0, //wheel radius (in)
+        TRACK_WIDTH, //track width (in)
+        MPC_MOTOR_A, //motor time-constant
+        MPC_MOTOR_B, //motor gain constant
+        MPC_SAMPLE_PERIOD, //sampling period (s)
+        MPC_P_X, //output weight for x
+        MPC_P_Y, //output weight for y
+        MPC_P_THETA, //output weight for theta
+        MPC_Q_U, //input penalty q_u
+        MPC_Q_ZERO_MULT, //multiplier for first Q_i
+        MPC_Q_FINAL_MULT, //multiplier for last Q_i
+        MPC_P_FINAL_MULT, //multiplier for last P_i
+        MPC_V_MAX, //voltage max
+        MPC_DELTA_U_MAX, //max positive change in voltage between steps
+        MPC_DELTA_U_MIN, //max negative change in voltage between steps
+        MPC_X_FIELD_MAX, //max allowed x position on field
+        MPC_Y_FIELD_MAX, //max allowed y position on field
+        MPC_OMEGA_WHEEL_MAX, //max allowed wheel rad/s
+        0.0, //starting voltage left (stopped)
+        0.0 //starting voltage right (stopped)
+    ) {}
+
+//reference params from the controller's model, so the two can't disagree
+template<std::size_t F>
+static typename MPCReference<F>::Params referenceParams(double h, double r, double L, double a, double b) {
+    typename MPCReference<F>::Params p;
+    p.h = h;
+    p.r = r;
+    p.track_width = L;
+    p.a = a;
+    p.b = b;
+    return p;
+}
+
 //constructor
 template<std::size_t V, std::size_t F>
 MPCController<V, F>::MPCController(const Params& params)
-    : m_params(params) {
+    : m_params(params),
+      m_reference(referenceParams<F>(params.h, params.r, params.L, params.a, params.b)) {
     //fill all matrices with 0s
     m_Ac.setZero();
     m_A.setZero();
@@ -193,12 +230,13 @@ void MPCController<V, F>::buildStageModels() {
             omega_sum = (omega_sum >= 0.0) ? OMEGA_SUM_EPS : -OMEGA_SUM_EPS;
         }
         //cont Jacobian at stage-i ref
+        //x_dot = (r/2)(w_l + w_r) sin(theta), y_dot = (r/2)(w_l + w_r) cos(theta), theta_dot = (r/L)(w_l - w_r)
         double c = std::cos(theta);
-	    double s = std::sin(theta);
+        double s = std::sin(theta);
         m_Ac <<
-            0, 0, -R_TWO*omega_sum*s,  R_TWO*c,     R_TWO*c,
             0, 0,  R_TWO*omega_sum*c,  R_TWO*s,     R_TWO*s,
-            0, 0,  0,                 -R_L,         R_L,
+            0, 0, -R_TWO*omega_sum*s,  R_TWO*c,     R_TWO*c,
+            0, 0,  0,                  R_L,        -R_L,
             0, 0,  0,                 -m_params.a,  0,
             0, 0,  0,                  0,          -m_params.a;
         //ZOH discretize the curr stage model
@@ -234,14 +272,14 @@ void MPCController<V, F>::buildReferenceStates() {
         double y_one  = m_z_desired(3*(i+1) + 1);
         double theta_one = m_z_desired(3*(i+1) + 2);
 
-        //signed forward speed: displacement projected onto heading
-        double v = ((x_one - x_zero) * std::cos(theta_zero) + (y_one - y_zero) * std::sin(theta_zero)) / h;
-        //heading rate from finite difference
+        //signed forward speed: displacement projected onto heading (heading direction is (sin, cos))
+        double v = ((x_one - x_zero) * std::sin(theta_zero) + (y_one - y_zero) * std::cos(theta_zero)) / h;
+        //heading rate from finite difference (positive turns from +y toward +x)
         double w = utils::wrapAngle(theta_one - theta_zero) / h;
 
-        //diff-drive inverse kinematics: wheel omegas from (v, w)
-        double w_l = (v - w * L / 2.0) / r;
-        double w_r = (v + w * L / 2.0) / r;
+        //diff-drive inverse kinematics: wheel omegas from (v, w), theta_dot = (r/L)(w_l - w_r)
+        double w_l = (v + w * L / 2.0) / r;
+        double w_r = (v - w * L / 2.0) / r;
 
         m_x_ref.col(i) << x_zero, y_zero, theta_zero, w_l, w_r;
         //steady-state feedforward voltage
@@ -301,10 +339,10 @@ void MPCController<V, F>::buildPredictionMatrices() {
 
 //assemble full G, b: stacks all inequality constraints into single matrix G and vector b
 template<std::size_t V, std::size_t F>
-void MPCController<V, F>::assembleConstraints(double V_batt, double I_total, const Eigen::Matrix<double, m_inputs, 1> u_prev) {
+void MPCController<V, F>::assembleConstraints(double V_batt, const Eigen::Matrix<double, m_inputs, 1> u_prev) {
     //rebuild time-varying constr
     buildConstraintDelta(u_prev);
-    buildConstraintBattery(V_batt, I_total);
+    buildConstraintBattery(V_batt);
     buildConstraintPosition();
     buildConstraintOmega();
     //build G and b: stacking the blocks
@@ -346,10 +384,10 @@ void MPCController<V, F>::buildConstraintDelta(const Eigen::Matrix<double, m_inp
     m_b_delta.template segment<m_inputs>(m_inputs * V) += u_prev; //upper bound
 }
 
-//battery voltage constraint: available voltage drops with current: V_avail = V_batt - I*R_int
+//battery voltage constraint: the brain measures the battery under load, so that voltage (sag included) is what the motors can get
 template<std::size_t V, std::size_t F>
-void MPCController<V, F>::buildConstraintBattery(double V_battery, double I_total) {
-    double u_b_max = V_battery - m_params.R_internal * I_total;
+void MPCController<V, F>::buildConstraintBattery(double V_battery) {
+    double u_b_max = V_battery;
     //symmetric limit for both motors, at all steps 
     m_b_b.template topRows<m_inputs*V>().setConstant(u_b_max);
     m_b_b.template bottomRows<m_inputs*V>().setConstant(u_b_max);
@@ -520,9 +558,9 @@ void MPCController<V, F>::solveQP() {
     osqp_warm_start(m_solver, m_x_ws.data(), OSQP_NULL);
 }
 
-//outputs wheel voltages using MPC, taking in info from MPCUpdatePacket
+//outputs wheel voltages using MPC
 template<std::size_t V, std::size_t F>
-WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, const Eigen::Matrix<double, r_states*(F+1), 1>& z_ref, double omega_L, double omega_R, double V_battery, double I_total) {
+WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, const Eigen::Matrix<double, r_states*(F+1), 1>& z_ref, double omega_L, double omega_R, double V_battery) {
      //store reference trajectory and current state estimate
     m_z_ref = z_ref;
     m_z_desired = z_ref;
@@ -531,14 +569,14 @@ WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, const Eige
     try {
         //reject NaN/inf inputs before they reach OSQP
         if (!std::isfinite(currentPose.x) || !std::isfinite(currentPose.y) || !std::isfinite(currentPose.theta) ||
-            !std::isfinite(omega_L) || !std::isfinite(omega_R) || !std::isfinite(V_battery) || !std::isfinite(I_total) ||
+            !std::isfinite(omega_L) || !std::isfinite(omega_R) || !std::isfinite(V_battery) ||
             !z_ref.allFinite() || !m_u_prev.allFinite()) {
             throw std::runtime_error("MPC input is not finite");
         }
         buildReferenceStates();
         buildStageModels();
         buildPredictionMatrices();
-        assembleConstraints(V_battery, I_total, m_u_prev);
+        assembleConstraints(V_battery, m_u_prev);
         assembleQP();
         solveQP();
     }
@@ -557,11 +595,20 @@ WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, const Eige
     return WheelVelocities{m_u_left, m_u_right, ControlMode::INPUT_VOLTAGE};
 }
 
-//! Unused override that doesn't work (no planned use either)
+//path following: build the reference from the closest sample on, then solve
 template<std::size_t V, std::size_t F>
-WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, const ALS_Path& als_path, std::size_t& closestSampleIdx) {
-    std::cerr << "USING UNSUPPPORTED OVERLOAD OF COMPUTE!!!" <<  std::endl;
-    return {0,0};
+WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, const DriveState& drive, const ALS_Path& als_path, std::size_t& closestSampleIdx, PathFlag flag) {
+    try {
+        auto z = m_reference.build(currentPose, als_path, closestSampleIdx, flag == PathFlag::REVERSE, drive.omegaLeft, drive.omegaRight);
+        WheelVelocities out = compute(currentPose, z, drive.omegaLeft, drive.omegaRight, drive.batteryVolts);
+        //V -> mV
+        return {out.left * 1000.0, out.right * 1000.0, ControlMode::INPUT_VOLTAGE};
+    }
+    catch (const std::exception& e) {
+        //failed solve: 0 V this step (compute already recorded 0 V as applied)
+        std::cerr << "[MPC] " << e.what() << ", sending zero volts\n";
+        return {0.0, 0.0, ControlMode::INPUT_VOLTAGE};
+    }
 }
 
 //clears all dynamic data for fresh start (ie. new path segment)
@@ -581,6 +628,7 @@ void MPCController<V, F>::reset() {
     m_u_right = 0.0;
     //back to the constructor's starting voltages
     m_u_prev << m_params.V_left_applied, m_params.V_right_applied;
+    m_reference.reset();
     //drop the OSQP workspace (warm start, adapted rho) so the next solve sets up fresh
     if (m_solver) {
         osqp_cleanup(m_solver);
@@ -596,7 +644,7 @@ MPCController<V, F>::~MPCController() {
     }
 }
 
-//explicit instantiation for V=F=15
-template class MPCController<15, 15>;
+//explicit instantiation for the horizons in config/constants.h
+template class MPCController<MPC_CONTROL_HORIZON, MPC_PREDICTION_HORIZON>;
 
 
