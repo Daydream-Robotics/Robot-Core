@@ -67,7 +67,9 @@ if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(Threads REQUIRED)
     add_executable(MPCController
         src/main.cpp
+        src/autonomous/autonomous.cpp
         src/motion/pathFollower.cpp
+        src/utils/helpers.cpp
         src/link/serial.cpp
         src/link/serialProtocol.cpp
         ../shared/src/protocol/serialProtocol.cpp

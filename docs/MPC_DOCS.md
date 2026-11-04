@@ -1,10 +1,10 @@
 ## Where it runs
 The MPC runs entirely on the Nano. The brain is only an I/O server on the serial link (see SERIAL_PROTOCOL.md): every 10 ms it sends `STATE` (drive group speeds, battery voltage, status bits) and applies the Nano's `COMMAND`.
 
-Each 20 ms (`MPC_SAMPLE_PERIOD`) during an enabled autonomous period, `jetson-nano/src/main.cpp`:
+Each 20 ms (`MPC_SAMPLE_PERIOD`) during an enabled autonomous period, `Autonomous::run()` (jetson-nano/src/autonomous/autonomous.cpp) steps the `PathFollower`, which:
 1. reads the latest `SerialLink::Sample` and the robot pose from `latestPose()`
 2. converts the drive group speeds from motor output shaft to wheel (`× DRIVE_GEAR_RATIO`)
-3. runs `PathFollower::step()`, which calls the motion controller (`MPC`: reference rollout + solve)
+3. calls the motion controller (`MPC`: reference rollout + solve)
 4. sends the left/right voltages as `GroupMode::VOLTAGE` commands
 
 Outside autonomous, or without a pose, it sends `STOP`. A failed solve sends 0 V for that step.
@@ -28,7 +28,7 @@ All MPC constants are in shared/include/config/constants.h: the `[MPC]` section 
 3. If wanted change MPC_P_X, MPC_P_Y, MPC_P_THETA, MPC_Q_U, MPC_Q_ZERO_MULT, MPC_Q_FINAL_MULT, MPC_P_FINAL_MULT, MPC_DELTA_U_MAX, MPC_DELTA_U_MIN (tuning steps below)
 4. Connect the pose source: make latestPose() in jetson-nano/src/main.cpp return the EKF's latest pose (frame above)
 5. read over jetson-nano/README.md to set up the Nano, copy over jetson-nano/ and shared/ (or clone the repo there) and build
-6. run `./build/MPCController <device> <usb|rs485> <paths.jerryio.txt> [baud] [deGpio]` on the Nano
+6. set the link and path file in the `[NANO]` section of shared/include/config/constants.h, then run `./build/MPCController` on the Nano
 7. the brain only needs to run its SerialLink; the Nano drives during autonomous
 
 The brain and the Nano must be built from the same shared/ folder (packet layouts and the built-in link config). Changing only the `[MPC]` constants needs just the Nano rebuilt.

@@ -24,8 +24,8 @@ enum class PathFlag {
  * @note INPUT_VELOCITY: rpm at the motor output shaft. INPUT_VOLTAGE: mV, -12000..12000
  */
 struct WheelVelocities {
-    double left;    /**< command value for left motor group */
-    double right;   /**< command value for right motor group */
+    double left; /**< command value for left motor group */
+    double right; /**< command value for right motor group */
     //! IMPORTANT: Would have renamed WheelVelocities but didn't want to make merging everyone else's code too difficult
     ControlMode input = ControlMode::INPUT_VELOCITY;
 };
@@ -35,8 +35,8 @@ struct WheelVelocities {
  * @brief drivetrain measurements from the brain's latest STATE
  */
 struct DriveState {
-    double omegaLeft;    /**< left wheel speed in rad/s (wheel side, after external gearing) */
-    double omegaRight;   /**< right wheel speed in rad/s (wheel side, after external gearing) */
+    double omegaLeft; /**< left wheel speed in rad/s (wheel side, after external gearing) */
+    double omegaRight; /**< right wheel speed in rad/s (wheel side, after external gearing) */
     double batteryVolts; /**< battery voltage measured under load in volts */
 };
 

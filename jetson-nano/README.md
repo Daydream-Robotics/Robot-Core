@@ -32,10 +32,10 @@ git submodule update --init --recursive
 cd jetson-nano
 cmake -B build
 cmake --build build -j4
-./build/MPCController /dev/ttyACM1 usb paths.jerryio.txt
+./build/MPCController
 
-Arguments: <device> <usb|rs485> <paths.jerryio.txt> [baud] [deGpio]
-(baud defaults to 921600 and is ignored over USB; deGpio defaults to -1, no DE pin)
+The link (USB or RS-485, device, baud, DE GPIO) and the JerryIO path file are set in the [NANO] section of
+shared/include/config/constants.h (the path file is relative to where the program runs).
 The program runs the file's paths in order during each enabled autonomous period.
 It needs a pose source: latestPose() in src/main.cpp has to return the EKF pose (until then the drive holds 0 V).
 

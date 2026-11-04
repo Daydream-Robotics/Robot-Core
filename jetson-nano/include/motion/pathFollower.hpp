@@ -48,14 +48,14 @@ class PathFollower {
          */
         void stopAndReset();
 
-        MotionController& m_controller;         /**< Reference to motion controller */
-        SerialLink& m_link;                     /**< Brain link */
-        PoseSource m_poseSource;                /**< Robot pose */
-        const ALS_Path* m_path = nullptr;       /**< Pointer to current path being tracked */
+        MotionController& m_controller; /**< Reference to motion controller */
+        SerialLink& m_link; /**< Brain link */
+        PoseSource m_poseSource; /**< Robot pose */
+        const ALS_Path* m_path = nullptr; /**< Pointer to current path being tracked */
 
-        std::size_t m_currentSampleIdx = 0;     /**< index of the current closest sample on the path */
-        double m_distanceFromEnd = 999.0;       /**< arc length to the end of the path in inches */
-        bool m_isFinished = false;              /**< Boolean true if end of path reached */
+        std::size_t m_currentSampleIdx = 0; /**< index of the current closest sample on the path */
+        double m_distanceFromEnd = 999.0; /**< arc length to the end of the path in inches */
+        bool m_isFinished = false; /**< Boolean true if end of path reached */
 
-        PathFlag flag = PathFlag::FORWARDS;     /**< Direction config parameter */
+        PathFlag flag = PathFlag::FORWARDS; /**< Direction config parameter */
 };
