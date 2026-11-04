@@ -1,5 +1,5 @@
 /** @file mailboxes.cpp
- *  @brief Implementation placeholder for thread-safe Brain value mailboxes.
+*  @brief Thread-safe latest-value mailboxes shared between Brain tasks.
  */
 
 //brainState holds what the robot senses
