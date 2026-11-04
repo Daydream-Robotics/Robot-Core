@@ -2,6 +2,7 @@
 #define _REFERENCE_ROLLOUT_HPP_
 
 #include "mpc/mpcConfig.hpp"
+#include "utils/mathHelpers.hpp"
 #include <cmath>
 #include <algorithm>
 #include <cstddef>
@@ -23,14 +24,6 @@ struct Params {
     double a_max = mpc_config::A_MAX; //max accel of bot (in/s^2)
     double v_ref_min = mpc_config::V_REF_MIN; //speed floor (in/s)
 };
-
-//wrap angle to (-pi, pi]
-inline double wrapAngle(double a) {
-    constexpr double PI = 3.14159265358979323846;
-    while (a > PI) a -= 2.0 * PI;
-    while (a < -PI) a += 2.0 * PI;
-    return a;
-}
 
 //roll out F+1 reference poses (x, y, theta) into z_out, starting at arc length s_start
 /* (the reference is gend by looking forward along the path where
@@ -61,7 +54,7 @@ void rollout(const Params& params, SampleFn&& sampleAt, double s_start, double s
         auto b = sampleAt(std::min(sq + 3.0, s_end));
         double ds = std::max(1e-3, b.s - a.s);
         //curvature
-        double kappa = std::abs(wrapAngle(b.theta - a.theta)) / ds;
+        double kappa = std::abs(utils::wrapAngle(b.theta - a.theta)) / ds;
         //return outer wheel limit
         return V_STRAIGHT_MAX / (1.0 + kappa * TRACK_WIDTH / 2.0);
     };
@@ -116,15 +109,15 @@ void rollout(const Params& params, SampleFn&& sampleAt, double s_start, double s
         double ref_theta = ref.theta;
         if (reverse) {
             //if driving backwards, face opposite to path tangent
-            ref_theta = wrapAngle(ref_theta + PI);
+            ref_theta = utils::wrapAngle(ref_theta + PI);
         }
         if (!have_prev) {
             //first stage: unrwap rel to robot's actual heading so MPC sees small heading error
-            ref_theta = currentTheta + wrapAngle(ref_theta - currentTheta);
+            ref_theta = currentTheta + utils::wrapAngle(ref_theta - currentTheta);
         }
         else {
             //subsequent stages: rate-limit heading change to the feasible turn-rate
-            double dth = wrapAngle(ref_theta - prev_theta);
+            double dth = utils::wrapAngle(ref_theta - prev_theta);
             //max heading change per step
             double dth_max = W_REF_MAX * h;
             dth = std::clamp(dth, -dth_max, dth_max);
