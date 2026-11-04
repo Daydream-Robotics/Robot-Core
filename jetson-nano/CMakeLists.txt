@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 # lets DreamSim link the static libs into its shared library
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# writes build/compile_commands.json for clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # matches the old Makefile (-O2, Eigen asserts still on) when no build type is given
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES AND NOT MSVC)
@@ -49,6 +51,17 @@ if(MSVC)
     target_compile_options(robotcore_mpc PRIVATE /bigobj)
 endif()
 
+# - - - - - - - - - - - - - - [LIDAR CORE] - - - - - - - - - - - - - -
+# portable: Eigen + std only, so the simulator and tests can link it too
+add_library(robotcore_lidar STATIC
+    src/perception/lidar/adaptiveThreshold.cpp
+)
+target_include_directories(robotcore_lidar PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen/include
+)
+
 # - - - - - - - - - - - - - - [NANO EXECUTABLE] - - - - - - - - - - - - - -
 # only built when jetson-nano/ is the top-level project (DreamSim's add_subdirectory skips it)
 # CMAKE_SOURCE_DIR check instead of PROJECT_IS_TOP_LEVEL, which needs cmake 3.21
@@ -69,5 +82,5 @@ if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         ../shared/src/protocol/serialProtocol.cpp
     )
     target_compile_definitions(MPCController PRIVATE __jetson_nano__)
-    target_link_libraries(MPCController PRIVATE robotcore_mpc Threads::Threads m)
+    target_link_libraries(MPCController PRIVATE robotcore_mpc robotcore_lidar Threads::Threads m)
 endif()
