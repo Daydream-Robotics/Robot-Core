@@ -35,7 +35,8 @@ static std::optional<Pose> latestPose() {
 int main() {
     // link and path file settings are in config/constants.h ([NANO])
     Pose startPose{0.0, 0.0, 0.0};
-    const std::vector<ALS_Path> paths = Path::buildAllPathsFromJerryIO(NANO_PATH_FILE, startPose);
+    std::vector<PathFlag> pathFlags;
+    const std::vector<ALS_Path> paths = Path::buildAllPathsFromJerryIO(NANO_PATH_FILE, startPose, pathFlags);
     if (paths.empty()) {
         std::cerr << "No paths loaded from " << NANO_PATH_FILE << "\n";
         return 1;
@@ -47,7 +48,7 @@ int main() {
     // motion controllers (tuning in config/constants.h).
     MPC mpc;
     PathFollower pathFollower(mpc, link, latestPose);
-    Autonomous autonomous(pathFollower, link, paths);
+    Autonomous autonomous(pathFollower, link, paths, pathFlags);
 
     if (!link.start()) {
         std::cerr << "Could not start the brain link\n";

@@ -4,34 +4,49 @@
 #include <cstdio>
 #include <fstream>
 
-std::vector<ALS_Path> Path::buildAllPathsFromJerryIO(const std::string& filePath, Pose& outStartPose, double sampleSpacing) {
+std::vector<ALS_Path> Path::buildAllPathsFromJerryIO(const std::string& filePath, Pose& outStartPose, std::vector<PathFlag>& outFlags, double sampleSpacing) {
     std::vector<ALS_Path> newPaths;
+    outFlags.clear();
 
-    double initialHeading = 0.0;
-    std::vector<std::vector<Waypoint>> rawPaths = parseFile(filePath, initialHeading);
+    std::vector<double> startHeadings;
+    std::vector<std::vector<Waypoint>> rawPaths = parseFile(filePath, startHeadings);
 
     std::fprintf(stderr, "[PATH] parseFile returned %zu paths\n", rawPaths.size());
     if (rawPaths.empty()) return newPaths;
 
     // JerryIO headings already use the Pose convention, only deg -> rad
+    double initialHeading = std::isnan(startHeadings[0]) ? 0.0 : startHeadings[0];
     double initialHeadingRad = utils::wrapAngle(initialHeading * (M_PI / 180.0));
     std::fprintf(stderr, "[PATH] Initial heading set to %f rad\n", initialHeadingRad);
 
     // paths stay in the JerryIO field frame, so the pose source must start from this pose
     outStartPose = {rawPaths[0][0].x, rawPaths[0][0].y, initialHeadingRad};
 
-    int pathIndex = 0;
-    for (const auto& rawPath : rawPaths) {
+    for (std::size_t pathIndex = 0; pathIndex < rawPaths.size(); pathIndex++) {
+        const std::vector<Waypoint>& rawPath = rawPaths[pathIndex];
         ALS_Path tempAlsPath;
         bool success = tempAlsPath.buildFromPoints(rawPath, sampleSpacing);
 
-        if (success) {
-            newPaths.push_back(tempAlsPath);
-            std::fprintf(stderr, "[PATH] Path %d build success (%zu points)\n", pathIndex, rawPath.size());
-        } else {
-            std::fprintf(stderr, "[PATH] Path %d build failure, skipped\n", pathIndex);
+        if (!success) {
+            std::fprintf(stderr, "[PATH] Path %zu build failure, skipped\n", pathIndex);
+            continue;
         }
-        pathIndex++;
+
+        // the file's heading is where the robot faces, the spline's is the direction of travel.
+        // facing more than 90 deg away from the travel direction means the robot backs along the path
+        PathFlag flag = PathFlag::FORWARDS;
+        if (!std::isnan(startHeadings[pathIndex])) {
+            double robotHeading = startHeadings[pathIndex] * (M_PI / 180.0);
+            double travelHeading = tempAlsPath.getSamples().front().heading;
+            if (std::fabs(utils::wrapAngle(robotHeading - travelHeading)) > M_PI / 2.0) {
+                flag = PathFlag::REVERSE;
+            }
+        }
+
+        newPaths.push_back(tempAlsPath);
+        outFlags.push_back(flag);
+        std::fprintf(stderr, "[PATH] Path %zu build success (%zu points, %s)\n", pathIndex, rawPath.size(),
+                     flag == PathFlag::REVERSE ? "reverse" : "forwards");
     }
 
     std::fprintf(stderr, "[PATH] buildAllPathsFromJerryIO finished, returning %zu paths\n", newPaths.size());
@@ -39,9 +54,12 @@ std::vector<ALS_Path> Path::buildAllPathsFromJerryIO(const std::string& filePath
 }
 
 
-std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, double& outInitialHeading) {
+std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, std::vector<double>& outStartHeadings) {
     std::vector<std::vector<Waypoint>> raw_paths;
     std::vector<Waypoint> currentPath;
+    outStartHeadings.clear();
+    // start heading of the path being read, NaN until its first point
+    double currentStartHeading = NAN;
 
     // open master path file
     std::ifstream file(filePath);
@@ -52,8 +70,6 @@ std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, 
 
     std::string line;
     bool readingPoints = false;
-
-    bool initialHeadingSet = false;
     int lineCount = 0;
 
     while (std::getline(file, line)) {
@@ -68,8 +84,10 @@ std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, 
             // save previous path if exists
             if (!currentPath.empty()) {
                 raw_paths.push_back(currentPath);
+                outStartHeadings.push_back(currentStartHeading);
                 currentPath.clear();
             }
+            currentStartHeading = NAN;
             readingPoints = true;
             continue;
         }
@@ -84,10 +102,9 @@ std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, 
         double x = 0.0, y = 0.0, v = 0.0, h = 0.0;
         int parsed = std::sscanf(line.c_str(), "%lf,%lf,%lf,%lf", &x, &y, &v, &h);
         if (parsed >= 3) {
-            // set init heading (only the first point of the file carries one)
-            if (!initialHeadingSet && parsed >= 4) {
-                outInitialHeading = h;
-                initialHeadingSet = true;
+            // a path's first point carries the robot heading at its start
+            if (currentPath.empty() && parsed >= 4) {
+                currentStartHeading = h;
             }
 
             // cm -> in
@@ -109,6 +126,7 @@ std::vector<std::vector<Waypoint>> Path::parseFile(const std::string& filePath, 
     // last path (also when the file has no JSON footer)
     if (!currentPath.empty()) {
         raw_paths.push_back(currentPath);
+        outStartHeadings.push_back(currentStartHeading);
     }
     std::fprintf(stderr, "[PATH] File reading complete. Processed %d lines, found %zu paths\n", lineCount, raw_paths.size());
 

@@ -70,15 +70,17 @@ constexpr double TURN_KI_THRESHOLD = 15.0;
 
 /* - - - - - - - - - - - - - - [Motion Controllers] - - - - - - - - - - - - - - */
 constexpr double END_TOLERANCE = 0.5;
+constexpr double PATH_SEARCH_AHEAD = 6.0; // in, how far past the last progress the closest-point search looks
 
 /* - - - - - - - - - - - - - - [NANO] - - - - - - - - - - - - - - */
-// Nano program settings. the link hardware isn't confirmed yet (docs/SERIAL_PROTOCOL_INTEGRATION_STATUS.md)
+// brain <-> Nano link and Nano program settings, used by both sides. the link hardware isn't confirmed yet (docs/SERIAL_PROTOCOL_INTEGRATION_STATUS.md)
 
 constexpr bool NANO_LINK_USE_USB = true; // true: brain USB port, false: RS-485
 constexpr const char* NANO_LINK_DEVICE = "/dev/ttyACM1"; // brain USB port, or the RS-485 UART
 constexpr int NANO_LINK_BAUD = 921600; // RS-485 baud, ignored over USB
 constexpr int NANO_DE_GPIO = -1; // sysfs GPIO for the RS-485 DE and /RE pins, -1 = none
 constexpr const char* NANO_PATH_FILE = "path.jerryio.txt"; // JerryIO path file, relative to where the program runs
+constexpr int BRAIN_LINK_PORT = 0; // brain smart port of the RS-485 link, ignored over USB. not confirmed yet
 
 /* - - - - - - - - - - - - - - [MPC] - - - - - - - - - - - - - - */
 // used by the Nano's MPC. wheel size, track width and gear ratio come from [ROBOT DIMS]. tuning notes in docs/MPC_DOCS.md
@@ -87,6 +89,7 @@ constexpr const char* NANO_PATH_FILE = "path.jerryio.txt"; // JerryIO path file,
 constexpr std::size_t MPC_PREDICTION_HORIZON = 15; // F, steps
 constexpr std::size_t MPC_CONTROL_HORIZON = 15; // V, steps
 constexpr double MPC_SAMPLE_PERIOD = 0.02; // control step (s)
+constexpr double MPC_COMMAND_DELAY = 0.01; // s from solving to the brain applying the command (it goes out with the next state)
 
 // motor model at the wheel: omega_dot = -a*omega + b*V
 constexpr double MPC_MOTOR_A = 16.7211; // motor time-constant (1/s)

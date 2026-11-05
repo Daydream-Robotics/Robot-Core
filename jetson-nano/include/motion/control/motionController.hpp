@@ -38,6 +38,7 @@ struct DriveState {
     double omegaLeft; /**< left wheel speed in rad/s (wheel side, after external gearing) */
     double omegaRight; /**< right wheel speed in rad/s (wheel side, after external gearing) */
     double batteryVolts; /**< battery voltage measured under load in volts */
+    double age = 0.0; /**< seconds since the brain measured the wheel speeds */
 };
 
 /**
@@ -58,7 +59,18 @@ class MotionController {
          * @returns left and right wheel velocities 
          */
         virtual WheelVelocities compute(const Pose& currentPose, const DriveState& drive, const ALS_Path& als_path, std::size_t& closestSampleIdx, PathFlag flag) = 0;
-        
+
+        /**
+         * @brief moves the measured pose and wheel speeds forward to when the next command will apply
+         * @param pose robot pose, advanced in place
+         * @param drive drivetrain measurements, advanced in place (age becomes 0)
+         * @note optional for child classes: by default the measurements are used as they are
+         */
+        virtual void predict(Pose& pose, DriveState& drive) const {
+            (void)pose;
+            (void)drive;
+        }
+
         /**
          * @brief resets tracking variables to inital values
          * @note This implementaion is optional for child classes

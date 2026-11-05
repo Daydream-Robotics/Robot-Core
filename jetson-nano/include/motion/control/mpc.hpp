@@ -44,6 +44,7 @@ class MPCController : public MotionController {
             double omega_motor_max; //max allowed rpm
             double V_left_applied; //starting Voltage left
             double V_right_applied; //starting Voltage right
+            double command_delay; //s from solving to the command being applied, for predict()
 
             //from the [MPC] and [ROBOT DIMS] constants in config/constants.h, starting at 0 V
             Params();
@@ -68,7 +69,8 @@ class MPCController : public MotionController {
                 double maxFieldY,
                 double maxMotorOmega, 
                 double voltageLeft,
-                double voltageRight
+                double voltageRight,
+                double commandDelay = 0.0
             );
         };
         //dimensions
@@ -86,6 +88,10 @@ class MPCController : public MotionController {
 
         //builds the reference from the path and solves. returns INPUT_VOLTAGE in mV (0 mV if the solve fails)
         WheelVelocities compute(const Pose& currentPose, const DriveState& drive, const ALS_Path& als_path, std::size_t& closestSampleIdx, PathFlag flag) override;
+
+        //moves the wheel speeds forward by their age plus command_delay, and the pose by command_delay,
+        //with the motor model and the voltage this controller last sent (what the brain is applying)
+        void predict(Pose& pose, DriveState& drive) const override;
 
         //full MPC solve from state + reference trajectory, returns optimal voltages (V). throws if the solve fails
         //omega_L, omega_R: wheel speeds (rad/s). V_battery: battery voltage measured under load (V), caps the input voltage

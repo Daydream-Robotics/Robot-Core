@@ -32,7 +32,8 @@ MPCController<V, F>::Params::Params(
     double maxFieldY,
     double maxMotorOmega,
     double voltageLeft,
-    double voltageRight
+    double voltageRight,
+    double commandDelay
 )
     : r(wheelRadius),
     L(trackWidth),
@@ -53,7 +54,8 @@ MPCController<V, F>::Params::Params(
     y_field_max(maxFieldY),
     omega_motor_max(maxMotorOmega),
     V_left_applied(voltageLeft),
-    V_right_applied(voltageRight) {}
+    V_right_applied(voltageRight),
+    command_delay(commandDelay) {}
 
 
 template<std::size_t V, std::size_t F>
@@ -78,7 +80,8 @@ MPCController<V, F>::Params::Params()
         MPC_Y_FIELD_MAX, //max allowed y position on field
         MPC_OMEGA_WHEEL_MAX, //max allowed wheel rad/s
         0.0, //starting voltage left (stopped)
-        0.0 //starting voltage right (stopped)
+        0.0, //starting voltage right (stopped)
+        MPC_COMMAND_DELAY //solve to applied (s)
     ) {}
 
 //reference params from the controller's model, so the two can't disagree
@@ -282,13 +285,18 @@ void MPCController<V, F>::buildReferenceStates() {
         double w_r = (v - w * L / 2.0) / r;
 
         m_x_ref.col(i) << x_zero, y_zero, theta_zero, w_l, w_r;
-        //steady-state feedforward voltage
-        m_u_ref.col(i) << (m_params.a / m_params.b) * w_l,
-                          (m_params.a / m_params.b) * w_r;
     }
     //terminal reference state: last pose, hold last wheel speeds
     m_x_ref.col(F) << m_z_desired(3*F + 0), m_z_desired(3*F + 1), m_z_desired(3*F + 2),
                       m_x_ref(3, F - 1), m_x_ref(4, F - 1);
+    //feedforward voltage that takes the wheels from stage i's reference speed to stage i+1's in one step,
+    //from the motor's exact discrete step w[i+1] = e^(-ah) w[i] + (1 - e^(-ah)) (b/a) u[i].
+    const double decay = std::exp(-m_params.a * h);
+    const double gain = (1.0 - decay) * m_params.b / m_params.a;
+    for (std::size_t i = 0; i < F; i++) {
+        m_u_ref.col(i) << (m_x_ref(3, i + 1) - decay * m_x_ref(3, i)) / gain,
+                          (m_x_ref(4, i + 1) - decay * m_x_ref(4, i)) / gain;
+    }
 }
 
 //build LTV pred. matrices over the horizon
@@ -380,8 +388,10 @@ void MPCController<V, F>::buildConstraintDelta(const Eigen::Matrix<double, m_inp
     m_b_delta.template topRows<m_inputs*V>().setConstant(-m_params.delta_u_min);
     m_b_delta.template bottomRows<m_inputs*V>().setConstant(m_params.delta_u_max);
     //adjust first block for actual previous control
-    m_b_delta.template segment<m_inputs>(0) += u_prev; //lower bound
-    m_b_delta.template segment<m_inputs>(m_inputs * V) += u_prev; //upper bound
+    //lower bound row: -(u_0 - u_prev) <= -delta_u_min, so -u_0 <= -delta_u_min - u_prev
+    m_b_delta.template segment<m_inputs>(0) -= u_prev;
+    //upper bound row: u_0 - u_prev <= delta_u_max, so u_0 <= delta_u_max + u_prev
+    m_b_delta.template segment<m_inputs>(m_inputs * V) += u_prev;
 }
 
 //battery voltage constraint: the brain measures the battery under load, so that voltage (sag included) is what the motors can get
@@ -609,6 +619,41 @@ WheelVelocities MPCController<V, F>::compute(const Pose& currentPose, const Driv
         std::cerr << "[MPC] " << e.what() << ", sending zero volts\n";
         return {0.0, 0.0, ControlMode::INPUT_VOLTAGE};
     }
+}
+
+//delay compensation: the brain's wheel speeds are drive.age old and the command applies command_delay after the solve
+template<std::size_t V, std::size_t F>
+void MPCController<V, F>::predict(Pose& pose, DriveState& drive) const {
+    //longest measurement age to predict over (s)
+    constexpr double MAX_AGE = 0.05;
+    const double a = m_params.a;
+    const double b = m_params.b;
+    //voltage the brain is applying: the last one sent, which the battery caps
+    const double v_cap = drive.batteryVolts > 0.0 ? std::min(m_params.V_max, drive.batteryVolts) : m_params.V_max;
+    const double u_left = std::clamp(m_u_prev(0), -v_cap, v_cap);
+    const double u_right = std::clamp(m_u_prev(1), -v_cap, v_cap);
+    //exact motor step over dt at a constant voltage
+    auto motor = [a, b](double omega, double u, double dt) {
+        const double decay = std::exp(-a * dt);
+        return decay * omega + (1.0 - decay) * (b / a) * u;
+    };
+    //wheel speeds now, then when the command applies
+    const double age = std::clamp(drive.age, 0.0, MAX_AGE);
+    const double dt = m_params.command_delay;
+    const double w_l_now = motor(drive.omegaLeft, u_left, age);
+    const double w_r_now = motor(drive.omegaRight, u_right, age);
+    const double w_l = motor(w_l_now, u_left, dt);
+    const double w_r = motor(w_r_now, u_right, dt);
+    //pose over the command delay at the average of the two speeds, heading at the midpoint
+    const double v = m_params.r * (w_l_now + w_r_now + w_l + w_r) / 4.0;
+    const double w = m_params.r * ((w_l_now - w_r_now) + (w_l - w_r)) / (2.0 * m_params.L);
+    pose.theta += w * dt / 2.0;
+    pose.x += v * std::sin(pose.theta) * dt;
+    pose.y += v * std::cos(pose.theta) * dt;
+    pose.theta += w * dt / 2.0;
+    drive.omegaLeft = w_l;
+    drive.omegaRight = w_r;
+    drive.age = 0.0;
 }
 
 //clears all dynamic data for fresh start (ie. new path segment)

@@ -4,12 +4,20 @@ The MPC runs entirely on the Nano. The brain is only an I/O server on the serial
 Each 20 ms (`MPC_SAMPLE_PERIOD`) during an enabled autonomous period, `Autonomous::run()` (jetson-nano/src/autonomous/autonomous.cpp) steps the `PathFollower`, which:
 1. reads the latest `SerialLink::Sample` and the robot pose from `latestPose()`
 2. converts the drive group speeds from motor output shaft to wheel (`× DRIVE_GEAR_RATIO`)
-3. calls the motion controller (`MPC`: reference rollout + solve)
-4. sends the left/right voltages as `GroupMode::VOLTAGE` commands
+3. predicts the wheel speeds and pose to when the command will apply (`MotionController::predict()`): the speeds are as old as the sample, and the command goes out with the brain's next state, `MPC_COMMAND_DELAY` later. The MPC does this with its motor model and the voltage it last sent
+4. finds the closest point on the path, searching at most `PATH_SEARCH_AHEAD` past the last progress
+5. calls the motion controller (`MPC`: reference rollout + solve)
+6. sends the left/right voltages as `GroupMode::VOLTAGE` commands
 
 Outside autonomous, or without a pose, it sends `STOP`. A failed solve sends 0 V for that step.
 
-Path following is split like on the brain: `PathFollower` (jetson-nano/src/motion/pathFollower.cpp) tracks progress along the path and sends the commands, and any `MotionController` computes them. `MPCController` is the only one on the Nano. To try another controller, implement `MotionController::compute()` and pass it to the `PathFollower` in main.cpp.
+Each path runs forwards or in reverse from the JerryIO file: when a path's start heading (where the robot faces) points more than 90° away from its direction of travel, the robot backs along it (`PathFlag::REVERSE`).
+
+If the brain's `STATE` stops (link dropout), the Nano holds the drive and keeps its progress, then carries on with the same path when the link is back. Only a `STATE` saying autonomous is over (disabled, or not autonomous) ends the routine; the next autonomous starts again from the first path.
+
+Path following is split like on the brain: `PathFollower` (jetson-nano/src/motion/pathFollower.cpp) tracks progress along the path and sends the commands, and any `MotionController` computes them. `MPCController` is the only one on the Nano. To try another controller, implement `MotionController::compute()` (and optionally `predict()`) and pass it to the `PathFollower` in main.cpp.
+
+The MPC's feedforward voltage for each reference stage is the voltage that moves the wheels from that stage's reference speed to the next one's in one step (from the exact discrete motor model).
 
 The battery limit is the battery voltage the brain measures under load (`STATE.battery_mV`), which already includes sag, so there is no internal-resistance or current term.
 
@@ -29,7 +37,7 @@ All MPC constants are in shared/include/config/constants.h: the `[MPC]` section 
 4. Connect the pose source: make latestPose() in jetson-nano/src/main.cpp return the EKF's latest pose (frame above)
 5. read over jetson-nano/README.md to set up the Nano, copy over jetson-nano/ and shared/ (or clone the repo there) and build
 6. set the link and path file in the `[NANO]` section of shared/include/config/constants.h, then run `./build/MPCController` on the Nano
-7. the brain only needs to run its SerialLink; the Nano drives during autonomous
+7. the brain starts its SerialLink in `initialize()` and hands the drive to the Nano in `autonomous()`; the Nano drives during autonomous
 
 The brain and the Nano must be built from the same shared/ folder (packet layouts and the built-in link config). Changing only the `[MPC]` constants needs just the Nano rebuilt.
 

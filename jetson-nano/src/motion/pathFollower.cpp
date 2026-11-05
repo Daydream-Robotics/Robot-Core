@@ -1,5 +1,7 @@
 #include "motion/pathFollower.hpp"
 #include "config/constants.h"
+#include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <utility>
 
@@ -49,9 +51,28 @@ bool PathFollower::step() {
         stopAndReset();
         return false;
     }
-    const Pose currentPose = *pose;
+    // omegaRadS is at the motor output shaft, controllers work at the wheel
+    const int64_t nowUs = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    DriveState drive{
+        sample->omegaRadS[packets::LEFT_DRIVE_SLOT] * DRIVE_GEAR_RATIO,
+        sample->omegaRadS[packets::RIGHT_DRIVE_SLOT] * DRIVE_GEAR_RATIO,
+        sample->batteryMv / 1000.0,
+        (nowUs - sample->tNanoUs) / 1e6
+    };
+    // the wheel speeds are from the brain's last state and the command applies a little after this step,
+    // so the controller works from where the robot will be then
+    Pose currentPose = *pose;
+    m_controller.predict(currentPose, drive);
 
-    m_currentSampleIdx = m_path->findClosestSampleIndex({currentPose.x, currentPose.y}, m_currentSampleIdx);
+    // only search a short way ahead
+    const std::vector<Sample>& samples = m_path->getSamples();
+    const double searchLimit = samples[std::min(m_currentSampleIdx, samples.size() - 1)].s + PATH_SEARCH_AHEAD;
+    std::size_t searchEnd = m_currentSampleIdx;
+    while (searchEnd < samples.size() && samples[searchEnd].s <= searchLimit) {
+        searchEnd++;
+    }
+    m_currentSampleIdx = m_path->findClosestSampleIndex({currentPose.x, currentPose.y}, m_currentSampleIdx, searchEnd);
 
     if (m_currentSampleIdx >= m_path->getSamples().size()) {
         std::fprintf(stderr, "[PF-ERROR] m_currentSampleIdx (%zu) is out of bounds (size %zu)!\n", m_currentSampleIdx, m_path->getSamples().size());
@@ -68,13 +89,6 @@ bool PathFollower::step() {
         m_isFinished = true;
         return true;
     }
-
-    // omegaRadS is at the motor output shaft, controllers work at the wheel
-    DriveState drive{
-        sample->omegaRadS[packets::LEFT_DRIVE_SLOT] * DRIVE_GEAR_RATIO,
-        sample->omegaRadS[packets::RIGHT_DRIVE_SLOT] * DRIVE_GEAR_RATIO,
-        sample->batteryMv / 1000.0
-    };
 
     WheelVelocities wheelVelocities = m_controller.compute(currentPose, drive, *m_path, m_currentSampleIdx, flag);
 
