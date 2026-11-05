@@ -4,3 +4,6 @@
 [submodule "jetson-nano/external/qdldl"]
 	path = jetson-nano/external/qdldl
 	url = https://github.com/osqp/qdldl.git
+[submodule "jetson-nano/external/rplidar_sdk"]
+	path = jetson-nano/external/rplidar_sdk
+	url = https://github.com/Slamtec/rplidar_sdk.git
