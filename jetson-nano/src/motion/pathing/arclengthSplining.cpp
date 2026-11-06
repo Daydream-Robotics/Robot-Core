@@ -1,4 +1,5 @@
 #include "motion/pathing/arclengthSplining.hpp"
+#include "utils/mathHelpers.hpp"
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
@@ -343,13 +344,15 @@ Waypoint ALS_Path::getPointAtArcLength(double sQuery) const {
     return p;
 }
 
+// heading uses the Pose convention: 0 along +y, pi/2 along +x
 double ALS_Path::getHeadingAtParameter(double tQuery) const {
     double dx = m_splineX.evalFirstDeriv(tQuery);
     double dy = m_splineY.evalFirstDeriv(tQuery);
-    return std::atan2(dy, dx);
+    return std::atan2(dx, dy);
 }
 
-// κ(t)=(x′(t)2+y′(t)2)3/2x′(t)y′′(t)−y′(t)x′′(t)​
+// κ(t) = (y′(t)x′′(t) − x′(t)y′′(t)) / (x′(t)² + y′(t)²)^(3/2)
+// signed like the heading: positive when the heading increases (turning from +y toward +x)
 double ALS_Path::getCurvatureAtParameter(double tQuery) const {
     double dx = m_splineX.evalFirstDeriv(tQuery);
     double dy = m_splineY.evalFirstDeriv(tQuery);
@@ -361,7 +364,7 @@ double ALS_Path::getCurvatureAtParameter(double tQuery) const {
         return 0.0;
     }
 
-    return (dx * ddy - dy * ddx) / denom;
+    return (dy * ddx - dx * ddy) / denom;
 }
 
 
@@ -604,14 +607,6 @@ const CubicSpline& ALS_Path::getVSpline() const {
     return m_splineV;
 }
 
-//wrap angle to (-pi, pi]
-static inline double wrapAngleALS(double a) {
-    constexpr double PI = 3.14159265358979323846;
-    while (a > PI) a -= 2.0 * PI;
-    while (a < -PI) a += 2.0 * PI;
-    return a;
-}
-
 //find point on path for given arc length (linear interp between samples)
 InterpSample ALS_Path::sampleAtArcLength(double sQuery) const {
     const std::vector<Sample>& samples = m_samples;
@@ -660,12 +655,12 @@ InterpSample ALS_Path::sampleAtArcLength(double sQuery) const {
     //normalized interpolation
     double alpha = (std::abs(ds) < 1e-12) ? 0.0 : (sQuery - a.s) / ds;
     //shortest angle diff
-    double dtheta = wrapAngleALS(b.heading - a.heading);
+    double dtheta = utils::wrapAngle(b.heading - a.heading);
 
     //interpolate x, y and theta
     result.x = a.x + alpha * (b.x - a.x);
     result.y = a.y + alpha * (b.y - a.y);
-    result.theta = wrapAngleALS(a.heading + alpha * dtheta);
+    result.theta = utils::wrapAngle(a.heading + alpha * dtheta);
     // interpolated reference speed and arc length
     result.v = a.v + alpha * (b.v - a.v);
     result.s = a.s + alpha * ds;

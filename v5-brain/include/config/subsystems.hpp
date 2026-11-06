@@ -6,6 +6,7 @@
 #include "config/constants.h"
 #include "subsystems/drivetrain.hpp"
 #include "subsystems/pneumatics.hpp"
+#include "protocol/serial.hpp"
 
 inline pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
@@ -28,3 +29,7 @@ inline pros::adi::Pneumatics descorer(DESCORE_PORT, false);
 inline daydream::Drivetrain drivetrain(controller, leftMotors, rightMotors);
 inline daydream::Pneumatics pneumatics(
     controller, ballBlocker, scoringLifter, matchloader, descorer);
+
+// link to the Nano, which drives during autonomous. settings in config/constants.h ([NANO])
+inline SerialLink nanoLink(BRAIN_LINK_PORT, NANO_LINK_BAUD, packets::buildLinkConfig(),
+                           NANO_LINK_USE_USB ? SerialProtocol::Transport::USB : SerialProtocol::Transport::RS485);

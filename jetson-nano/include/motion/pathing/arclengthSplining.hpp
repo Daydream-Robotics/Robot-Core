@@ -8,8 +8,8 @@ struct Sample {
     double s = 0.0; // distance from start
     double x = 0.0;
     double y = 0.0;
-    double heading = 0.0; // direction of motion
-    double curvature = 0.0;
+    double heading = 0.0; // direction of motion (rad), Pose convention: 0 along +y, pi/2 along +x
+    double curvature = 0.0; // signed like heading: positive when heading increases (1/in)
 
     double time_s = 0.0;
     double v = 0.0;
@@ -39,7 +39,7 @@ struct InterpSample {
     double s = 0.0; // arc length along path (in)
     double x = 0.0; // x position (in)
     double y = 0.0; // y position (in)
-    double theta = 0.0; // heading (rad)
+    double theta = 0.0; // heading (rad), Pose convention: 0 along +y, pi/2 along +x
     double v = 0.0; // path velocity (in/s)
 };
 

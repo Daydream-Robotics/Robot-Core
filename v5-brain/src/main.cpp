@@ -1,8 +1,6 @@
 #include "main.h"
 
-#include "autonomous/autonomous.hpp"
 #include "config/subsystems.hpp"
-#include "motion/pathing/paths.hpp"
 #include "subsystems/drivetrain.hpp"
 #include "subsystems/pneumatics.hpp"
 
@@ -17,19 +15,6 @@ void initialize() {
         pros::delay(20);
     }
 
-    printf("[MAIN] Loading paths...\n");
-	paths = Path::buildAllPathsFromJerryIO("/usd/path.jerryio.txt");
-	printf("[MAIN] Paths loaded: %zu\n", paths.size());
-
-	if (paths.size() != PathName::COUNT) {
-		printf("[MAIN] ERROR: Path count mismatch\n");
-		pros::lcd::print(1, "EsRROR: Path count mismatch");
-		pros::lcd::print(2, "Expected: %d, Actual: %zu", PathName::COUNT, paths.size());
-	} else {
-		printf("[MAIN] Trajectories Loaded successfully\n");
-		pros::lcd::print(1, "Trajectories Loaded");
-	}
-
     
 
 
@@ -38,6 +23,13 @@ void initialize() {
 	// odom in background 
 	pros::Task odom_task(Odometry::odomTask, TASK_PRIORITY_DEFAULT + 1, TASK_STACK_DEPTH_DEFAULT, "Odom Task");
 	printf("[MAIN] Initialize complete\n");
+
+    // the brain keeps the drive until autonomous hands it to the Nano.
+    // started after the last printf: over USB the link sends its frames on stdout
+    nanoLink.setNanoControl(false);
+    if (!nanoLink.start()) {
+        pros::lcd::print(3, "Nano link failed to open");
+    }
 }
 
 void disabled() {
@@ -47,14 +39,14 @@ void disabled() {
 void competition_initialize() {}
 
 void autonomous() {
+    // the Nano runs the paths: it reads STATE from the link and drives through COMMAND
     drivetrain.stop();
-    odom.setPose({0.0, 0.0, 0.0});
-
-    Autonomous auton(drivetrain, odom, pneumatics);
-    auton.runExample();
+    nanoLink.setNanoControl(true);
 }
 
 void opcontrol() {
+    // the brain drives in driver control, so the link stops applying the Nano's commands
+    nanoLink.setNanoControl(false);
     pros::Task drivetrainTask(
         [] { drivetrain.control(); },
         TASK_PRIORITY_DEFAULT + 4,
