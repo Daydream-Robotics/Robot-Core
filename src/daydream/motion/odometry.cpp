@@ -6,18 +6,24 @@
 #include <numbers>
 #include <vector>
 
-static double averageMotorGroupPosition(const pros::MotorGroup& group) {
-    std::vector<double> positions = group.get_position_all();
-    if (positions.empty()) {
-        return 0.0;
-    }
+// Average position (deg) of the motors in a group that read successfully.
+// Returns PROS_ERR_F if none did.
+static double getPositionAllSanitizedAvg(const pros::MotorGroup& group) {
+	std::vector<double> positions = group.get_position_all();
 
-    double sum = 0.0;
-    for (double pos : positions) {
-        sum += pos;
-    }
+	double sum = 0.0;
+	int size = 0;
+	for (double& pos : positions) {
+		if (pos != PROS_ERR_F) {
+			sum += pos;
+			size++;
+		}
+	}
 
-    return sum / static_cast<double>(positions.size());
+	if (size == 0) {
+		return PROS_ERR_F;
+	}
+	return sum / size;
 }
 
 // Distance a tracking wheel moved since the last frame, in inches. Updates prev to the current reading.
@@ -58,8 +64,8 @@ void Odometry::updatePose(void) {
 		m_prevTheta = theta_rad;
 		m_lastRawTheta = theta_rad;
 
-		m_prevLeft = averageMotorGroupPosition(leftMotors);
-		m_prevRight = averageMotorGroupPosition(rightMotors);
+		m_prevLeft = getPositionAllSanitizedAvg(leftMotors);
+		m_prevRight = getPositionAllSanitizedAvg(rightMotors);
 
 		// a failed read seeds PROS_ERR, so that wheel re-seeds on its first good read
 		m_prevParallel = parallelTrackingWheel.get_position();
@@ -77,6 +83,11 @@ void Odometry::updatePose(void) {
 
 	// Calculate distance travelled by either drive encoders or tracking wheels
 	WheelLengths arcs;
+	// whether each axis was measured by its tracking wheel, so its offset correction applies
+	bool parallelFromWheel = false;
+	bool perpendicularFromWheel = false;
+	// tracking wheel error to show on the LCD this frame, if any
+	const char* wheelError = nullptr;
 	if (m_config.useMotorEncoders) {
 		arcs = imeTravel;
 
@@ -88,6 +99,8 @@ void Odometry::updatePose(void) {
 			m_prevParallel = currParallel;
 			m_prevPerpendicular = currPerpendicular;
 			m_config.useMotorEncoders = false;
+		} else {
+			wheelError = "[Update Pose] Tracking Wheel Error!";
 		}
 	} else {
 		WheelTravelResult wheelResult = getOdomWheelTravel(imeTravel.parallel);
@@ -95,30 +108,51 @@ void Odometry::updatePose(void) {
 		switch (wheelResult.error) {
 			case OdomError::NONE:
 				arcs = wheelResult.travel;
+				parallelFromWheel = true;
+				perpendicularFromWheel = true;
 				break;
 			case OdomError::PARALLEL_WHEEL_ERROR:
-				pros::lcd::print(0, "[Update Pose] Parallel Wheel Error!");
+				wheelError = "[Update Pose] Parallel Wheel Error!";
 				arcs = wheelResult.travel;
+				perpendicularFromWheel = true;
 				break;
 			case OdomError::PERPENDICULAR_WHEEL_ERROR:
-				pros::lcd::print(0, "[Update Pose] Perpendicular Wheel Error!");
+				wheelError = "[Update Pose] Perpendicular Wheel Error!";
 				arcs = wheelResult.travel;
+				parallelFromWheel = true;
 				break;
 			default:
 				// both wheels down: IMEs until one comes back
-				pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
+				wheelError = "[Update Pose] Tracking Wheel Error!";
 				m_config.useMotorEncoders = true;
 				arcs = imeTravel;
 				break;
 		}
 	}
-	
-	// Determine change in heading 
+
+	if (wheelError) {
+		static uint32_t lastWheelFailurePrint = 0;
+		const uint32_t now = pros::millis();
+		if (now - lastWheelFailurePrint >= 500) {
+			pros::lcd::print(0, "%s", wheelError);
+			lastWheelFailurePrint = now;
+		}
+	}
+
+	// Determine change in heading
 	double del_theta = normalizeAngle(theta_rad - m_prevTheta);
 
 	// Determine change in local x and in local y
-	double dx_local = arcs.parallel - (del_theta * m_config.parallelTrackingWheelOffset);
-	double dy_local = arcs.perpendicular + (del_theta * m_config.perpendicularTrackingWheelOffset);
+	// offset corrections remove a tracking wheel's own rotation, so they only apply to travel that wheel measured
+	// (IME forward travel is already at the drive center, and a missing perpendicular wheel's sideways is taken as 0)
+	double dx_local = arcs.parallel;
+	double dy_local = arcs.perpendicular;
+	if (parallelFromWheel) {
+		dx_local -= del_theta * m_config.parallelTrackingWheelOffset;
+	}
+	if (perpendicularFromWheel) {
+		dy_local += del_theta * m_config.perpendicularTrackingWheelOffset;
+	}
 
 	// Arc-length, chord-length correction
 	double chordFactor = 1.0;
@@ -152,8 +186,6 @@ void Odometry::updatePose(void) {
 	// 	controller.print(0, 0, "X:%.1f Y:%.1f", m_currentPosition.x, m_currentPosition.y);
 	// 	lastPrintTime = pros::millis();
 	// }
-
-	m_prevTheta = theta_rad;
 }
 
 Pose Odometry::getPose() {
@@ -255,7 +287,8 @@ WheelTravelResult Odometry::getOdomWheelTravel(double imeForward) {
 VelocityResult Odometry::getParallelVel() {
 	double initialVelocity = parallelTrackingWheel.get_velocity();
 
-	if (m_config.useMotorEncoders){
+	// IMEs when odometry is on them, or when the parallel wheel is down
+	if (m_config.useMotorEncoders || initialVelocity == PROS_ERR){
 
 		double leftVelocity = averageMotorGroupVelocities(leftMotors);
 		double rightVelocity = averageMotorGroupVelocities(rightMotors);
@@ -272,10 +305,6 @@ VelocityResult Odometry::getParallelVel() {
 		return {velocity, OdomError::NONE};
 	}
 
-	if (initialVelocity == PROS_ERR) {
-		return {0.0, OdomError::PARALLEL_WHEEL_ERROR};
-	}
-
 	// rotation sensor velocity is in centidegrees per second
 	double deg_s = initialVelocity / 100.0;
 
@@ -289,19 +318,31 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
 		return {0, 0};
 	}
 
-    double currLeft = averageMotorGroupPosition(leftMotors);
-    double currRight = averageMotorGroupPosition(rightMotors);
+    double currLeft = getPositionAllSanitizedAvg(leftMotors);
+    double currRight = getPositionAllSanitizedAvg(rightMotors);
 
-    double dLeft = currLeft - m_prevLeft;
-    double dRight = currRight - m_prevRight;
+    // a side only has travel when it read this frame and last frame. a failed read stores PROS_ERR_F
+    // in prev, so the side's first good read after that only re-seeds it
+    bool leftValid = currLeft != PROS_ERR_F && m_prevLeft != PROS_ERR_F;
+    bool rightValid = currRight != PROS_ERR_F && m_prevRight != PROS_ERR_F;
 
-    double leftInches = (dLeft / 360.0) *DRIVE_GEAR_RATIO  * m_config.driveWheelDiameter * std::numbers::pi;
-    double rightInches = (dRight / 360.0) * DRIVE_GEAR_RATIO * m_config.driveWheelDiameter * std::numbers::pi;
+    double leftInches = leftValid ? ((currLeft - m_prevLeft) / 360.0) * DRIVE_GEAR_RATIO * m_config.driveWheelDiameter * std::numbers::pi : 0.0;
+    double rightInches = rightValid ? ((currRight - m_prevRight) / 360.0) * DRIVE_GEAR_RATIO * m_config.driveWheelDiameter * std::numbers::pi : 0.0;
 
     m_prevLeft = currLeft;
     m_prevRight = currRight;
 
-    double forwardInches = (leftInches + rightInches) / 2.0;
+    // average both sides, or use the one side that has travel (off by the turn while turning, but better than halving it)
+    double forwardInches = 0.0;
+    if (leftValid && rightValid) {
+        forwardInches = (leftInches + rightInches) / 2.0;
+    } 
+	else if (leftValid) {
+        forwardInches = leftInches;
+    } 
+	else if (rightValid) {
+        forwardInches = rightInches;
+    }
     return {forwardInches, 0.0};
 }
 

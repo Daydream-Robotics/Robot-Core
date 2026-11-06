@@ -134,11 +134,6 @@ public:
      * @returns velocity in inches per second
      */
     VelocityResult getParallelVel();
-    
-    /**
-     * @brief Returns struct of distances travelled by drive encoders when using internal encoders
-     */
-    WheelLengths getDriveEncoderTravel(void);
 
     /**
      * @brief Background task entry point
@@ -169,6 +164,12 @@ private:
      *          or TRACKING_WHEEL_ERROR with no travel when both are down
      */
     WheelTravelResult getOdomWheelTravel(double imeForward);
+
+    /**
+     * @brief Returns struct of distances travelled by drive encoders since the last call
+     * @note updates the previous readings, so updatePose() calls it once per frame and nothing else should
+     */
+    WheelLengths getDriveEncoderTravel(void);
 
     /**
      * @brief Averages the actual velocities of all motors in a motor group
