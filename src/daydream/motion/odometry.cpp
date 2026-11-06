@@ -132,6 +132,8 @@ void Odometry::updatePose(void) {
 	if (!m_config.useMotorEncoders) {
 		wheelResult = getOdomWheelTravel();
 
+		m_lastWheelError = wheelResult.error;
+
 		parallelFromWheel = wheelResult.error == OdomError::NONE ||
 			wheelResult.error == OdomError::PERPENDICULAR_WHEEL_ERROR;
 		perpendicularFromWheel = wheelResult.error == OdomError::NONE ||
@@ -436,6 +438,10 @@ OdomError Odometry::getOdomError() {
 	return m_lastOdomError.load();
 }
 
+OdomError Odometry::getTrackingWheelError() {
+	return m_lastWheelError.load();
+}
+
 YawResult Odometry::getYaw(void) {
 	YawResult imuResult = getIMUYaw();
 
@@ -492,13 +498,18 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	double delParallel = trackingWheelTravel(currParallel, m_prevParallel, m_config.parallelWheelDiameter);
 	double delPerpendicular = trackingWheelTravel(currPerpendicular, m_prevPerpendicular, m_config.perpendicularWheelDiameter);
 
+	// A wheel is also treated as down on the frame it reconnects (no valid previous reading),
+	// so that axis keeps using the fallback source while the new baseline is saved
+	const bool parallelDown = currParallel == PROS_ERR || m_prevParallel == PROS_ERR;
+	const bool perpendicularDown = currPerpendicular == PROS_ERR || m_prevPerpendicular == PROS_ERR;
+
 	// Report which wheel is down so updatePose() can use the other sources for that axis
 	OdomError error = OdomError::NONE;
-	if (currParallel == PROS_ERR && currPerpendicular == PROS_ERR) {
+	if (parallelDown && perpendicularDown) {
 		error = OdomError::TRACKING_WHEEL_ERROR;
-	} else if (currPerpendicular == PROS_ERR) {
+	} else if (perpendicularDown) {
 		error = OdomError::PERPENDICULAR_WHEEL_ERROR;
-	} else if (currParallel == PROS_ERR) {
+	} else if (parallelDown) {
 		error = OdomError::PARALLEL_WHEEL_ERROR;
 	}
 
@@ -756,7 +767,7 @@ Odometry odom({
 	PERPENDICULAR_TRACKING_WHEEL_DIAMETER,
 	PARALLEL_TRACKING_WHEEL_OFFSET,
 	PERPENDICULAR_TRACKING_WHEEL_OFFSET,
-	true,
+	false,
 	DRIVE_WHEEL_DIAMETER_INCHES,
 	TRACK_WIDTH
 });
