@@ -179,9 +179,10 @@ void Odometry::updatePose(void) {
 		std::isfinite(m_config.driveTrackWidth) &&
 		m_config.driveTrackWidth > 0.0;
 
+	// raw heading is CCW positive, so turning left (right side further than left) is positive
 	if (encoderHeadingAvailable) {
 		encoderHeading =
-			(motorResult.leftInches - motorResult.rightInches)
+			(motorResult.rightInches - motorResult.leftInches)
 			/ m_config.driveTrackWidth;
 	}
 
@@ -355,14 +356,16 @@ void Odometry::updatePose(void) {
 
 	// Increment position and angle by calculated changes
 	m_mutex.take();
+	// math angle (0 = +x, CCW positive) at the middle of this update
 	double theta_mid = normalizeAngle(m_prevTheta + m_headingOffset + del_theta / 2.0);
 
-    // Compute change in x and y based on heading and local changes
+    // Compute change in x and y based on heading and local changes (local +x forward, +y left)
 	double del_x = std::cos(theta_mid) * dx_local - std::sin(theta_mid) * dy_local;
 	double del_y = std::sin(theta_mid) * dx_local + std::cos(theta_mid) * dy_local;
 	m_currentPosition.x += del_x;
 	m_currentPosition.y += del_y;
-	m_currentPosition.theta = normalizeAngle(theta_rad + m_headingOffset);
+	// report as a field heading (0 = +y, 90 deg = +x, CW positive)
+	m_currentPosition.theta = mathToHeading(theta_rad + m_headingOffset);
 	m_lastRawTheta = theta_rad;
 	m_mutex.give();
 
@@ -409,7 +412,8 @@ void Odometry::setPose(Pose pose) {
 	m_currentPosition.x = pose.x;
 	m_currentPosition.y = pose.y;
 	m_currentPosition.theta = normalizeAngle(pose.theta);
-    m_headingOffset = normalizeAngle(pose.theta - m_lastRawTheta);
+	// offset is kept in the math frame: math angle = raw + offset
+    m_headingOffset = normalizeAngle(headingToMath(pose.theta) - m_lastRawTheta);
 	m_mutex.give();
 }
 
@@ -445,7 +449,9 @@ OdomError Odometry::getTrackingWheelError() {
 YawResult Odometry::getYaw(void) {
 	YawResult imuResult = getIMUYaw();
 
+	// raw yaw is CCW positive, flip it so it matches field headings (CW positive)
 	if (imuResult.error == OdomError::NONE || !m_usingEncoderHeading) {
+		imuResult.yaw = normalizeAngle(-imuResult.yaw);
 		return imuResult;
 	}
 
@@ -454,7 +460,7 @@ YawResult Odometry::getYaw(void) {
 	double encoderYaw = m_lastRawTheta;
 	m_mutex.give();
 
-	return {encoderYaw, OdomError::NONE};
+	return {normalizeAngle(-encoderYaw), OdomError::NONE};
 }
 
 YawResult Odometry::getIMUYaw(void) {

@@ -37,8 +37,8 @@ WheelVelocities PurePursuitController::compute(const Pose& currentPose, const AL
         // create ghost point
         Sample lastPoint = als_path.getSamples().back();
         targetPoint = {
-            lastPoint.x + END_GHOST_CAST * std::cos(lastPoint.heading),
-            lastPoint.y + END_GHOST_CAST * std::sin(lastPoint.heading)
+            lastPoint.x + END_GHOST_CAST * std::sin(lastPoint.heading),
+            lastPoint.y + END_GHOST_CAST * std::cos(lastPoint.heading)
         };
     } else {
         // get global target point coords
@@ -123,9 +123,9 @@ double PurePursuitController::calculateCurvature(Position robotFrameTargetPt) {
 Position PurePursuitController::convertPtToRobotFrame(Position targetPoint, const Pose& currentPose) {
     double dx = targetPoint.x - currentPose.x;
     double dy = targetPoint.y - currentPose.y;
-    double robot_heading_rad = currentPose.theta;
+    double robot_heading_rad = headingToMath(currentPose.theta);
 
-    // localize displacements relative to orientation of robot
+    // localize displacements relative to orientation of robot (+x forward, +y left)
     double localX = dx * cos(robot_heading_rad) + dy * sin(robot_heading_rad);
     double localY = dx * (-sin(robot_heading_rad)) + dy * cos(robot_heading_rad);
 

@@ -84,10 +84,14 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
     double dx = target.x - currentPose.x;
     double dy = target.y - currentPose.y;
 
+    // ramsete math uses math angles (0 = +x, CCW positive)
+    double robotTheta = headingToMath(virtualPose.theta);
+    double targetTheta = headingToMath(target.heading);
+
     // project global errors to local coordinate frame
-    double e_x = (std::cos(virtualPose.theta) * dx) + (std::sin(virtualPose.theta) * dy);
-    double e_y = (-std::sin(virtualPose.theta) * dx) + (std::cos(virtualPose.theta) * dy);
-    double e_theta = angleDiffRad(target.heading, virtualPose.theta);
+    double e_x = (std::cos(robotTheta) * dx) + (std::sin(robotTheta) * dy);
+    double e_y = (-std::sin(robotTheta) * dx) + (std::cos(robotTheta) * dy);
+    double e_theta = angleDiffRad(targetTheta, robotTheta);
 
     // calculate target angular velocity
     double targetAngularVel = target.v * target.curvature;

@@ -342,10 +342,12 @@ Waypoint ALS_Path::getPointAtArcLength(double sQuery) const {
 double ALS_Path::getHeadingAtParameter(double tQuery) const {
     double dx = m_splineX.evalFirstDeriv(tQuery);
     double dy = m_splineY.evalFirstDeriv(tQuery);
-    return std::atan2(dy, dx);
+    // field heading: 0 = +y, 90 deg = +x, CW positive
+    return std::atan2(dx, dy);
 }
 
 // κ(t)=(x′(t)2+y′(t)2)3/2x′(t)y′′(t)−y′(t)x′′(t)​
+// positive curvature is a left (CCW) turn
 double ALS_Path::getCurvatureAtParameter(double tQuery) const {
     double dx = m_splineX.evalFirstDeriv(tQuery);
     double dy = m_splineY.evalFirstDeriv(tQuery);

@@ -7,6 +7,7 @@
 #include "daydream/motion/pathFollower.hpp"
 #include "daydream/utils/sd_card_logging.hpp"
 #include "daydream/config/constants.h"
+#include "daydream/utils/helpers.hpp"
 
 //store sample period and gear ratio
 MPCSerial::Params::Params(double frequency, double ratio, double trackWidth, double A, double B, double aMax, double vMin)
@@ -98,7 +99,9 @@ MPCSerial::MPCUpdatePacket MPCSerial::buildUpdatePacket(const Pose& currentPose,
     MPCUpdatePacket p{};
     p.pose_x = static_cast<float>(currentPose.x);
     p.pose_y = static_cast<float>(currentPose.y);
-    p.pose_theta = static_cast<float>(currentPose.theta);
+    // the MPC model uses math angles (0 = +x, CCW positive)
+    const double poseTheta = headingToMath(currentPose.theta);
+    p.pose_theta = static_cast<float>(poseTheta);
     p.omega_L = static_cast<float>(omega_L);
     p.omega_R = static_cast<float>(omega_R);
     p.V_battery = static_cast<float>(V_battery);
@@ -173,14 +176,14 @@ MPCSerial::MPCUpdatePacket MPCSerial::buildUpdatePacket(const Pose& currentPose,
     for (std::size_t i = 0; i <= F; i++) {
         //pose at current rollout arc length
         InterpSample ref = sampleAtArcLength(samples, s);
-        double ref_theta = ref.theta;
+        double ref_theta = headingToMath(ref.theta);
         if (flag == PathFlag::REVERSE) {
             //if driving backwards, face opposite to path tangent
             ref_theta = wrapAngle(ref_theta + M_PI);
         }
         if (!have_prev) {
             //first stage: unrwap rel to robot's actual heading so MPC sees small heading error
-            ref_theta = currentPose.theta + wrapAngle(ref_theta - currentPose.theta);
+            ref_theta = poseTheta + wrapAngle(ref_theta - poseTheta);
         } 
         else {
             //subsequent stages: rate-limit heading change to the feasible turn-rate

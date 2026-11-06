@@ -112,7 +112,7 @@ public:
     Position2d calculatePositionFrom2Sensors(int sensor1Idx, int sensor2Idx, bool silent = false);
 
 private:
-    //converts chassis/field heading (90 deg = +x) to math heading
+    //converts field heading (0 = +y, 90 deg = +x, CW positive) to math heading (0 = +x, CCW positive)
     static float fieldHeadingToMathHeading(float fieldHeadingRad);
 
     //sensor physical offsets from robot center in inches

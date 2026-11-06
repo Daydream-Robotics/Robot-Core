@@ -8,7 +8,7 @@ struct Sample {
     double s = 0.0; // distance from start
     double x = 0.0;
     double y = 0.0;
-    double heading = 0.0; // direction of motion
+    double heading = 0.0; // direction of motion, field heading (0 = +y, 90 deg = +x, CW positive)
     double curvature = 0.0;
 
     double time_s = 0.0;

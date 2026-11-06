@@ -6,6 +6,20 @@
 // Normalize angle between [-pi,pi] 
 double normalizeAngle(double a);
 
+/*
+ * Field frame: +x forward, +y left. Headings are compass style:
+ * 0 = facing +y, pi/2 (90 deg) = facing +x, clockwise positive.
+ * Direction of heading h is (sin h, cos h).
+ *
+ * Math angles (0 = +x, counter clockwise positive) are only used inside trig/controller math.
+ */
+
+// Convert a field heading (0 = +y, 90 deg = +x, CW positive) to a math angle (0 = +x, CCW positive), radians
+double headingToMath(double heading);
+
+// Convert a math angle (0 = +x, CCW positive) to a field heading (0 = +y, 90 deg = +x, CW positive), radians
+double mathToHeading(double angle);
+
 // Convert Degrees to Radians
 double convertDegToRad(double degree);
 

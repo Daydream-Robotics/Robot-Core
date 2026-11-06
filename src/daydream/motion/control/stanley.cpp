@@ -50,8 +50,9 @@ bool StanleyController::step(int direction) {
     
 
 
-    double pathYawRad  = nearest.heading; //the yaw of the path in radians
-    double robotYawRad = convertDegToRad(yaw); //the yaw of the robot in radians
+    // stanley math uses math angles (0 = +x, CCW positive), path and robot yaw are field headings
+    double pathYawRad  = headingToMath(nearest.heading); //the yaw of the path in radians
+    double robotYawRad = headingToMath(yaw); //the yaw of the robot in radians (getYaw is already radians)
 
     double effectivePathYaw = (direction == 1) ? pathYawRad : normalizeAngle(pathYawRad + M_PI); //adjusts path yaw for backwards travel
     double headingError = normalizeAngle(effectivePathYaw - robotYawRad); 

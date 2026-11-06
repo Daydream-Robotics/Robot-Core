@@ -18,6 +18,15 @@ double normalizeAngle(double a) {
     return std::atan2(std::sin(a), std::cos(a));
 }
 
+// heading = pi/2 - angle and angle = pi/2 - heading, so both directions are the same reflection
+double headingToMath(double heading) {
+    return normalizeAngle(std::numbers::pi / 2.0 - heading);
+}
+
+double mathToHeading(double angle) {
+    return normalizeAngle(std::numbers::pi / 2.0 - angle);
+}
+
 // Convert Degrees to Radians
 double convertDegToRad(double degree) {
     return degree * (std::numbers::pi / 180.0);

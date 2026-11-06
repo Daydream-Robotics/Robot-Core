@@ -34,9 +34,10 @@ void updateRangeSensors() {
     distanceReadings.right = calibratedDistance(distanceSensors.right, calibration[3]);
 }
 
-//Odometry headings already use the math frame: +x forward, +y left, CCW positive.
+//Odometry headings are field headings (0 = +y, 90 deg = +x, CW positive).
+//Raycasting rotates with math angles (0 = +x, CCW positive).
 float RangeSensing::fieldHeadingToMathHeading(float fieldHeadingRad) {
-    return fieldHeadingRad;
+    return static_cast<float>(M_PI_2) - fieldHeadingRad;
 }
 
 //initializes lookup tables and precomputed data
@@ -90,16 +91,16 @@ RangeReadings RangeSensing::raycast(const mcl::Particle& particle) {
         //calculate sensor position in global frame
         //local frame uses +x = forward, +y = left
         const float sensorGlobalX = particle.x +
-            (SENSOR_OFFSET_X[sensorDir] * headingCos + SENSOR_OFFSET_Y[sensorDir] * headingSin);
+            (SENSOR_OFFSET_X[sensorDir] * headingCos - SENSOR_OFFSET_Y[sensorDir] * headingSin);
         const float sensorGlobalY = particle.y +
-            (-SENSOR_OFFSET_X[sensorDir] * headingSin + SENSOR_OFFSET_Y[sensorDir] * headingCos);
+            (SENSOR_OFFSET_X[sensorDir] * headingSin + SENSOR_OFFSET_Y[sensorDir] * headingCos);
 
         //calculate sensor direction in global frame
         //sensor basis uses +x = forward, +y = left
         const float cosSensor =
-            SIN_HEADINGS[sensorDir] * headingCos + COS_HEADINGS[sensorDir] * headingSin;
+            SIN_HEADINGS[sensorDir] * headingCos - COS_HEADINGS[sensorDir] * headingSin;
         const float sinSensor =
-            -SIN_HEADINGS[sensorDir] * headingSin + COS_HEADINGS[sensorDir] * headingCos;
+            SIN_HEADINGS[sensorDir] * headingSin + COS_HEADINGS[sensorDir] * headingCos;
 
         float minDistance = INFINITY;
 
@@ -167,9 +168,9 @@ RangeReadings RangeSensing::raycastFixedTheta(const mcl::Particle& particle,
     for (int sensorDir = 0; sensorDir < 4; sensorDir++) {
         //calculate sensor position in global frame
         const float sensorGlobalX = particle.x +
-            (SENSOR_OFFSET_X[sensorDir] * headingCos + SENSOR_OFFSET_Y[sensorDir] * headingSin);
+            (SENSOR_OFFSET_X[sensorDir] * headingCos - SENSOR_OFFSET_Y[sensorDir] * headingSin);
         const float sensorGlobalY = particle.y +
-            (-SENSOR_OFFSET_X[sensorDir] * headingSin + SENSOR_OFFSET_Y[sensorDir] * headingCos);
+            (SENSOR_OFFSET_X[sensorDir] * headingSin + SENSOR_OFFSET_Y[sensorDir] * headingCos);
 
         //use precomputed sensor directions
         const float cosSensor = cosSensors[sensorDir];
@@ -290,7 +291,7 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
     };
 
     //convert robot heading to math heading
-    double headingRad = currentPose.theta;
+    double headingRad = fieldHeadingToMathHeading(static_cast<float>(currentPose.theta));
     double c = std::cos(headingRad);
     double s = std::sin(headingRad);
 
@@ -311,8 +312,8 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
         if (std::isnan(dist)) return;
 
         //rotate sensor offset to field frame
-        double offX = SENSOR_OFFSET_X[idx] * c + SENSOR_OFFSET_Y[idx] * s;
-        double offY = -SENSOR_OFFSET_X[idx] * s + SENSOR_OFFSET_Y[idx] * c;
+        double offX = SENSOR_OFFSET_X[idx] * c - SENSOR_OFFSET_Y[idx] * s;
+        double offY = SENSOR_OFFSET_X[idx] * s + SENSOR_OFFSET_Y[idx] * c;
 
         //calculate sensor position in field frame
         double sx = currentPose.x + offX;
@@ -322,8 +323,8 @@ RangeSensing::Position2d RangeSensing::calculatePositionFrom2Sensors(int sensor1
         double dirXRobot = SIN_HEADINGS[idx];  //forward component
         double dirYRobot = COS_HEADINGS[idx];  //left component
 
-        double dx = dirXRobot * c + dirYRobot * s;
-        double dy = -dirXRobot * s + dirYRobot * c;
+        double dx = dirXRobot * c - dirYRobot * s;
+        double dy = dirXRobot * s + dirYRobot * c;
 
         if (!silent) {
             printf("Sensor %d offset: local(%.2f, %.2f) -> global(%.2f, %.2f)\n",

@@ -4,6 +4,7 @@
 #include <vector>
 #include <optional>
 #include <atomic>
+#include <numbers>
 
 struct OdomConfig {
     double parallelWheelDiameter;
@@ -91,12 +92,13 @@ struct Position {
 
 /**
  * @brief stores a pose of the robot
- * @note Made for the frame: +X forward, +Y left, CCW positive
+ * @note Frame: +X forward, +Y left. Heading is compass style: 0 = facing +Y,
+ *       pi/2 (90 deg) = facing +X, clockwise positive. Heading h points along (sin h, cos h)
  */
 struct Pose {
     double x; /**< The x-position of the robot in inches */
     double y; /**< The y-position of the robot in inches */
-    double theta; /**< The heading of the robot in radians */
+    double theta; /**< The heading of the robot in radians (0 = +Y, pi/2 = +X, CW positive) */
 };
 
 /**
@@ -165,7 +167,7 @@ public:
 
     /**
      * @brief Gets yaw, falling back to the drive encoder heading tracked by odometry if the IMU is unavailable
-     * @note Counter clockwise is positive
+     * @note Clockwise is positive, matching Pose::theta. Not offset by setPose()
      * @returns yaw/heading in radians and error status
      */
     YawResult getYaw(void);
@@ -240,7 +242,9 @@ private:
     std::vector<std::optional<double>> m_prevLeftMotorPositions;
     std::vector<std::optional<double>> m_prevRightMotorPositions;
     bool m_driveEncodersReady = false;
-    double m_headingOffset = 0.0; //field heading = raw IMU heading + offset
+    // math angle (0 = +X, CCW positive) = raw IMU heading + offset. Starts at pi/2 so the
+    // robot starts at field heading 0 (facing +Y)
+    double m_headingOffset = std::numbers::pi / 2.0;
     double m_lastRawTheta = 0.0; //latest raw IMU heading, used by setPose()
     bool m_initialized = false;
     std::atomic<bool> m_usingEncoderHeading{false}; // read by getYaw() from other tasks

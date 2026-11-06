@@ -128,9 +128,10 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
     Position start = m_odometry.getPosition();
     double direction = (distance >= 0.0) ? 1.0 : -1.0;
 
+	// field heading: 0 = +y, 90 deg = +x
 	Position headingUnit {
-		std::cos(targetHeading),
-		std::sin(targetHeading)
+		std::sin(targetHeading),
+		std::cos(targetHeading)
 	};
 
     double prevVelocity = 0.0;
@@ -187,9 +188,9 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
         double omega = headingPID.compute(headingError);
 
         // Differential drive
-		
-        double left  = v + omega;
-        double right = v - omega;
+		// heading is CW positive, so a positive headingError (omega < 0) needs the left side faster
+        double left  = v - omega;
+        double right = v + omega;
 
         // Magnitude Scaling
         double maxMag = std::max(std::fabs(left), std::fabs(right));
@@ -229,7 +230,7 @@ bool Autonomous::travelToPoint(double targetX, double targetY, double maxSpeed, 
 	double dy = targetY - start.y;
 	
 	double distance = std::hypot(dx, dy); //euclidean distance from start to end point	
-	double targetHeading = std::atan2(dy, dx);
+	double targetHeading = std::atan2(dx, dy); // field heading: 0 = +y, 90 deg = +x
 	
 	if (reverse) {
 		targetHeading += std::numbers::pi;

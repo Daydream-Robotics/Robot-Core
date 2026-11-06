@@ -15,8 +15,7 @@ std::vector<ALS_Path> Path::buildAllPathsFromJerryIO(const std::string& filePath
     printf("[PATH] parseFile returned %zu paths\n", rawPaths.size());
     if (rawPaths.empty()) return newPaths;
     
-    // convert jerryio heading to robot heading
-    initialHeading = 90.0 - initialHeading;
+    // jerryio headings already match the robot frame (0 = +y, 90 deg = +x, CW positive)
     double initalHeadingRad = normalizeAngle(initialHeading * (M_PI / 180.0));
 
     printf("[PATH] Initial heading set to %f rad\n", initalHeadingRad);
@@ -136,8 +135,10 @@ std::vector<Waypoint> Path::normalizePath(const std::vector<Waypoint>& rawPath, 
     std::vector<Waypoint> normalizedPath;
     normalizedPath.reserve(rawPath.size());
 
-    double cosTheta = std::cos(-initialPose.theta);
-    double sinTheta = std::sin(-initialPose.theta);
+    // rotate the path so the start heading becomes heading 0 (+y). Subtracting a CW heading
+    // is a CCW rotation by that heading
+    double cosTheta = std::cos(initialPose.theta);
+    double sinTheta = std::sin(initialPose.theta);
 
     for (const auto& wp : rawPath) {  
         Waypoint newWp;
