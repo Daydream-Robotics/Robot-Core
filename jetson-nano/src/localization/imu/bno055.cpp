@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <utility>
 
 #include <fcntl.h>
 #include <linux/i2c-dev.h>
@@ -18,10 +19,7 @@ namespace {
 constexpr uint8_t REG_CHIP_ID = 0x00; // reads CHIP_ID_VALUE
 constexpr uint8_t REG_PAGE_ID = 0x07;
 constexpr uint8_t REG_GYR_DATA_Z_LSB = 0x18; // 0x18 LSB, 0x19 MSB
-constexpr uint8_t REG_EUL_HEADING_LSB = 0x1A; // fused heading, logging / sanity checks only
 constexpr uint8_t REG_CALIB_STAT = 0x35; // gyro calibration is bits 5:4
-constexpr uint8_t REG_SYS_STATUS = 0x39;
-constexpr uint8_t REG_SYS_ERR = 0x3A;
 constexpr uint8_t REG_UNIT_SEL = 0x3B;
 constexpr uint8_t REG_OPR_MODE = 0x3D;
 constexpr uint8_t REG_PWR_MODE = 0x3E;
@@ -67,6 +65,20 @@ bool Bno055::start() {
         return true;
     }
 
+    // the static asserts only cover the NANO_IMU defaults, so check a caller's own Config here
+    if (m_cfg.rateHz <= 0 || m_cfg.rateHz > 1000) {
+        std::fprintf(stderr, "[bno055] rateHz %d out of range (1-1000)\n", m_cfg.rateHz);
+        return false;
+    }
+    if (m_cfg.historySec * m_cfg.rateHz < 2) {
+        std::fprintf(stderr, "[bno055] historySec %.3f too short, need at least 2 samples\n", m_cfg.historySec);
+        return false;
+    }
+    if (m_cfg.maxReadErrors < 1) {
+        std::fprintf(stderr, "[bno055] maxReadErrors must be at least 1\n");
+        return false;
+    }
+
     // open the I2C bus, where m_fd is the handle every later read/write uses
     m_fd = open(m_cfg.device.c_str(), O_RDWR);
     if (m_fd < 0) {
@@ -87,15 +99,31 @@ bool Bno055::start() {
     m_historyHead = 0;
     m_historyCount = 0;
 
-    // set IMU mode, then measure gyro bias (robot must be still), and close the bus on failure so a retry starts clean
-    if (!configure() || !estimateBias()) {
+    // set before configure() so stop() can cut its chip ID retries short, and before the thread since run() loops while m_running
+    m_running = true;
+
+    // set IMU mode, then measure gyro bias (robot must be still)
+    const BiasResult bias = configure() ? estimateBias() : BiasResult::READ_ERRORS;
+    if (bias == BiasResult::READ_ERRORS) {
+        // the chip isn't answering, so close the bus so a retry starts clean
+        m_running = false;
         close(m_fd);
         m_fd = -1;
         return false;
     }
 
-    // set before the thread starts, since run() loops while m_running
-    m_running = true;
+    // a moving robot gives a wrong bias, but run() re-measures it once the chip calibrates,
+    // so keep going and flag it for whoever reads health()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_health.movedAtStart = bias == BiasResult::MOVING;
+    }
+    if (bias == BiasResult::MOVING) {
+        std::fprintf(stderr,
+                     "[bno055] ******** WARNING: ROBOT MOVED DURING IMU STARTUP ********\n"
+                     "[bno055] heading stays invalid until the robot sits still after the gyro calibrates\n");
+    }
+
     // run() on this object in its own thread
     m_thread = std::thread(&Bno055::run, this);
     return true;
@@ -148,7 +176,7 @@ bool Bno055::configure() {
 
     // check we're talking to a BNO055 and retry briefly in case it's still booting
     uint8_t id = 0;
-    for (int i = 0; i < 10 && id != CHIP_ID_VALUE; ++i) {
+    for (int i = 0; i < 10 && id != CHIP_ID_VALUE && m_running; ++i) {
         // a failed read is seen as a wrong ID, so the loop retries
         if (!readRegs(REG_CHIP_ID, &id, 1)) {
             id = 0;
@@ -157,6 +185,10 @@ bool Bno055::configure() {
         if (id != CHIP_ID_VALUE) {
             std::this_thread::sleep_for(100ms);
         }
+    }
+    // stop() was called mid-retry, so give up without blaming the wiring
+    if (!m_running) {
+        return false;
     }
     // still wrong after ~1 s: wrong address, or wiring problem
     if (id != CHIP_ID_VALUE) {
@@ -285,7 +317,8 @@ void Bno055::run() {
             m_biasWindowCount++;
 
             if (m_biasWindowCount >= static_cast<int>(NANO_IMU_BIAS_SEC * m_cfg.rateHz)) {
-                if (applyBiasStats(m_biasWindowSum, m_biasWindowSumSq, m_biasWindowCount)) {
+                // no log on failure, since this retries every window while the robot moves
+                if (applyBiasStats(m_biasWindowSum, m_biasWindowSumSq, m_biasWindowCount, false)) {
                     m_biasSettled = true;
                     m_biasWindowActive = false;
                     std::lock_guard<std::mutex> lock(m_mutex);
@@ -345,8 +378,9 @@ void Bno055::run() {
                 if (!saveGyroOffsets()) {
                     recover();
                     m_lastTUs = 0;
-                    nextTick = clock::now();
                 }
+                // the save paused the loop, so restart the schedule instead of catching up with back-to-back reads
+                nextTick = clock::now();
             }
         }
     }
@@ -387,7 +421,7 @@ void Bno055::recover() {
     }
 
     // re-measure gyro bias, keep the old bias if the robot is moving
-    if (!estimateBias()) {
+    if (estimateBias() != BiasResult::OK) {
         std::fprintf(stderr, "[bno055] bias not re-estimated, keeping previous bias\n");
     }
 
@@ -395,7 +429,7 @@ void Bno055::recover() {
     m_lastRateRadS = 0.0;
 }
 
-bool Bno055::estimateBias() {
+Bno055::BiasResult Bno055::estimateBias() {
     // one sample per 1 / rateHz for NANO_IMU_BIAS_SEC
     const auto period = std::chrono::microseconds(1'000'000 / m_cfg.rateHz);
     const int wanted = static_cast<int>(NANO_IMU_BIAS_SEC * m_cfg.rateHz);
@@ -419,23 +453,22 @@ bool Bno055::estimateBias() {
     // need most of the samples to trust the average
     if (count < wanted * 8 / 10) {
         std::fprintf(stderr, "[bno055] bias: only %d of %d reads succeeded\n", count, wanted);
-        return false;
+        return BiasResult::READ_ERRORS;
     }
 
-    if (!applyBiasStats(sum, sumSq, count)) {
-        std::fprintf(stderr, "[bno055] bias: robot moving\n");
-        return false;
-    }
-    return true;
+    return applyBiasStats(sum, sumSq, count, true) ? BiasResult::OK : BiasResult::MOVING;
 }
 
-bool Bno055::applyBiasStats(double sum, double sumSq, int count) {
+bool Bno055::applyBiasStats(double sum, double sumSq, int count, bool logIfMoving) {
     // mean and standard deviation of the leftover rate
     const double mean = sum / count;
     const double stdDev = std::sqrt(std::max(0.0, sumSq / count - mean * mean));
 
     // a still robot reads near-constant rate, so a big spread or a big mean means it was moving
     if (stdDev > NANO_IMU_BIAS_MAX_STDDEV || std::abs(mean) > NANO_IMU_BIAS_MAX_MEAN) {
+        if (logIfMoving) {
+            std::fprintf(stderr, "[bno055] bias: robot moving (mean %.4f, std %.4f rad/s)\n", mean, stdDev);
+        }
         return false;
     }
 

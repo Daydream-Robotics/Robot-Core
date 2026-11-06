@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <optional>
@@ -46,7 +47,8 @@ public:
         uint32_t readErrors = 0;
         uint32_t resets = 0;
         uint8_t calibGyro = 0; // CALIB_STAT gyro bits, 0–3
-        bool valid = false; // false until configured and the gyro is calibrated
+        bool valid = false; // false until configured, the gyro is calibrated, and the bias re-measured after it
+        bool movedAtStart = false; // robot wasn't still during start()'s bias estimate; stays set for the run so it reaches the logs
         double lastRateHz = 0.0;
     };
 
@@ -68,6 +70,9 @@ public:
 
     /**
      * @brief Opens the bus, checks the chip ID, sets IMU mode, and starts the read thread.
+     *
+     * Still starts if the robot was moving during the bias estimate, but prints a warning and sets
+     * Health::movedAtStart.
      *
      * @return bool True if the sensor answered and was configured.
      */
@@ -101,6 +106,13 @@ private:
         double theta = 0.0; // integrated heading since start(), CCW+, rad
     };
 
+    /// @brief How estimateBias() went.
+    enum class BiasResult {
+        OK,
+        READ_ERRORS, // too many failed reads, the chip isn't answering
+        MOVING, // the robot wasn't still, bias unchanged
+    };
+
     /**
      * @brief Chip ID check, CONFIG mode, units, axis remap, IMU mode, restore calibration offsets.
      *
@@ -121,9 +133,9 @@ private:
     /**
      * @brief Averages gyro Z while the robot is still, to estimate the bias.
      *
-     * @return bool True if enough samples were collected.
+     * @return BiasResult OK if the bias was updated, otherwise why not.
      */
-    bool estimateBias();
+    BiasResult estimateBias();
 
     /**
      * @brief Adds the mean of the collected leftover rates to the bias, if they look like a still robot.
@@ -131,9 +143,10 @@ private:
      * @param sum Sum of the leftover rates (rad/s).
      * @param sumSq Sum of their squares.
      * @param count Number of rates.
+     * @param logIfMoving Print the mean and spread when the robot looks like it was moving.
      * @return bool True if the bias was updated, false if the robot looked like it was moving.
      */
-    bool applyBiasStats(double sum, double sumSq, int count);
+    bool applyBiasStats(double sum, double sumSq, int count, bool logIfMoving);
 
     /**
      * @brief Writes saved gyro offsets from calibFile to the chip. Call only in CONFIG mode.
@@ -187,7 +200,7 @@ private:
     int m_fd{-1}; // I2C device, -1 when closed
 
     std::thread m_thread;
-    std::atomic<bool> m_running{false};
+    std::atomic<bool> m_running{false}; // true from start() until stop(), including while configuring
 
     // read thread only
     double m_biasRadS{0.0}; // gyro Z bias, subtracted from every read
