@@ -126,6 +126,16 @@ private:
     bool estimateBias();
 
     /**
+     * @brief Adds the mean of the collected leftover rates to the bias, if they look like a still robot.
+     *
+     * @param sum Sum of the leftover rates (rad/s).
+     * @param sumSq Sum of their squares.
+     * @param count Number of rates.
+     * @return bool True if the bias was updated, false if the robot looked like it was moving.
+     */
+    bool applyBiasStats(double sum, double sumSq, int count);
+
+    /**
      * @brief Writes saved gyro offsets from calibFile to the chip. Call only in CONFIG mode.
      *
      * @return bool True if offsets were loaded and written.
@@ -186,6 +196,12 @@ private:
     int64_t m_lastTUs{0};
     int m_errorStreak{0};
     bool m_offsetsSaved{false}; // true once offsets were loaded or a save was tried this run
+    // the chip's own gyro offset changes while it calibrates, so the bias is re-measured once it's trusted
+    bool m_biasSettled{false}; // bias re-measured since the gyro last reached NANO_IMU_GYRO_CALIB_TRUSTED
+    bool m_biasWindowActive{false}; // collecting reads for that re-measure
+    double m_biasWindowSum{0.0};
+    double m_biasWindowSumSq{0.0};
+    int m_biasWindowCount{0};
 
     // shared with headingIncrement() and health(), guarded by m_mutex
     mutable std::mutex m_mutex;

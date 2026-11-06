@@ -278,6 +278,29 @@ void Bno055::run() {
             }
         }
 
+        // re-measure the bias from the normal reads, so integration never pauses for it
+        if (m_biasWindowActive) {
+            m_biasWindowSum += *rate;
+            m_biasWindowSumSq += *rate * *rate;
+            m_biasWindowCount++;
+
+            if (m_biasWindowCount >= static_cast<int>(NANO_IMU_BIAS_SEC * m_cfg.rateHz)) {
+                if (applyBiasStats(m_biasWindowSum, m_biasWindowSumSq, m_biasWindowCount)) {
+                    m_biasSettled = true;
+                    m_biasWindowActive = false;
+                    std::lock_guard<std::mutex> lock(m_mutex);
+                    // older samples were integrated with the stale bias, so headingIncrement() can't span them
+                    m_historyHead = 0;
+                    m_historyCount = 0;
+                    m_health.valid = m_health.calibGyro >= NANO_IMU_GYRO_CALIB_TRUSTED;
+                }
+                // robot moved during the window: start another and stay invalid until one is still
+                m_biasWindowSum = 0.0;
+                m_biasWindowSumSq = 0.0;
+                m_biasWindowCount = 0;
+            }
+        }
+
         // about once a second: calibration and status into health
         const auto now = clock::now();
         if (now - lastHealthCheck >= std::chrono::seconds(1)) {
@@ -294,15 +317,27 @@ void Bno055::run() {
                     // gyro calibration is bits 5:4 of CALIB_STAT: shift down, keep 2 bits (0-3)
                     m_health.calibGyro = (calib >> 4) & 0x03;
                 }
-                // valid once the gyro reports full calibration
-                m_health.valid = m_health.calibGyro >= NANO_IMU_GYRO_CALIB_TRUSTED;
+                calibrated = m_health.calibGyro >= NANO_IMU_GYRO_CALIB_TRUSTED;
+                // valid once the gyro reports full calibration and the bias was re-measured after it
+                m_health.valid = calibrated && m_biasSettled;
                 m_health.lastRateHz = samplesSinceCheck / seconds;
-                calibrated = m_health.valid;
             }
 
             // start the next one-second window
             lastHealthCheck = now;
             samplesSinceCheck = 0;
+
+            if (!calibrated) {
+                // the chip's offset may change again before it's trusted, so measure the bias after that
+                m_biasSettled = false;
+                m_biasWindowActive = false;
+            } else if (!m_biasSettled && !m_biasWindowActive) {
+                // the chip now removes its own offset, so the bias measured before is stale
+                m_biasWindowActive = true;
+                m_biasWindowSum = 0.0;
+                m_biasWindowSumSq = 0.0;
+                m_biasWindowCount = 0;
+            }
 
             // save the offsets the first time the gyro is fully calibrated
             if (calibrated && !m_offsetsSaved && !m_cfg.calibFile.empty()) {
@@ -323,10 +358,16 @@ void Bno055::recover() {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_health.valid = false;
         m_health.resets++;
+        // the reset clears the chip's calibration, so don't trust the level read before it
+        m_health.calibGyro = 0;
         // clear the history so headingIncrement() can't span the reset gap
         m_historyHead = 0;
         m_historyCount = 0;
     }
+    // the chip recalibrates after the reset, so the bias must be re-measured once it's trusted again
+    m_biasSettled = false;
+    m_biasWindowActive = false;
+
     // reset and reconfigure, retrying up to NANO_IMU_RESET_ATTEMPTS times
     bool configured = false;
     for (int attempt = 0; attempt < NANO_IMU_RESET_ATTEMPTS && m_running && !configured; ++attempt) {
@@ -375,26 +416,32 @@ bool Bno055::estimateBias() {
         sumSq += *rate * *rate;
         count++;
     }
-     // need most of the samples to trust the average
+    // need most of the samples to trust the average
     if (count < wanted * 8 / 10) {
         std::fprintf(stderr, "[bno055] bias: only %d of %d reads succeeded\n", count, wanted);
         return false;
     }
 
+    if (!applyBiasStats(sum, sumSq, count)) {
+        std::fprintf(stderr, "[bno055] bias: robot moving\n");
+        return false;
+    }
+    return true;
+}
+
+bool Bno055::applyBiasStats(double sum, double sumSq, int count) {
     // mean and standard deviation of the leftover rate
     const double mean = sum / count;
     const double stdDev = std::sqrt(std::max(0.0, sumSq / count - mean * mean));
 
     // a still robot reads near-constant rate, so a big spread or a big mean means it was moving
     if (stdDev > NANO_IMU_BIAS_MAX_STDDEV || std::abs(mean) > NANO_IMU_BIAS_MAX_MEAN) {
-        std::fprintf(stderr, "[bno055] bias: robot moving (mean %.4f, std %.4f rad/s)\n", mean, stdDev);
         return false;
     }
 
     // add the leftover error to the bias already being subtracted
     m_biasRadS += mean;
     return true;
-
 }
 
 std::optional<double> Bno055::readGyroZ() {
