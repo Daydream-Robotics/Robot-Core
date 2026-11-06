@@ -35,6 +35,8 @@ struct DriverInput {
 struct MotorGroupTelemetry {
     /// Encoder position change in centidegrees over the reported interval.
     std::int32_t positionDelta = 0;
+    /// Continuous output-shaft position in radians since the current configuration was applied.
+    double positionRad = 0.0;
     /// Output-shaft angular velocity in radians per second.
     float velocity = 0.0f;
     /// Fault bits defined by the shared serial protocol.
@@ -45,6 +47,8 @@ struct MotorGroupTelemetry {
 struct TrackingWheelTelemetry {
     /// Rotation change in centidegrees over the reported interval.
     std::int32_t delta = 0;
+    /// Continuous sensor position in radians since the current configuration was applied.
+    double positionRad = 0.0;
     /// Fault bits defined by the shared serial protocol.
     std::uint8_t faultFlags = 0;
 };
@@ -77,42 +81,20 @@ struct BrainState {
     std::uint8_t statusFlags = 0;
 };
 
-/** @brief Control representation used for one motor group. */
-enum class MotorCommandMode : std::uint8_t {
-    /// Stop the group using its configured brake behavior.
-    Stop,
-    /// Set motor voltage; see the serial protocol for the value range and units.
-    Voltage,
-    /// Set motor velocity; see the serial protocol for the value units.
-    Velocity,
-    /// Move to a position; see the serial protocol for value and auxiliary units.
-    Position
-};
-
-/** @brief Requested control mode and values for one motor group. */
-struct MotorGroupCommand {
-    /// Interpretation of @ref value and @ref auxiliary.
-    MotorCommandMode mode = MotorCommandMode::Stop;
-    /// Mode-dependent set point for the motor group.
-    float value = 0.0f;
-    /// Additional mode-dependent argument, such as a position speed limit.
-    std::int16_t auxiliary = 0;
-};
-
 /** @brief Motor commands returned by the selected control source. */
 struct MotorCommand {
     /// Number of valid entries in @ref groups.
     std::uint8_t groupCount = 0;
     /// Per-group commands, indexed by configured motor-group slot.
-    std::array<MotorGroupCommand, packets::MAX_GROUPS> groups{};
+    std::array<packets::GroupCmd, packets::MAX_GROUPS> groups{};
 };
 
 /** @brief A motor command received from the Jetson Nano. */
 struct NanoCommand {
-    /// Sequence number assigned by the Nano.
-    std::uint16_t sequence = 0;
-    /// Motor-group commands carried by this Nano command.
-    MotorCommand motors{};
+    /// Shared command metadata, including sequence, acknowledgments and ADI requests.
+    packets::CommandFixed fixed{};
+    /// Group commands; fixed.nGroups is the sole count of valid entries.
+    std::array<packets::GroupCmd, packets::MAX_GROUPS> groups{};
     /// Whether the command passed reception and validation.
     bool valid = false;
 };

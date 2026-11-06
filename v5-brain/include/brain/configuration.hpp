@@ -11,15 +11,15 @@
 
 namespace brain {
 
-/** @brief Physical robot and serial-protocol configuration sent to the Nano. */
+/** @brief Physical robot geometry and serial configuration applied on the Brain. */
 struct BrainConfiguration {
     /// Robot dimensions and wheel geometry used by shared calculations.
     shared::RobotConfig robot{};
-    /// Fixed fields of the Nano CONFIG packet.
+    /// Fixed fields of the boot configuration or CONFIG received from the Nano.
     packets::ConfigFixed fixed{};
-    /// Per-slot motor-group configuration sent with the fixed CONFIG fields.
+    /// Per-slot motor-group configuration accompanying the fixed CONFIG fields.
     std::array<packets::GroupCfg, packets::MAX_GROUPS> motorGroups{};
-    /// Per-slot rotation-sensor configuration sent with the fixed CONFIG fields.
+    /// Per-slot rotation-sensor configuration accompanying the fixed CONFIG fields.
     std::array<packets::RotationCfg, packets::MAX_ROTATIONS> trackingWheels{};
 };
 

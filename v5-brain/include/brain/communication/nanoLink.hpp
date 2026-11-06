@@ -1,48 +1,54 @@
 /** @file nanoLink.hpp
- *  @brief Brain-side adapter for exchanging state and commands with the Nano.
+ *  @brief Brain hardware and link boundary for the shared serial protocol.
  */
-
 #pragma once
 
 #include "brain/configuration.hpp"
 #include "brain/types.hpp"
-#include "protocol/serialProtocol.hpp"
 
 namespace brain {
 
-/** @brief Result of one serial state/command exchange. */
-struct LinkExchange {
-    /// True when a valid Nano command was received for this exchange.
-    bool commandReceived = false;
-    /// Received command; inspect @ref commandReceived and its @c valid field first.
-    NanoCommand command{};
-    /// Protocol error reported by the serial operation, if any.
-    packets::Error error = packets::Error::NONE;
+/** @brief Hardware operations used by the protocol link.
+ *
+ * The runtime owns the devices. Calls are serialized by the link; implementations
+ * must synchronize with any other task that accesses those devices. A failed
+ * configuration must leave the previous configuration active. The robot geometry
+ * in BrainConfiguration is local data and is not carried by CONFIG packets.
+ */
+class LinkHardware {
+public:
+    virtual ~LinkHardware() = default;
+
+    /// Validate and apply the boot or received configuration, resetting sensor origins on success.
+    virtual packets::Error applyConfiguration(const BrainConfiguration& config) = 0;
+    /// Sample continuous sensor positions, controller input, battery and hardware status.
+    virtual BrainState sample() = 0;
+    /// Apply motor and ADI outputs from a validated command; do not execute its one-shot request.
+    virtual packets::Error applyOutputs(const NanoCommand& command) = 0;
+    /// Execute a validated one-shot request and report its result to the link.
+    virtual packets::Error executeRequest(const packets::CommandFixed& command) = 0;
+    /// Brake configured motor groups when the autonomous watchdog expires.
+    virtual void brakeGroups() = 0;
 };
 
-/** @brief Encodes Brain state and decodes Nano responses over SerialProtocol. */
+/** @brief Protocol link service implemented using the shared SerialLink.
+ *
+ * The service applies CONFIG through LinkHardware, receives COMMAND, and sends
+ * STATE and LOG. It owns protocol bookkeeping, including command validation,
+ * request deduplication, watchdog timing, sequence numbers and acknowledged
+ * sensor-position history. It converts sampled cumulative radians to wire deltas
+ * from the acknowledged baseline. An implementation requires the existing
+ * SerialLink to be refactored to use LinkHardware instead of owning devices.
+ */
 class NanoLink {
 public:
-    /** @brief Bind the link adapter to a serial protocol instance.
-     *  @param serial Serial transport used for all link operations.
-     *  @note The referenced protocol instance must outlive this adapter.
-     */
-    explicit NanoLink(SerialProtocol& serial);
-
-    /** @brief Send robot configuration to the Nano.
-     *  @param config Robot and protocol configuration to transmit.
-     *  @return True when the configuration exchange succeeds.
-     */
-    bool configure(const BrainConfiguration& config);
-    /** @brief Exchange one Brain state update for a Nano motor command.
-     *  @param state Latest state snapshot to send.
-     *  @return Result containing command-reception and protocol-error information.
-     */
-    LinkExchange exchange(const BrainState& state);
-
-private:
-    /// Non-owning serial protocol object used to perform transport I/O.
-    SerialProtocol& serial_;
+    virtual ~NanoLink() = default;
+    /// Open the transport, apply the boot configuration, and start the link.
+    virtual bool start() = 0;
+    /// Stop link activity before destroying its hardware owner.
+    virtual void stop() = 0;
+    /// Enable Nano outputs in autonomous; disable them for local driver control.
+    virtual void setNanoControl(bool enabled) = 0;
 };
 
 } // namespace brain
