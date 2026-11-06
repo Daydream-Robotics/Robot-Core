@@ -108,6 +108,11 @@ void Bno055::stop() {
     if (m_thread.joinable()) {
         m_thread.join();
     }
+    // close the bus so a later start() opens a fresh handle instead of leaking this one
+    if (m_fd >= 0) {
+        close(m_fd);
+        m_fd = -1;
+    }
 }
 
 std::optional<double> Bno055::headingIncrement(int64_t t0Us, int64_t t1Us) const {

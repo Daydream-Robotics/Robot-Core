@@ -73,6 +73,9 @@ constexpr double END_TOLERANCE = 0.5;
 /* - - - - - - - - - - - - - - [NANO IMU] - - - - - - - - - - - - - - */
 // BNO055 on the Nano's I2C bus (jetson-nano/src/localization/imu/bno055.cpp)
 
+constexpr int NANO_IMU_RATE_HZ = 100; // gyro read rate, matches the chip's 100 Hz output in IMU mode
+constexpr double NANO_IMU_HISTORY_SEC = 1.0; // how far back headingIncrement() can look (s)
+constexpr int NANO_IMU_MAX_READ_ERRORS = 10; // consecutive read errors before recover()
 constexpr unsigned NANO_IMU_GYRO_CALIB_TRUSTED = 3; // CALIB_STAT gyro level needed for valid data (3 = fully calibrated)
 constexpr double NANO_IMU_BIAS_SEC = 1.0; // how long to average gyro Z for the bias (s)
 constexpr double NANO_IMU_BIAS_MAX_STDDEV = 0.01; // max gyro Z spread while still (rad/s), about 0.6 dps

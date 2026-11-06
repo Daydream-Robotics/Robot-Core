@@ -10,6 +10,15 @@
 
 #include "config/constants.h"
 
+// catch bad NANO_IMU constants at compile time instead of a divide by zero or out-of-bounds write at runtime
+static_assert(NANO_IMU_RATE_HZ > 0 && NANO_IMU_RATE_HZ <= 1000, "NANO_IMU_RATE_HZ must be 1-1000 (period is 1 s / rate in us)");
+static_assert(NANO_IMU_HISTORY_SEC * NANO_IMU_RATE_HZ >= 2, "heading history needs at least 2 samples to interpolate");
+static_assert(NANO_IMU_BIAS_SEC * NANO_IMU_RATE_HZ >= 10, "bias estimate needs at least 10 samples");
+static_assert(NANO_IMU_BIAS_MAX_STDDEV > 0 && NANO_IMU_BIAS_MAX_MEAN > 0, "bias limits must be positive");
+static_assert(NANO_IMU_GYRO_CALIB_TRUSTED <= 3, "CALIB_STAT gyro level is 0-3");
+static_assert(NANO_IMU_MAX_READ_ERRORS >= 1, "NANO_IMU_MAX_READ_ERRORS must be at least 1");
+static_assert(NANO_IMU_RESET_ATTEMPTS >= 1, "recover() needs at least one reset attempt");
+
 /**
  * @brief Adafruit BNO055 driver on the Nano's I2C bus. Integrates gyro Z into heading.
  *
@@ -24,9 +33,9 @@ public:
     struct Config {
         std::string device = "/dev/i2c-1";
         uint8_t address = 0x28; // 0x29 with ADR high
-        int rateHz = 100; // sensor output rate in fusion mode
-        double historySec = 1.0; // how far back headingIncrement() can look
-        int maxReadErrors = 10; // consecutive read errors before recover()
+        int rateHz = NANO_IMU_RATE_HZ; // sensor output rate in fusion mode
+        double historySec = NANO_IMU_HISTORY_SEC; // how far back headingIncrement() can look
+        int maxReadErrors = NANO_IMU_MAX_READ_ERRORS; // consecutive read errors before recover()
         std::string calibFile = NANO_IMU_CALIB_FILE; // saved gyro offsets, empty = don't save or load
     };
 
