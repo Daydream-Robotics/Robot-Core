@@ -41,6 +41,11 @@ add_library(robotcore_mpc STATIC
     src/motion/pathing/arclengthSplining.cpp
     src/motion/control/mpcReference.cpp
 )
+
+find_package(Threads REQUIRED)
+add_executable(rplidar_lite_test src/perception/lidar/test.cpp)
+target_link_libraries(rplidar_lite_test robotcore_lidar Threads::Threads)
+
 target_include_directories(robotcore_mpc PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
@@ -54,7 +59,8 @@ endif()
 # - - - - - - - - - - - - - - [LIDAR CORE] - - - - - - - - - - - - - -
 # portable: Eigen + std only, so the simulator and tests can link it too
 add_library(robotcore_lidar STATIC
-    src/perception/lidar/adaptiveThreshold.cpp
+        src/perception/lidar/adaptiveThreshold.cpp
+        src/perception/lidar/rplidar_lite.cpp
 )
 target_include_directories(robotcore_lidar PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -80,6 +86,8 @@ if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/link/serial.cpp
         src/link/serialProtocol.cpp
         ../shared/src/protocol/serialProtocol.cpp
+            src/perception/lidar/test.cpp
+            src/perception/lidar/test.cpp
     )
     target_compile_definitions(MPCController PRIVATE __jetson_nano__)
     target_link_libraries(MPCController PRIVATE robotcore_mpc robotcore_lidar Threads::Threads m)
