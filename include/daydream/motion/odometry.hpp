@@ -25,7 +25,9 @@ enum class OdomError {
     IMU_DISCONNECTED,
     IMU_CALIBRATING,
     IMU_COMMUNICATION_ERROR,
-    TRACKING_WHEEL_ERROR,
+    TRACKING_WHEEL_ERROR, // both tracking wheels are down
+    PERPENDICULAR_WHEEL_ERROR, // perpendicular wheel is down, sideways travel is taken as 0
+    PARALLEL_WHEEL_ERROR, // parallel wheel is down, forward travel is coming from the drive encoders
     MOTOR_ENCODER_ERROR,
     IMU_FALLBACK // IMU is unavailable, heading is coming from the drive encoders
 };
@@ -51,8 +53,8 @@ struct WheelLengths {
 struct WheelTravelResult {
     WheelLengths travel{0.0, 0.0}; /**< The distances traveled by the parallel and perpendicular tracking wheels in inches */
     OdomError error{OdomError::NONE}; /**< The tracking wheel error status */
-    double currentParallelPosition{0.0};
-    double currentPerpendicularPosition{0.0};
+    double currentParallelPosition{0.0}; /**< raw reading this frame, PROS_ERR if the read failed */
+    double currentPerpendicularPosition{0.0}; /**< raw reading this frame, PROS_ERR if the read failed */
 };
 
 /**
@@ -146,10 +148,20 @@ public:
     /**
      * @brief Gets the most recent odometry error
      * @note task safe
-     * @returns The latest OdomError, OdomError::IMU_FALLBACK if the pose is updating from
-     *          the drive encoders, or OdomError::NONE if the last update succeeded
+     * @returns The latest OdomError, OdomError::IMU_FALLBACK if the heading is coming from
+     *          the drive encoders, PARALLEL_WHEEL_ERROR / PERPENDICULAR_WHEEL_ERROR / TRACKING_WHEEL_ERROR
+     *          if the pose is updating without that tracking wheel, or OdomError::NONE if the last update succeeded
      */
     OdomError getOdomError();
+
+    /**
+     * @brief Gets the most recent tracking wheel status, independent of the IMU status
+     * @note task safe. getOdomError() reports IMU_FALLBACK over a wheel error, this doesn't hide it
+     * @returns PARALLEL_WHEEL_ERROR / PERPENDICULAR_WHEEL_ERROR / TRACKING_WHEEL_ERROR if a wheel is down
+     *          (including the frame it reconnects on), or OdomError::NONE if both are working
+     *          or the tracking wheels aren't the movement source
+     */
+    OdomError getTrackingWheelError();
 
     /**
      * @brief Gets yaw, falling back to the drive encoder heading tracked by odometry if the IMU is unavailable
@@ -163,11 +175,6 @@ public:
      * @returns velocity in inches per second
      */
     VelocityResult getParallelVel();
-    
-    /**
-     * @brief Returns struct of distances travelled by drive encoders when using internal encoders
-     */
-    DriveTravelResult getDriveEncoderTravel(void);
 
     /**
      * @brief Background task entry point
@@ -198,8 +205,18 @@ private:
 
     /**
      * @brief Returns struct of distances travelled by Odometry Wheels
+     * @note doesn't save the readings as previous. updatePose() does that after the pose update
+     * @returns PARALLEL_WHEEL_ERROR / PERPENDICULAR_WHEEL_ERROR with the remaining wheel's travel,
+     *          or TRACKING_WHEEL_ERROR with no travel when both are down. A wheel with no valid
+     *          previous reading (just reconnected) counts as down for that frame
      */
     WheelTravelResult getOdomWheelTravel(void);
+
+    /**
+     * @brief Returns struct of distances travelled by drive encoders since the saved previous readings
+     * @note sets up the per-motor baselines when they aren't ready, so only updatePose() should call it
+     */
+    DriveTravelResult getDriveEncoderTravel(void);
 
     /**
      * @brief Yaw straight from the IMU
@@ -231,6 +248,9 @@ private:
 
     // latest odom error, readable from any task
     std::atomic<OdomError> m_lastOdomError{OdomError::NONE};
+
+    // latest tracking wheel status, readable from any task
+    std::atomic<OdomError> m_lastWheelError{OdomError::NONE};
     
 };
 

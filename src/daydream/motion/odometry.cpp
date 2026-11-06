@@ -104,6 +104,16 @@ static std::optional<double> averageMotorGroupPosition(const pros::MotorGroup& g
     return sum / static_cast<double>(validCount);
 }
 
+// Distance a tracking wheel moved between two readings, in inches.
+// A failed read is PROS_ERR, so the first good read after a reconnect gives 0 travel and becomes the new baseline.
+static double trackingWheelTravel(double curr, double prev, double diameter) {
+	if (curr == PROS_ERR || prev == PROS_ERR) {
+		return 0.0;
+	}
+	// rotation sensor position is in centidegrees
+	return ((curr - prev) / 36000.0) * diameter * std::numbers::pi;
+}
+
 Odometry::Odometry(OdomConfig config) : m_config(config) {}
 
 
@@ -111,8 +121,43 @@ void Odometry::updatePose(void) {
 	// Read motor encoders every update as IMU backup
 	DriveTravelResult motorResult = getDriveEncoderTravel();
 
-	if (m_config.useMotorEncoders &&
-		motorResult.error != OdomError::NONE) {
+	// Check tracking wheels for if they are the movement source
+	WheelTravelResult wheelResult;
+
+	// whether each axis comes from its tracking wheel this update. without it,
+	// forward travel comes from the drive encoders and sideways travel is taken as 0
+	bool parallelFromWheel = false;
+	bool perpendicularFromWheel = false;
+
+	if (!m_config.useMotorEncoders) {
+		wheelResult = getOdomWheelTravel();
+
+		m_lastWheelError = wheelResult.error;
+
+		parallelFromWheel = wheelResult.error == OdomError::NONE ||
+			wheelResult.error == OdomError::PERPENDICULAR_WHEEL_ERROR;
+		perpendicularFromWheel = wheelResult.error == OdomError::NONE ||
+			wheelResult.error == OdomError::PARALLEL_WHEEL_ERROR;
+
+		if (wheelResult.error != OdomError::NONE) {
+			static uint32_t lastWheelFailurePrint = 0;
+			const uint32_t now = pros::millis();
+
+			if (now - lastWheelFailurePrint >= 500) {
+				const char* message = "[Update Pose] Tracking Wheel Error!";
+				if (wheelResult.error == OdomError::PARALLEL_WHEEL_ERROR) {
+					message = "[Update Pose] Parallel Wheel Error!";
+				} else if (wheelResult.error == OdomError::PERPENDICULAR_WHEEL_ERROR) {
+					message = "[Update Pose] Perpendicular Wheel Error!";
+				}
+				pros::lcd::print(0, "%s", message);
+				lastWheelFailurePrint = now;
+			}
+		}
+	}
+
+	// forward travel needs the drive encoders when they are the source or the parallel wheel is down
+	if (!parallelFromWheel && motorResult.error != OdomError::NONE) {
 
 		static uint32_t lastMotorFailurePrint = 0;
 		const uint32_t now = pros::millis();
@@ -124,19 +169,6 @@ void Odometry::updatePose(void) {
 
 		m_lastOdomError = OdomError::MOTOR_ENCODER_ERROR;
 		return;
-	}
-
-	// Check tracking wheels for if they are the movement source
-	WheelTravelResult wheelResult;
-
-	if (!m_config.useMotorEncoders) {
-		wheelResult = getOdomWheelTravel();
-
-		if (wheelResult.error != OdomError::NONE) {
-			m_lastOdomError = wheelResult.error;
-			pros::lcd::print(0, "[Update Pose] Tracking Wheel Error!");
-			return;
-		}
 	}
 
 	double encoderHeading = 0.0;
@@ -243,13 +275,9 @@ void Odometry::updatePose(void) {
 			m_driveEncodersReady = true;
 
 		} else {
+			// a failed read seeds PROS_ERR, so that wheel re-seeds on its first good read
 			m_prevParallel = parallelTrackingWheel.get_position();
 			m_prevPerpendicular = perpendicularTrackingWheel.get_position();
-
-			if (m_prevParallel == PROS_ERR || m_prevPerpendicular == PROS_ERR) {
-				m_lastOdomError = OdomError::TRACKING_WHEEL_ERROR;
-				return;
-			}
 
 			auto leftSample = readMotorGroupSample(leftMotors);
 			auto rightSample = readMotorGroupSample(rightMotors);
@@ -285,31 +313,33 @@ void Odometry::updatePose(void) {
 		return;
 	}
 
-	// Calculate distance travelled by either drive encoders or tracking wheels
-	WheelLengths arcs;
-	
-	if (m_config.useMotorEncoders) {
-		double forwardInches = (motorResult.leftInches + motorResult.rightInches) / 2.0;
-		arcs = {forwardInches, 0.0};
-	}	
-	else {
-		arcs = wheelResult.travel;
+	// Calculate distance travelled by the drive encoders or tracking wheels, per axis
+	WheelLengths arcs{0.0, 0.0};
+
+	if (parallelFromWheel) {
+		arcs.parallel = wheelResult.travel.parallel;
+	} else {
+		arcs.parallel = (motorResult.leftInches + motorResult.rightInches) / 2.0;
 	}
-	
-	// Determine change in heading 
+
+	if (perpendicularFromWheel) {
+		arcs.perpendicular = wheelResult.travel.perpendicular;
+	}
+
+	// Determine change in heading
 	double del_theta = normalizeAngle(theta_rad - m_prevTheta);
 
 	// Select the correct parallel offset for the active movement source
-	const double activeParallelOffset = m_config.useMotorEncoders
-		? m_config.driveEncoderOffset
-		: m_config.parallelTrackingWheelOffset;
+	const double activeParallelOffset = parallelFromWheel
+		? m_config.parallelTrackingWheelOffset
+		: m_config.driveEncoderOffset;
 
 	// Determine change in local x and local y
 	double dx_local = arcs.parallel - (del_theta * activeParallelOffset);
 	double dy_local = arcs.perpendicular;
 
-	// Perpendicular offset correction applies only to tracking wheels
-	if (!m_config.useMotorEncoders) {
+	// Perpendicular offset correction applies only to travel the perpendicular wheel measured
+	if (perpendicularFromWheel) {
 		dy_local += del_theta * m_config.perpendicularTrackingWheelOffset;
 	}
 
@@ -347,6 +377,7 @@ void Odometry::updatePose(void) {
 	}
 
 	// Save tracking wheel positions only after updating the pose
+	// (PROS_ERR for a wheel that's down, so it re-seeds when it comes back)
 	if (!m_config.useMotorEncoders) {
 		m_prevParallel = wheelResult.currentParallelPosition;
 		m_prevPerpendicular = wheelResult.currentPerpendicularPosition;
@@ -354,7 +385,8 @@ void Odometry::updatePose(void) {
 
 	m_prevTheta = theta_rad;
 
-	m_lastOdomError = m_usingEncoderHeading ? OdomError::IMU_FALLBACK : OdomError::NONE;
+	// wheelResult.error is NONE when the tracking wheels aren't the source
+	m_lastOdomError = m_usingEncoderHeading ? OdomError::IMU_FALLBACK : wheelResult.error;
 
 	// !IMPORTANT!: Likely not task safe
 	// print to the controller every 100 ms 
@@ -404,6 +436,10 @@ double Odometry::getPosY() {
 
 OdomError Odometry::getOdomError() {
 	return m_lastOdomError.load();
+}
+
+OdomError Odometry::getTrackingWheelError() {
+	return m_lastWheelError.load();
 }
 
 YawResult Odometry::getYaw(void) {
@@ -458,44 +494,47 @@ WheelTravelResult Odometry::getOdomWheelTravel(void) {
 	double currParallel = parallelTrackingWheel.get_position();
 	double currPerpendicular = perpendicularTrackingWheel.get_position();
 
-	// Returns error for problem with either wheel
-	if (currParallel == PROS_ERR || currPerpendicular == PROS_ERR) {
-		return {{0.0, 0.0}, OdomError::TRACKING_WHEEL_ERROR};
+	// Get delta between current and last frame, 0 for a wheel that's down or just reconnected
+	double delParallel = trackingWheelTravel(currParallel, m_prevParallel, m_config.parallelWheelDiameter);
+	double delPerpendicular = trackingWheelTravel(currPerpendicular, m_prevPerpendicular, m_config.perpendicularWheelDiameter);
+
+	// A wheel is also treated as down on the frame it reconnects (no valid previous reading),
+	// so that axis keeps using the fallback source while the new baseline is saved
+	const bool parallelDown = currParallel == PROS_ERR || m_prevParallel == PROS_ERR;
+	const bool perpendicularDown = currPerpendicular == PROS_ERR || m_prevPerpendicular == PROS_ERR;
+
+	// Report which wheel is down so updatePose() can use the other sources for that axis
+	OdomError error = OdomError::NONE;
+	if (parallelDown && perpendicularDown) {
+		error = OdomError::TRACKING_WHEEL_ERROR;
+	} else if (perpendicularDown) {
+		error = OdomError::PERPENDICULAR_WHEEL_ERROR;
+	} else if (parallelDown) {
+		error = OdomError::PARALLEL_WHEEL_ERROR;
 	}
 
-    // Get delta between current and last frame 
-	double dTicksL = currParallel - m_prevParallel; 
-	double dTicksS = currPerpendicular - m_prevPerpendicular;
-
-	// Convert centidegrees to degrees and find distance travelled by wheel
-	double delParallel = (dTicksL / 36000.0) * m_config.parallelWheelDiameter * std::numbers::pi; 
-	double delPerpendicular = (dTicksS / 36000.0) * m_config.perpendicularWheelDiameter * std::numbers::pi; 
-
-	return {{delParallel, delPerpendicular}, OdomError::NONE, currParallel, currPerpendicular};
+	return {{delParallel, delPerpendicular}, error, currParallel, currPerpendicular};
 }
 
 VelocityResult Odometry::getParallelVel() {
 	double initialVelocity = parallelTrackingWheel.get_velocity();
 
-	if (m_config.useMotorEncoders){
+	// drive encoders when they are the source, or when the parallel wheel is down
+	if (m_config.useMotorEncoders || initialVelocity == PROS_ERR){
 
 		double leftVelocity = averageMotorGroupVelocities(leftMotors);
 		double rightVelocity = averageMotorGroupVelocities(rightMotors);
 
 		if (leftVelocity == PROS_ERR_F || rightVelocity == PROS_ERR_F) {
-			return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+			return {0.0, OdomError::MOTOR_ENCODER_ERROR};
 		}
 
 		// motor velocities are in RPM
 		double averageRpm = (leftVelocity + rightVelocity) / 2;
 
 		double velocity  = averageRpm * DRIVE_GEAR_RATIO * (m_config.driveWheelDiameter / 2) * (2 * std::numbers::pi / 60);
-		
-		return {velocity, OdomError::NONE};
-	}
 
-	if (initialVelocity == PROS_ERR) {
-		return {0.0, OdomError::TRACKING_WHEEL_ERROR};
+		return {velocity, OdomError::NONE};
 	}
 
 	// rotation sensor velocity is in centidegrees per second
@@ -728,7 +767,7 @@ Odometry odom({
 	PERPENDICULAR_TRACKING_WHEEL_DIAMETER,
 	PARALLEL_TRACKING_WHEEL_OFFSET,
 	PERPENDICULAR_TRACKING_WHEEL_OFFSET,
-	true,
+	false,
 	DRIVE_WHEEL_DIAMETER_INCHES,
 	TRACK_WIDTH
 });
