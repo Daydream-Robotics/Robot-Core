@@ -343,6 +343,7 @@ WheelLengths Odometry::getDriveEncoderTravel(void) {
 	else if (rightValid) {
         forwardInches = rightInches;
     }
+	
     return {forwardInches, 0.0};
 }
 
