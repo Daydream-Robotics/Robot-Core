@@ -7,13 +7,41 @@
 namespace se2 {
 
 Pose compose(const Pose& a, const Pose& b) {
-    // TODO: rotate b's translation by a.theta, add to a's position, sum and wrap headings
-    return Pose{0.0, 0.0, 0.0};
+    // turns add, wrapped back into (-pi, pi]
+    double heading = utils::wrapAngle(a.theta + b.theta);
+
+    // rotate by a's heading, the direction the robot faced before the move
+    double cosA = std::cos(a.theta);
+    double sinA = std::sin(a.theta);
+
+    // b's forward/left move turned into world-frame x and y changes
+    double dxWorld = b.x * cosA - b.y * sinA;
+    double dyWorld = b.x * sinA + b.y * cosA;
+
+    // start at a's position, then apply the move
+    double x = a.x + dxWorld;
+    double y = a.y + dyWorld;
+
+    return Pose{x, y, heading};
 }
 
 Pose inverse(const Pose& a) {
-    // TODO: negate heading, rotate -a's translation by -a.theta
-    return Pose{0.0, 0.0, 0.0};
+    // turn back by a's heading, wrapped into (-pi, pi]
+    double heading = utils::wrapAngle(-a.theta);
+
+    // the move from a back to the origin, in world-frame x and y
+    double backX = -a.x;
+    double backY = -a.y;
+
+    // rotate by -a.theta, written with cos/sin of a.theta (cos(-t) = cos(t), sin(-t) = -sin(t))
+    double cosA = std::cos(a.theta);
+    double sinA = std::sin(a.theta);
+
+    // the move back turned into a's frame (forward/left as seen from a)
+    double x = backX * cosA + backY * sinA;
+    double y = -backX * sinA + backY * cosA;
+
+    return Pose{x, y, heading};
 }
 
 Pose between(const Pose& a, const Pose& b) {
