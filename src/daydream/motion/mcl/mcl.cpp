@@ -17,8 +17,8 @@ namespace mcl {
     //precomputed constants for gaussian calculation
     const double INV_2_SIGMA2 = 1.0 / (2.0 * SIGMA_M * SIGMA_M);
     const double LOG_NORM = std::log(2.0 * M_PI * SIGMA_M * SIGMA_M);
-    //random number generator initialized with current time
-    rng::Xoshiro128Plus rngGen(pros::millis());
+    //random number generator, reseeded in initMcl() (millis() is ~0 during static init, so every boot would match)
+    rng::Xoshiro128Plus rngGen(1);
 
     //range sensing system used for raycasting expected sensor readings
     RangeSensing rangeSensing;
@@ -37,7 +37,6 @@ namespace mcl {
     int nanDebugPrints = 0;
     bool rangeSystemInitialized = false;
     bool mclInitialized = false;
-    pros::task_t odomTaskHandle = nullptr;
     pros::task_t mclUpdateTaskHandle = nullptr;
     // std::uint32_t lastPoseCorrectionMs = 0;
     std::uint32_t lastEstimatePrintMs = 0;
@@ -46,14 +45,11 @@ namespace mcl {
     //change in odometry position since last update
     RobotPosition deltaOdomPos;
 
-    //motion noise covariance matrix
-    constexpr Covariance EPSILON = {
-        0.5 * 0.5, 0.0, 0.0, // xx, xy, xTheta
-        0.0, 0.5 * 0.5, 0.0, // yx, yy, yTheta
-        0.0, 0.0, 0.02 * 0.02 // thetaX, thetaY, thetaTheta
-    };
-    constexpr double SIGMA_X = 0.5;
-    constexpr double SIGMA_Y = 0.5;
+    //motion noise stddev per update, scaled with how far odom moved (inches of noise per inch moved)
+    //TODO: tune
+    constexpr double MOTION_NOISE_PER_INCH = 0.1;
+    //small stddev added every update so particles keep some spread while the robot is still
+    constexpr double MOTION_NOISE_FLOOR = 0.01;
 
     //vector storing all particles
     std::vector<Particle> particles;
@@ -110,8 +106,10 @@ namespace mcl {
         return state != pros::E_TASK_STATE_DELETED && state != pros::E_TASK_STATE_INVALID;
     }
 
-    //fast approximation of exponential function
+    //fast approximation of exponential function, for x <= 0
     inline float fastExp(float x) {
+        //below -256 the base goes negative and the even power makes it huge, e^-256 is 0 anyway
+        if (x <= -256.0f) return 0.0f;
         x = 1.0f + x / 256.0f;
         x *= x; x *= x; x *= x; x *= x;
         x *= x; x *= x; x *= x; x *= x;
@@ -252,8 +250,11 @@ namespace mcl {
                 validMeasurements++;
             }
 
+            //no sensor could be compared, so there's no evidence for this particle. Give it zero weight
+            //(0 would be the best possible log weight). If every particle ends up here, the weights go uniform
             if (validMeasurements == 0) {
-                logSum = 0.0;
+                particles[i].logWeight = -INFINITY;
+                continue;
             }
 
             if (!std::isfinite(logSum)) {
@@ -414,15 +415,16 @@ namespace mcl {
 
     //propagates particles forward using odometry with added noise
     void stateSample() {
-        const double noiseXStddev = std::sqrt(EPSILON.xx);
-        const double noiseYStddev = std::sqrt(EPSILON.yy);
-        const double noiseThetaStddev = std::sqrt(EPSILON.thetaTheta);
         const double theta = odom.getPose().theta;
+
+        //noise grows with distance moved, so a still robot doesn't spread its particles out
+        const double distMoved = std::hypot(deltaOdomPos.x, deltaOdomPos.y);
+        const double noiseStddev = MOTION_NOISE_FLOOR + MOTION_NOISE_PER_INCH * distMoved;
 
         //update each particle with odometry delta plus noise
         for (auto& particle : particles) {
-            particle.x += deltaOdomPos.x + rngGen.normal(0.0, SIGMA_X);
-            particle.y += deltaOdomPos.y + rngGen.normal(0.0, SIGMA_Y);
+            particle.x += deltaOdomPos.x + rngGen.normal(0.0, noiseStddev);
+            particle.y += deltaOdomPos.y + rngGen.normal(0.0, noiseStddev);
             particle.theta = theta;
             //reset particles that go out of bounds
             if (particle.x < X_MIN || particle.x > X_MAX ||
@@ -436,14 +438,13 @@ namespace mcl {
     //initializes MCL system with uniformly distributed particles
     void initMcl(const Pose& initPose) {
         odom.setPose(initPose);
-        if (!taskIsActive(odomTaskHandle)) {
-            odomTaskHandle = pros::Task::create(
-                Odometry::odomTask,
-                TASK_PRIORITY_DEFAULT + 2,
-                TASK_STACK_DEPTH_DEFAULT,
-                "Custom Odom"
-            );
-        }
+        //no-op if initialize() already started it
+        odom.startTask();
+
+        //seed from the time MCL starts and the battery voltage, both vary between runs
+        const std::uint32_t seed = static_cast<std::uint32_t>(pros::micros()) ^
+            (static_cast<std::uint32_t>(pros::battery::get_voltage()) << 16);
+        rngGen = rng::Xoshiro128Plus(seed);
 
         mclInitialized = false;
         if (!rangeSystemInitialized) {
@@ -487,7 +488,8 @@ namespace mcl {
         if (!taskIsActive(mclUpdateTaskHandle)) {
             mclUpdateTaskHandle = pros::Task::create(
                 mcl::mclUpdate,
-                TASK_PRIORITY_DEFAULT + 3,
+                //below the odom task (DEFAULT + 1) so a long MCL update can't delay odometry
+                TASK_PRIORITY_DEFAULT,
                 TASK_STACK_DEPTH_DEFAULT,
                 "MCL Update"
             );

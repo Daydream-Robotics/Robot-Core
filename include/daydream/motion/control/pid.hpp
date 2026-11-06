@@ -8,28 +8,29 @@
 class PID {
     private:
         // Constants
-        double kP, kI, kD;
-        double start_i;
+        double kP = 0.0, kI = 0.0, kD = 0.0;
+        double start_i = 0.0;
         
         // State
-        double target;
-        double error, prevError;
-        double integral;
-        double derivative;
-        double output;
+        double target = 0.0;
+        double error = 0.0, prevError = 0.0;
+        double integral = 0.0;
+        double derivative = 0.0;
+        double output = 0.0;
         
-        // Exit conditions
-        double smallError, bigError;
-        int smallTime, bigTime;
-        double velocityThreshold;
-        int velocityTime, timeout;
+        // Exit conditions (all zero never exits until exit_condition_set() is called)
+        double smallError = 0.0, bigError = 0.0;
+        int smallTime = 0, bigTime = 0;
+        double velocityThreshold = 0.0;
+        int velocityTime = 0, timeout = 0;
         
-        int smallCounter, bigCounter, velocityCounter;
+        int smallCounter = 0, bigCounter = 0, velocityCounter = 0;
         std::chrono::steady_clock::time_point startTime, lastTime;
         
     public:
         // Initialize PID with constants
         PID(double p, double i, double d, double start_i);
+        // Zero gains, set them with setConstants()
         PID();
         
         // Set target and reset error

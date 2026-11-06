@@ -87,7 +87,7 @@ void Autonomous::turnTo(double targetHeading) {
 		
 		m_drivetrain.setVelocity(turnSpeed, -turnSpeed);
 		
-		double currentVelocity = (std::fabs(angleDiffDeg(targetHeading, filteredHeading)) < (1.0 * std::numbers::pi / 180)) ? angleDiffDeg(rawHeading, prevHeading) / dt : 999.0;
+		double currentVelocity = (std::fabs(angleDiffRad(targetHeading, filteredHeading)) < (1.0 * std::numbers::pi / 180)) ? angleDiffRad(rawHeading, prevHeading) / dt : 999.0;
 		if (turnPID.exit_condition(currentVelocity) != PID::RUNNING)
 			break;
 		prevHeading = rawHeading;
@@ -109,11 +109,6 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
         return (v < lo) ? lo : (v > hi) ? hi : v;
     };
 
-    auto normalizeDeg = [](double a) {
-        while (a >= std::numbers::pi) a -= (2 * std::numbers::pi);
-        while (a < -std::numbers::pi) a += (2 * std::numbers::pi);
-        return a;
-    };
 	// int count = 0;
     distancePID.setTarget(distance);
     distancePID.exit_condition_set(
@@ -181,7 +176,7 @@ double Autonomous::travel(double distance, double speed, double targetHeading, d
 
 		double rawHeading = rawHeadingResult.yaw;
 
-        double headingError = normalizeDeg(targetHeading - rawHeading);
+        double headingError = normalizeAngle(targetHeading - rawHeading);
 
         // Heading correction
 		// double omega = headingPID.compute(headingError) * (std::fabs(v) / speed);

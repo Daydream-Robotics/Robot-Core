@@ -447,20 +447,27 @@ OdomError Odometry::getTrackingWheelError() {
 }
 
 YawResult Odometry::getYaw(void) {
-	YawResult imuResult = getIMUYaw();
+	// Read the IMU directly so the heading is fresher than the last updatePose()
+	if (!m_usingEncoderHeading) {
+		YawResult imuResult = getIMUYaw();
+		if (imuResult.error != OdomError::NONE) {
+			return imuResult;
+		}
 
-	// raw yaw is CCW positive, flip it so it matches field headings (CW positive)
-	if (imuResult.error == OdomError::NONE || !m_usingEncoderHeading) {
-		imuResult.yaw = normalizeAngle(-imuResult.yaw);
-		return imuResult;
+		m_mutex.take();
+		const double offset = m_headingOffset;
+		m_mutex.give();
+
+		// raw yaw + offset is the math angle, convert it to a field heading like Pose::theta
+		return {mathToHeading(imuResult.yaw + offset), OdomError::NONE};
 	}
 
-	// IMU is unavailable, use the encoder heading updatePose() is tracking
+	// updatePose() is on encoder heading (IMU down, or just back and not rebased yet)
 	m_mutex.take();
-	double encoderYaw = m_lastRawTheta;
+	const double heading = mathToHeading(m_lastRawTheta + m_headingOffset);
 	m_mutex.give();
 
-	return {normalizeAngle(-encoderYaw), OdomError::NONE};
+	return {heading, OdomError::NONE};
 }
 
 YawResult Odometry::getIMUYaw(void) {
@@ -612,17 +619,47 @@ double Odometry::averageMotorGroupVelocities(const pros::MotorGroup& group){
 	}
 
 	double sum = 0.0;
+	size_t validCount = 0;
 
 	for(auto vel : velocities){
-		if(vel == PROS_ERR_F){
-			return PROS_ERR_F;
+		// Skip invalid motor readings, same as the position averaging
+		if(vel == PROS_ERR_F || !std::isfinite(vel)){
+			continue;
 		}
 		sum += vel;
+		validCount++;
 	}
-	return sum / static_cast<double>(velocities.size());
+
+	// No usable motors
+	if (validCount == 0) {
+		return PROS_ERR_F;
+	}
+
+	return sum / static_cast<double>(validCount);
 }
 
-// Background odom loop, started once in initialize(). Runs every 10 ms on a fixed schedule
+void Odometry::startTask() {
+	m_taskMutex.take();
+
+	bool running = false;
+	if (m_taskHandle != nullptr) {
+		const auto state = pros::c::task_get_state(m_taskHandle);
+		running = state != pros::E_TASK_STATE_DELETED && state != pros::E_TASK_STATE_INVALID;
+	}
+
+	if (!running) {
+		m_taskHandle = pros::Task::create(
+			Odometry::odomTask,
+			TASK_PRIORITY_DEFAULT + 1,
+			TASK_STACK_DEPTH_DEFAULT,
+			"Odom Task"
+		);
+	}
+
+	m_taskMutex.give();
+}
+
+// Background odom loop, started through startTask(). Runs every 10 ms on a fixed schedule
 // (delay_until), independent of PathFollower::step(), so pose stays current in every mode.
 void Odometry::odomTask() {
 	std::uint32_t now = pros::millis();

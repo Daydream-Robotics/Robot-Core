@@ -26,9 +26,6 @@ double convertDegToRad(double degree);
 // Covert Radians to Degrees
 double convertRadToDeg(double rad);
 
-// Subtract angles with [-180, 180] wrapping
-double angleDiffDeg(double a, double b);
-
 // Subtract angles with [-pi, +pi] wrapping
 double angleDiffRad(double a, double b);
 

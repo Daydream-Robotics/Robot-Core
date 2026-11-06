@@ -22,6 +22,12 @@ constexpr int LEVER_TWO_PORT = 22;
 
 constexpr int IMU_PORT = 1; 
 
+// MCL distance sensors
+constexpr int FRONT_DISTANCE_PORT = 3;
+constexpr int LEFT_DISTANCE_PORT = 2;
+constexpr int BACK_DISTANCE_PORT = 8;
+constexpr int RIGHT_DISTANCE_PORT = 9;
+
 constexpr char BALL_BLOCKER_PORT = 'A';
 constexpr char SCORING_LIFTER = 'B';
 constexpr char MATCHLOADER_PORT = 'C';

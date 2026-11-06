@@ -38,13 +38,6 @@ double convertRadToDeg(double rad) {
 }
 
 // Subtract angles with [-pi, pi] wrapping
-double angleDiffDeg(double a, double b) {
-    double c = a - b;
-    while (c > std::numbers::pi) c -= 2 * std::numbers::pi;
-    while (c <= -std::numbers::pi) c += 2 * std::numbers::pi;
-    return c;
-}
-
 double angleDiffRad(double a, double b) {
     double c = a - b;
     while (c > M_PI) c -= 2 * M_PI;
@@ -92,7 +85,7 @@ double accelLimit(double prev, double target, double dt, double maxAccel) {
  *     L = sum((dLeft - dRight) * dTheta) / sum(dTheta^2)
  *
  * @param iterations Number of turns to average over (alternates direction each turn)
- * @returns Effective track width L in inches (0.0 on IMU failure)
+ * @returns Effective track width L in inches (0.0 on IMU or encoder failure)
  */
 double measureTrackWidth(int iterations){
     //local instance of auton so we can use turnTo / turnPID
@@ -102,15 +95,20 @@ double measureTrackWidth(int iterations){
     double sumDiffTimesTheta = 0.0; //sum of (dLeft - dRight) * dTheta
     double sumThetaSquared = 0.0;   //sum of dTheta^2
 
-    //average drive side travel in inches (same math as Odometry::getDriveEncoderTravel, which is private)
+    //average drive side position in inches (same math as Odometry::getDriveEncoderTravel, which is private)
+    //NAN if no motor on the side has a valid reading
     auto sideInches = [](const pros::MotorGroup& group) {
-            //average position (deg) across every motor on this side
+            //average position (deg) across every motor on this side, skipping bad readings
             std::vector<double> positions = group.get_position_all();
             double sum = 0.0;
+            size_t validCount = 0;
             for (double pos : positions) {
+                if (!std::isfinite(pos)) continue;
                 sum += pos;
+                validCount++;
             }
-            double deg = positions.empty() ? 0.0 : sum / positions.size();
+            if (validCount == 0) return static_cast<double>(NAN);
+            double deg = sum / static_cast<double>(validCount);
 
             //motor deg to wheel rotations to inches of wheel circumference
             return (deg / 360.0) * DRIVE_GEAR_RATIO * DRIVE_WHEEL_DIAMETER_INCHES * std::numbers::pi;
@@ -118,10 +116,10 @@ double measureTrackWidth(int iterations){
 
     //go throught the iterations
     for (int i = 0; i < iterations; ++i) {
-        //zero the drive encoders so this trial's travel starts at 0
-        leftMotors.tare_position_all();
-        rightMotors.tare_position_all();
-        pros::delay(100);
+        //record where each side starts instead of taring, taring would make odometry see the
+        //encoders jump back to 0 and corrupt the pose
+        const double startLeft = sideInches(leftMotors);
+        const double startRight = sideInches(rightMotors);
 
         //heading before the turn (rad)
         YawResult start = odom.getYaw();
@@ -147,8 +145,13 @@ double measureTrackWidth(int iterations){
         double dTheta = angleDiffRad(end.yaw, start.yaw);
 
         //distance each side traveled during the turn (in) with opposite signs when turning in place
-        double dLeft  = sideInches(leftMotors);
-        double dRight = sideInches(rightMotors);
+        double dLeft  = sideInches(leftMotors) - startLeft;
+        double dRight = sideInches(rightMotors) - startRight;
+
+        if (!std::isfinite(dLeft) || !std::isfinite(dRight)) {
+                pros::lcd::print(0, "[TrackWidth] Motor Encoder Failure!");
+                return 0.0;
+        }
 
         //add this trial to the least-squares sums
         sumDiffTimesTheta += (dLeft - dRight) * dTheta;
@@ -186,7 +189,7 @@ double HeadingFilter::update(double raw) {
         return m_heading;
     }
 
-    m_heading += m_alpha * angleDiffDeg(raw, m_heading);
+    m_heading += m_alpha * angleDiffRad(raw, m_heading);
     return m_heading;
 }
 

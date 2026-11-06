@@ -167,7 +167,7 @@ public:
 
     /**
      * @brief Gets yaw, falling back to the drive encoder heading tracked by odometry if the IMU is unavailable
-     * @note Clockwise is positive, matching Pose::theta. Not offset by setPose()
+     * @note Field heading, same frame as Pose::theta (0 = +Y, pi/2 = +X, CW positive), includes setPose()
      * @returns yaw/heading in radians and error status
      */
     YawResult getYaw(void);
@@ -179,9 +179,10 @@ public:
     VelocityResult getParallelVel();
 
     /**
-     * @brief Background task entry point
+     * @brief Starts the background odom task, if it isn't already running
+     * @note Safe to call more than once, there is only ever one odom task
      */
-    static void odomTask();
+    void startTask();
 
     /**
      * @brief Calculates tracking wheel offsets by rotating the robot 
@@ -229,9 +230,18 @@ private:
     /**
      * @brief Averages the actual velocities of all motors in a motor group
      * @param group The motor group to average
-     * @returns The average velocity in RPM, or PROS_ERR_F if any motor reports an error
+     * @returns The average velocity in RPM of the motors with valid readings, or PROS_ERR_F if none are valid
      */
     static double averageMotorGroupVelocities(const pros::MotorGroup& group);
+
+    /**
+     * @brief Background task entry point, started by startTask()
+     */
+    static void odomTask();
+
+    // handle of the one background odom task, guarded by m_taskMutex
+    pros::task_t m_taskHandle = nullptr;
+    pros::Mutex m_taskMutex;
   
     // previous state tracking
     double m_prevTheta = 0;

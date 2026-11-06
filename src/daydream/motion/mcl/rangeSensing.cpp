@@ -1,6 +1,7 @@
 //Inclusions
 
 #include "main.h"
+#include "daydream/config/constants.h"
 
 #include "daydream/utils/helpers.hpp"
 #include "daydream/motion/odometry.hpp"
@@ -10,10 +11,10 @@
 #include <algorithm>
 
 RangeSensors distanceSensors = {
-    pros::Distance(3),
-    pros::Distance(2),
-    pros::Distance(8),
-    pros::Distance(9)
+    pros::Distance(FRONT_DISTANCE_PORT),
+    pros::Distance(LEFT_DISTANCE_PORT),
+    pros::Distance(BACK_DISTANCE_PORT),
+    pros::Distance(RIGHT_DISTANCE_PORT)
 };
 RangeReadings distanceReadings;
 
@@ -235,27 +236,29 @@ void RangeSensing::printPositionFromSensors() {
     int validCount = 0;
 
     //calculate position from each sensor
+    //assumes the robot is facing +x (heading 90 deg). Each reading gives the sensor's position,
+    //then the sensor's offset is subtracted to get the robot center
     //front sensor points in +x direction, measures distance to right wall
     if (!std::isnan(readings.front)) {
-        x = X_MAX - readings.front + SENSOR_OFFSET_X[0];
+        x = X_MAX - readings.front - SENSOR_OFFSET_X[0];
         validCount++;
     }
 
     //back sensor points in -x direction, measures distance to left wall
     if (!std::isnan(readings.back)) {
-        x = X_MIN + readings.back + SENSOR_OFFSET_X[2];
+        x = X_MIN + readings.back - SENSOR_OFFSET_X[2];
         validCount++;
     }
 
     //left sensor points in +y direction, measures distance to top wall
     if (!std::isnan(readings.left)) {
-        y = Y_MAX - readings.left + SENSOR_OFFSET_Y[1];
+        y = Y_MAX - readings.left - SENSOR_OFFSET_Y[1];
         validCount++;
     }
 
     //right sensor points in -y direction, measures distance to bottom wall
     if (!std::isnan(readings.right)) {
-        y = Y_MIN + readings.right + SENSOR_OFFSET_Y[3];
+        y = Y_MIN + readings.right - SENSOR_OFFSET_Y[3];
         validCount++;
     }
 
