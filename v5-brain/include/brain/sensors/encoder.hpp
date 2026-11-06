@@ -38,7 +38,7 @@ public:
 
 private:
     /// PROS rotation sensor used to acquire encoder readings.
-    pros::Rotation device_;
+    pros::Rotation m_device;
 };
 
 } // namespace brain
