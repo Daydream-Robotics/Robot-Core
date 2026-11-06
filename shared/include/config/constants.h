@@ -70,6 +70,16 @@ constexpr double TURN_KI_THRESHOLD = 15.0;
 /* - - - - - - - - - - - - - - [Motion Controllers] - - - - - - - - - - - - - - */
 constexpr double END_TOLERANCE = 0.5;
 
+/* - - - - - - - - - - - - - - [NANO IMU] - - - - - - - - - - - - - - */
+// BNO055 on the Nano's I2C bus (jetson-nano/src/localization/imu/bno055.cpp)
+
+constexpr unsigned NANO_IMU_GYRO_CALIB_TRUSTED = 3; // CALIB_STAT gyro level needed for valid data (3 = fully calibrated)
+constexpr double NANO_IMU_BIAS_SEC = 1.0; // how long to average gyro Z for the bias (s)
+constexpr double NANO_IMU_BIAS_MAX_STDDEV = 0.01; // max gyro Z spread while still (rad/s), about 0.6 dps
+constexpr double NANO_IMU_BIAS_MAX_MEAN = 0.05; // max gyro Z mean while still (rad/s), about 3 dps
+constexpr int NANO_IMU_RESET_ATTEMPTS = 3; // chip resets tried in a row by recover() before giving up until the next error streak
+constexpr const char* NANO_IMU_CALIB_FILE = "bno055_gyro_offsets.bin"; // saved gyro offsets, relative to where the program runs, empty = don't save or load
+
 enum class DriveType {
     SPLIT_ARCADE,
     TANK
