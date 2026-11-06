@@ -24,11 +24,11 @@ public:
     /** @brief Get the cached absolute sensor position in PROS rotation ticks.
      *  @return Position since the sensor was last tared or reset.
      */
-    double position() const;
+    double getPosition() const;
     /** @brief Get the cached position change since the previous update.
      *  @return Position delta in PROS rotation ticks.
      */
-    double delta() const;
+    double getDelta() const;
     /** @brief Check whether the sensor is connected and providing readings.
      *  @return True when the most recent sensor status indicates a connection.
      */
@@ -39,6 +39,10 @@ public:
 private:
     /// PROS rotation sensor used to acquire encoder readings.
     pros::Rotation m_device;
+    /// Most recently sampled sensor position in PROS rotation ticks.
+    double m_position = 0.0;
+    /// Change in position since the previous update.
+    double m_delta = 0.0;
 };
 
 } // namespace brain
