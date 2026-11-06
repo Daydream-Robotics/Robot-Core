@@ -164,8 +164,11 @@ private:
 
     /**
      * @brief Returns struct of distances travelled by Odometry Wheels
+     * @param imeForward forward travel from the IMEs this frame, used when the parallel wheel is down
+     * @returns PARALLEL_WHEEL_ERROR / PERPENDICULAR_WHEEL_ERROR with the travel from the remaining wheel,
+     *          or TRACKING_WHEEL_ERROR with no travel when both are down
      */
-    WheelTravelResult getOdomWheelTravel(void);
+    WheelTravelResult getOdomWheelTravel(double imeForward);
 
     /**
      * @brief Averages the actual velocities of all motors in a motor group
