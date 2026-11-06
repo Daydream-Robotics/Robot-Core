@@ -6,9 +6,6 @@
 // Normalize angle between [-pi,pi] 
 double normalizeAngle(double a);
 
-// Return Euclidean distance btwn points p1 and p2
-double getDistance(Position p1, Position p2);
-
 // Convert Degrees to Radians
 double convertDegToRad(double degree);
 
