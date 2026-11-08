@@ -49,8 +49,20 @@ Pose between(const Pose& a, const Pose& b) {
 }
 
 Eigen::Matrix3d composeJacA(const Pose& a, const Pose& b) {
-    // TODO: identity plus the theta column from rotating b's translation by a.theta
+    double cosA = std::cos(a.theta);
+    double sinA = std::sin(a.theta);
+
+    // rotate b's movement into world coordinates
+    double dxWorld = b.x * cosA - b.y * sinA;
+    double dyWorld = b.x * sinA + b.y * cosA;
+
+    // x, y, and heading change directly with a
     Eigen::Matrix3d jac = Eigen::Matrix3d::Identity();
+
+    // heading changes move the result perpendicular to b's movement
+    jac(0, 2) = -dyWorld;
+    jac(1, 2) = dxWorld;
+
     return jac;
 }
 
