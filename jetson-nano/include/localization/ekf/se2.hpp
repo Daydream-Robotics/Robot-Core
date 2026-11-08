@@ -55,7 +55,7 @@ Eigen::Matrix3d composeJacA(const Pose& a, const Pose& b);
  */
 Eigen::Matrix3d composeJacB(const Pose& a);
 
-} // namespace se2
+}
 
 /**
  * @brief A pose with a timestamp and covariance (x, y, θ order; in², rad²).
