@@ -25,8 +25,21 @@ struct OdomInputs {
 };
 
 void OdomEkf::step(const OdomInputs& in) {
-    // TODO: skip the cycle if in.dt <= 0
-    // TODO: predict(in.dt), then update(buildMeasurement(in)) if any row is valid
+    // skip a duplicate, out-of-order, or NaN dt
+    if (in.dt <= 0.0 || std::isnan(in.dt)) {
+        return;
+    }
+
+    // move the state forward and grow P
+    predict(in.dt);
+
+    Measurement measurement = buildMeasurement(in);
+    // no valid source this cycle: coast on the prediction
+    if (measurement.z.size() == 0) {
+        return;
+    }
+
+    update(measurement);
 }
 
 const OdomEkf::State& OdomEkf::state() const {
@@ -38,7 +51,16 @@ const OdomEkf::Cov& OdomEkf::covariance() const {
 }
 
 void OdomEkf::reset(const Pose& pose) {
-    // TODO: set x, y, theta from pose, zero the velocities, reset P
+    // zero everything, so v_x, v_y, omega start at rest
+    m_s.setZero();
+
+    // new pose in the odometry frame, heading wrapped to (-pi, pi]
+    m_s[0] = pose.x;
+    m_s[1] = pose.y;
+    m_s[2] = utils::wrapAngle(pose.theta);
+
+    // drop the old covariance and correlations, start from the initial P
+    m_P = kInitialP;
 }
 
 void OdomEkf::predict(double dt) {
