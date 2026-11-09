@@ -58,20 +58,20 @@ Eigen::Matrix3d composeJacB(const Pose& a);
 }
 
 /**
- * @brief A pose with a timestamp and covariance (x, y, θ order; in², rad²).
+ * @brief A pose with a timestamp and covariance (x, y, θ order, in² and rad²).
  */
 struct StampedPose {
-    int64_t tUs = 0; // Nano steady_clock time (us)
-    Pose pose{0.0, 0.0, 0.0};
-    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
+    int64_t tUs = 0; ///< Nano steady_clock time (us)
+    Pose pose{0.0, 0.0, 0.0}; ///< pose at tUs
+    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero(); ///< covariance of pose (x, y, θ order, in² and rad²)
 };
 
 /**
  * @brief Relative motion between two times, in the frame of the earlier pose.
  */
 struct PoseIncrement {
-    int64_t t0Us = 0; // start time, Nano steady_clock (us)
-    int64_t t1Us = 0; // end time, Nano steady_clock (us)
-    Pose delta{0.0, 0.0, 0.0}; // motion from t0 to t1, in the t0 pose's frame
-    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero(); // covariance of delta (x, y, θ order; in², rad²)
+    int64_t t0Us = 0; ///< start time, Nano steady_clock (us)
+    int64_t t1Us = 0; ///< end time, Nano steady_clock (us)
+    Pose delta{0.0, 0.0, 0.0}; ///< motion from t0 to t1, in the t0 pose's frame
+    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero(); ///< covariance of delta (x, y, θ order, in² and rad²)
 };
