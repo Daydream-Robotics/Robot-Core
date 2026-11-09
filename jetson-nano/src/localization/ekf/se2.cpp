@@ -7,18 +7,18 @@
 namespace se2 {
 
 Pose compose(const Pose& a, const Pose& b) {
-    // turns add, wrapped back into (-pi, pi]
+    // add the headings and wrap
     double heading = utils::wrapAngle(a.theta + b.theta);
 
-    // rotate by a's heading, the direction the robot faced before the move
+    // cos and sin of a's heading
     double cosA = std::cos(a.theta);
     double sinA = std::sin(a.theta);
 
-    // b's forward/left move turned into world-frame x and y changes
+    // rotate b's x and y into the world frame
     double dxWorld = b.x * cosA - b.y * sinA;
     double dyWorld = b.x * sinA + b.y * cosA;
 
-    // start at a's position, then apply the move
+    // add the rotated move to a's position
     double x = a.x + dxWorld;
     double y = a.y + dyWorld;
 
@@ -26,18 +26,18 @@ Pose compose(const Pose& a, const Pose& b) {
 }
 
 Pose inverse(const Pose& a) {
-    // turn back by a's heading, wrapped into (-pi, pi]
+    // negate a's heading and wrap
     double heading = utils::wrapAngle(-a.theta);
 
-    // the move from a back to the origin, in world-frame x and y
+    // negate a's position
     double backX = -a.x;
     double backY = -a.y;
 
-    // rotate by -a.theta, written with cos/sin of a.theta (cos(-t) = cos(t), sin(-t) = -sin(t))
+    // cos and sin of a's heading
     double cosA = std::cos(a.theta);
     double sinA = std::sin(a.theta);
 
-    // the move back turned into a's frame (forward/left as seen from a)
+    // rotate the negated position by -a.theta into a's frame
     double x = backX * cosA + backY * sinA;
     double y = -backX * sinA + backY * cosA;
 
@@ -49,17 +49,18 @@ Pose between(const Pose& a, const Pose& b) {
 }
 
 Eigen::Matrix3d composeJacA(const Pose& a, const Pose& b) {
+    // cos and sin of a's heading
     double cosA = std::cos(a.theta);
     double sinA = std::sin(a.theta);
 
-    // rotate b's movement into world coordinates
+    // rotate b's x and y into the world frame
     double dxWorld = b.x * cosA - b.y * sinA;
     double dyWorld = b.x * sinA + b.y * cosA;
 
-    // x, y, and heading change directly with a
+    // start from identity
     Eigen::Matrix3d jac = Eigen::Matrix3d::Identity();
 
-    // heading changes move the result perpendicular to b's movement
+    // fill the a.theta column for x and y
     jac(0, 2) = -dyWorld;
     jac(1, 2) = dxWorld;
 
@@ -67,8 +68,19 @@ Eigen::Matrix3d composeJacA(const Pose& a, const Pose& b) {
 }
 
 Eigen::Matrix3d composeJacB(const Pose& a) {
-    // TODO: a.theta rotation in the top-left 2x2, 1 in the bottom-right
+    // cos and sin of a's heading
+    double cosA = std::cos(a.theta);
+    double sinA = std::sin(a.theta);
+
+    // start from identity
     Eigen::Matrix3d jac = Eigen::Matrix3d::Identity();
+
+    // put the rotation by a's heading in the top-left 2x2
+    jac(0, 0) = cosA;
+    jac(0, 1) = -sinA;
+    jac(1, 0) = sinA;
+    jac(1, 1) = cosA;
+
     return jac;
 }
 
