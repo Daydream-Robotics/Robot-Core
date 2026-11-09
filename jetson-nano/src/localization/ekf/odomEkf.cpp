@@ -60,14 +60,56 @@ void OdomEkf::reset(const Pose& pose) {
     m_s[2] = utils::wrapAngle(pose.theta);
 
     // drop the old covariance and correlations, start from the initial P
-    m_P = kInitialP;
+    m_P = initialP;
 }
 
 void OdomEkf::predict(double dt) {
-    // TODO: theta_mid = theta + omega * dt / 2
-    // TODO: x += dt * (v_x * cos(theta_mid) - v_y * sin(theta_mid)), y += dt * (v_x * sin(theta_mid) + v_y * cos(theta_mid))
-    // TODO: theta += omega * dt, wrapped with utils::wrapAngle, velocities unchanged
-    // TODO: F = Jacobian of the lines above, P = F * P * F^T + Q(dt)
+    // old state
+    const double theta = m_s[2];
+    const double vX = m_s[3];
+    const double vY = m_s[4];
+    const double omega = m_s[5];
+
+    // heading halfway through the cycle, makes the straight step match the arc
+    const double thetaMid = theta + omega * dt / 2.0;
+    const double cosThetaMid = std::cos(thetaMid);
+    const double sinThetaMid = std::sin(thetaMid);
+
+    // robot-frame velocity rotated into the odometry frame, times dt
+    const double dx = dt * (vX * cosThetaMid - vY * sinThetaMid);
+    const double dy = dt * (vX * sinThetaMid + vY * cosThetaMid);
+
+    // F = d(new state) / d(old state), identity except where the pose depends on theta or the velocities
+    Cov F = Cov::Identity();
+    F(0, 2) = -dy; // dx/dtheta, a heading error swings the step sideways
+    F(1, 2) = dx; // dy/dtheta
+    F(0, 3) = dt * cosThetaMid; // dx/dvX, forward speed moves along the heading
+    F(1, 3) = dt * sinThetaMid; // dy/dvX
+    F(0, 4) = -dt * sinThetaMid; // dx/dvY, sideways speed moves perpendicular to the heading
+    F(1, 4) = dt * cosThetaMid; // dy/dvY
+    F(0, 5) = -dy * dt / 2.0; // dx/domega
+    F(1, 5) = dx * dt / 2.0; // dy/domega
+    F(2, 5) = dt; // dtheta/domega
+
+    // process noise on the velocities only, the next predict carries it into the pose through F
+    const double accelStep = ODOM_EKF_ACCEL_SIGMA * dt; // in/s the speed may change this cycle
+    const double angAccelStep = ODOM_EKF_ANG_ACCEL_SIGMA * dt; // rad/s the turn rate may change this cycle
+
+    Cov Q = Cov::Zero();
+    Q(3, 3) = accelStep * accelStep;
+    Q(4, 4) = accelStep * accelStep;
+    Q(5, 5) = angAccelStep * angAccelStep;
+
+    // new state, velocities stay constant
+    m_s[0] += dx;
+    m_s[1] += dy;
+    m_s[2] = utils::wrapAngle(theta + omega * dt);
+
+    // propagate the uncertainty and add this cycle's process noise
+    m_P = F * m_P * F.transpose() + Q;
+
+    // remove rounding asymmetry
+    m_P = ((m_P + m_P.transpose()) / 2.0).eval();
 }
 
 OdomEkf::Measurement OdomEkf::buildMeasurement(const OdomInputs& in) const {

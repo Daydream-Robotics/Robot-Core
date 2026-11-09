@@ -88,6 +88,25 @@ enum class DriveType {
     TANK
 };
 
+/* - - - - - - - - - - - - - - [ODOM EKF] - - - - - - - - - - - - - - */
+// starting values from the EKF design doc, tune with robot logs (jetson-nano/src/localization/ekf/odomEkf.cpp)
+
+// process noise, how fast the velocities can change between cycles
+constexpr double ODOM_EKF_ACCEL_SIGMA = 200.0;      // linear acceleration std dev (in/s^2), about 0 to 60 in/s in 0.3 s
+constexpr double ODOM_EKF_ANG_ACCEL_SIGMA = 20.0;   // angular acceleration std dev (rad/s^2), about 0 to 4 rad/s in 0.2 s
+
+// measurement noise per row, sigma = SIGMA_PER_IN * |ds| + FLOOR (+ IME turn term)
+constexpr double ODOM_EKF_TRACKING_SIGMA_PER_IN = 0.01;   // tracking wheel error per inch of travel
+constexpr double ODOM_EKF_TRACKING_SIGMA_FLOOR = 0.002;   // tracking wheel error when still (in), encoder resolution
+constexpr double ODOM_EKF_IME_SIGMA_PER_IN = 0.05;        // drive IME error per inch of travel, drive wheels slip
+constexpr double ODOM_EKF_IME_SIGMA_PER_OMEGA = 0.01;     // extra IME error per rad/s of turn rate (in), wheel scrub in turns
+constexpr double ODOM_EKF_IME_SIGMA_FLOOR = 0.005;        // drive IME error when still (in)
+constexpr double ODOM_EKF_IMU_NOISE_DENSITY = 2.4e-4;     // BNO055 gyro noise (rad/s/sqrt(Hz)), heading sigma = this * sqrt(dt)
+constexpr double ODOM_EKF_IMU_BIAS_SIGMA = 0.005;         // gyro bias left after calibration (rad/s), heading sigma += this * dt
+
+// per-row outlier gate on nu^2 / S, chi-squared 1 DOF at 99%
+constexpr double ODOM_EKF_ROW_GATE = 6.63;
+
 /* - - - - - - - - - - - - - - [LIDAR] - - - - - - - - - - - - - - */
 // starting values from the LiDAR plan's parameter table; tune with the simulator and robot logs
 
