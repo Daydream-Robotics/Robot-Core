@@ -13,7 +13,7 @@
 namespace se2 {
 
 /**
- * @brief a ∘ b: start at a, then move by b expressed in a's frame.
+ * @brief a ∘ b: start at a, then move by b in a's frame.
  *
  * @param a Starting pose, in the world frame.
  * @param b Motion, in a's frame.
@@ -39,7 +39,7 @@ Pose inverse(const Pose& a);
 Pose between(const Pose& a, const Pose& b);
 
 /**
- * @brief Jacobian of compose(a, b) with respect to a (the EKF's F).
+ * @brief Jacobian of compose(a, b) with respect to a.
  *
  * @param a Starting pose.
  * @param b Motion, in a's frame.
@@ -48,7 +48,7 @@ Pose between(const Pose& a, const Pose& b);
 Eigen::Matrix3d composeJacA(const Pose& a, const Pose& b);
 
 /**
- * @brief Jacobian of compose(a, b) with respect to b (the EKF's G). Depends only on a's heading.
+ * @brief Jacobian of compose(a, b) with respect to b. Depends only on a's heading.
  *
  * @param a Starting pose.
  * @return Eigen::Matrix3d d compose / d b, rows and columns in (x, y, theta) order.
