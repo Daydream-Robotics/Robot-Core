@@ -11,10 +11,12 @@ namespace utils {
  * @param a Angle in radians.
  * @return double The same angle in (-pi, pi].
  */
+
+constexpr double PI = 3.14159265358979323846;
+
 inline double wrapAngle(double a) {
-    while (a > M_PI) a -= 2.0 * M_PI;
-    while (a < -M_PI) a += 2.0 * M_PI;
-    return a;
+    a = std::remainder(a, 2.0 * PI);
+    return (a <= -PI) ? a + 2.0 * PI : a;
 }
 
 } // namespace utils
