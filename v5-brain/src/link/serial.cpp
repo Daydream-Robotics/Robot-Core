@@ -8,8 +8,8 @@
 #include <cstdio>
 #include <algorithm>
 
-SerialLink::SerialLink(brain::LinkHardware& hw, brain::BrainConfiguration cfg, uint8_t port, int32_t baud, SerialProtocol::Transport transport)
-    : hw_(hw), boot_(std::move(cfg)), cfg_(boot_), port_(port), baud_(baud), transport_(transport) {}
+SerialLink::SerialLink(brain::NanoLink& hw, std::vector<uint8_t> config, uint8_t port, int32_t baud, SerialProtocol::Transport transport)
+    : hw_(hw), boot_(std::move(config)), port_(port), baud_(baud), transport_(transport) {}
 SerialLink::~SerialLink() { stop(); }
 
 bool SerialLink::start() {
@@ -19,8 +19,15 @@ bool SerialLink::start() {
     if (!(transport_ == SerialProtocol::Transport::USB ? serial_->setUpVexSerial() : serial_->setUpVexSerial(port_, baud_))) {
         serial_.reset(); return false;
     }
-    cfg_.fixed.configId = 0;
-    if (applyConfig(boot_) != packets::Error::NONE) { serial_.reset(); return false; }
+    cfg_ = {};
+    cfg_.fixed.statePeriodMs = 10;
+    cfg_.fixed.watchdogMs = 100;
+    booted_ = true;
+    haveCmd_ = false;
+    seq_ = 1; lastCmd_ = 0; lastRequest_ = 0; braked_ = false;
+    history_ = {}; base_ = {}; cmdMs_ = pros::millis(); cmdUs_ = 0;
+    error_ = boot_.size() <= packets::MAX_PAYLOAD && packets::sizeInRange(packets::CONFIG, static_cast<uint16_t>(boot_.size()))
+        ? configFrame(boot_.data(), static_cast<uint16_t>(boot_.size())) : packets::Error::SIZE;
     running_ = true;
     reader_ = std::make_unique<pros::Task>([this] { readLoop(); }, transport_ == SerialProtocol::Transport::USB ? TASK_PRIORITY_MIN + 1 : TASK_PRIORITY_MAX - 2, TASK_STACK_DEPTH_DEFAULT, "nano reader");
     writer_ = std::make_unique<pros::Task>([this] { writeLoop(); }, TASK_PRIORITY_MAX - 2, TASK_STACK_DEPTH_DEFAULT, "nano writer");
@@ -31,8 +38,10 @@ void SerialLink::stop() {
     running_ = false;
     // Do not delete a task while it holds the shared hardware/protocol lock.
     std::lock_guard<pros::Mutex> lock(mutex_);
+    std::lock_guard<pros::Mutex> logLock(m_logMutex);
     if (reader_) { reader_->remove(); reader_.reset(); }
     if (writer_) { writer_->remove(); writer_.reset(); }
+    hw_.brakeGroups();
     serial_.reset();
 }
 
@@ -75,7 +84,15 @@ packets::Error SerialLink::applyConfig(const brain::BrainConfiguration& cfg) {
         if (error != packets::Error::NONE) return error;
     }
     auto error = hw_.applyConfiguration(cfg);
-    if (error != packets::Error::NONE) return error;
+    if (error != packets::Error::NONE) {
+        hw_.brakeGroups();
+        cfg_ = {};
+        cfg_.fixed.statePeriodMs = 10;
+        cfg_.fixed.watchdogMs = 100;
+        serial_->setCommandGroups(0);
+        base_ = {}; history_ = {}; haveCmd_ = false; lastCmd_ = 0;
+        return error;
+    }
     cfg_ = cfg;
     serial_->setCommandGroups(f.nGroups);
     base_ = {}; history_ = {}; haveCmd_ = false; braked_ = false; lastCmd_ = 0; cmdMs_ = pros::millis();
@@ -104,10 +121,10 @@ packets::Error SerialLink::commandFrame(const uint8_t* data, uint16_t size) {
         if (!std::isfinite(cmd.groups[i].value)) return packets::Error::RANGE;
     }
     cmd.valid = true;
+    if (nanoControl_) { auto error = hw_.applyOutputs(cmd); if (error != packets::Error::NONE) return error; }
     cmdUs_ = static_cast<uint32_t>(pros::c::micros()); cmdMs_ = pros::millis();
     haveCmd_ = true; booted_ = false; braked_ = false; lastCmd_ = cmd.fixed.cmdSeq;
     for (const auto& snap : history_) if (snap.seq && snap.seq == cmd.fixed.ackStateSeq && (!base_.seq || static_cast<int16_t>(snap.seq - base_.seq) > 0)) { base_ = snap; break; }
-    if (nanoControl_) { auto error = hw_.applyOutputs(cmd); if (error != packets::Error::NONE) return error; }
     if (cmd.fixed.requestId && cmd.fixed.requestId != lastRequest_) {
         lastRequest_ = cmd.fixed.requestId;
         return hw_.executeRequest(cmd.fixed);
@@ -133,12 +150,12 @@ void SerialLink::writeLoop() {
         { std::lock_guard<pros::Mutex> lock(mutex_); period = cfg_.fixed.statePeriodMs; }
         pros::Task::delay_until(&wake, period);
         for (int i = 0; i < 2 && serial_->midFrame(); ++i) pros::delay(1);
-        std::lock_guard<pros::Mutex> lock(mutex_);
-        const bool watchdog = pros::millis() - cmdMs_ > cfg_.fixed.watchdogMs;
+        std::unique_lock<pros::Mutex> lock(mutex_);
+        const bool watchdog = cfg_.fixed.configId && pros::millis() - cmdMs_ > cfg_.fixed.watchdogMs;
         if (watchdog && pros::competition::is_autonomous() && !braked_) { hw_.brakeGroups(); braked_ = true; }
-        if (!nanoControl_ && !pros::competition::is_disabled()) { flushOneLog(); continue; }
+        if (!nanoControl_ && !pros::competition::is_disabled()) { lock.unlock(); flushOneLog(); continue; }
         brain::BrainState state = hw_.sample();
-        if (state.sensors.motorGroupCount != cfg_.fixed.nGroups || state.sensors.trackingWheelCount != cfg_.fixed.nRotations) { error_ = packets::Error::GROUP_COUNT; continue; }
+        if (cfg_.fixed.configId && (state.sensors.motorGroupCount != cfg_.fixed.nGroups || state.sensors.trackingWheelCount != cfg_.fixed.nRotations)) { error_ = packets::Error::GROUP_COUNT; continue; }
         uint8_t payload[packets::MAX_PAYLOAD]{};
         packets::PayloadWriter writer{payload, sizeof(packets::StateFixed)};
         Snapshot snap; snap.seq = seq_;
@@ -156,10 +173,21 @@ void SerialLink::writeLoop() {
         f.status = (state.statusFlags & ~(packets::status::WATCHDOG | packets::status::BOOTED | packets::status::CONTROLLER)) | (watchdog ? packets::status::WATCHDOG : 0) | (booted_ ? packets::status::BOOTED : 0) | (state.driver.connected ? packets::status::CONTROLLER : 0);
         f.batteryMv = state.batteryVoltage; std::memcpy(f.ctrlAxes, state.driver.axes.data(), sizeof f.ctrlAxes); f.ctrlButtons = state.driver.buttons;
         f.rxErrors = serial_->m_crcErrors + serial_->m_badFrames; f.nGroups = cfg_.fixed.nGroups; f.nRotations = cfg_.fixed.nRotations;
+        const bool haveCmd = haveCmd_;
+        const uint32_t cmdUs = cmdUs_;
+        const packets::Error reportedError = error_;
+        history_[seq_ % history_.size()] = snap;
+        seq_ = seq_ == 0xffff ? 1 : seq_ + 1;
+        lock.unlock();
         flushOneLog();
-        f.tUs = static_cast<uint32_t>(pros::c::micros()); f.cmdAgeUs = haveCmd_ ? f.tUs - cmdUs_ : packets::NO_COMMAND;
+        f.tUs = static_cast<uint32_t>(pros::c::micros());
+        f.cmdAgeUs = haveCmd ? f.tUs - cmdUs : packets::NO_COMMAND;
         std::memcpy(payload, &f, sizeof f);
-        if (serial_->send(packets::STATE, writer)) { history_[seq_ % history_.size()] = snap; error_ = packets::Error::NONE; seq_ = seq_ == 0xffff ? 1 : seq_ + 1; }
+        const bool sent = serial_->send(packets::STATE, writer);
+        if (sent && reportedError != packets::Error::NONE) {
+            std::lock_guard<pros::Mutex> guard(mutex_);
+            if (error_ == reportedError) error_ = packets::Error::NONE;
+        }
     }
 }
 

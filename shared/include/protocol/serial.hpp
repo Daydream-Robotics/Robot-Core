@@ -129,7 +129,7 @@ class SerialLink {
     };
     static constexpr size_t LOG_QUEUE_SIZE = 8;
 public:
-    SerialLink(brain::LinkHardware& hw, brain::BrainConfiguration config, uint8_t port,
+    SerialLink(brain::NanoLink& hw, std::vector<uint8_t> config, uint8_t port,
                int32_t baud, SerialProtocol::Transport transport = SerialProtocol::Transport::RS485);
     ~SerialLink();
     SerialLink(const SerialLink&) = delete;
@@ -145,8 +145,9 @@ private:
     void readLoop();
     void writeLoop();
     void flushOneLog();
-    brain::LinkHardware& hw_;
-    brain::BrainConfiguration boot_, cfg_;
+    brain::NanoLink& hw_;
+    std::vector<uint8_t> boot_;
+    brain::BrainConfiguration cfg_;
     uint8_t port_;
     int32_t baud_;
     SerialProtocol::Transport transport_;

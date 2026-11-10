@@ -5,30 +5,57 @@
 
 #include "brain/configuration.hpp"
 #include "brain/types.hpp"
+#include "pros/adi.hpp"
+#include "pros/misc.hpp"
+#include "pros/motor_group.hpp"
+#include "pros/rotation.hpp"
+#include "pros/rtos.hpp"
+#include <array>
+#include <vector>
 
 namespace brain {
 
-/** @brief Hardware operations used by the protocol link.
- *
- * The runtime owns the devices. Calls are serialized by the link; implementations
- * must synchronize with any other task that accesses those devices. A failed
- * configuration must leave the previous configuration active. The robot geometry
- * in BrainConfiguration is local data and is not carried by CONFIG packets.
+/** Uses existing devices owned elsewhere; all supplied devices must outlive this object.
+ * The owner must coordinate access from other tasks with serial activity.
  */
-class LinkHardware {
+class NanoLink {
 public:
-    virtual ~LinkHardware() = default;
-
-    /// Validate and apply the boot or received configuration, resetting sensor origins on success.
-    virtual packets::Error applyConfiguration(const BrainConfiguration& config) = 0;
-    /// Sample continuous sensor positions, controller input, battery and hardware status.
-    virtual BrainState sample() = 0;
-    /// Apply motor and ADI outputs from a validated command; do not execute its one-shot request.
-    virtual packets::Error applyOutputs(const NanoCommand& command) = 0;
-    /// Execute a validated one-shot request and report its result to the link.
-    virtual packets::Error executeRequest(const packets::CommandFixed& command) = 0;
-    /// Brake configured motor groups when the autonomous watchdog expires.
-    virtual void brakeGroups() = 0;
+    NanoLink(pros::Controller& controller,
+             const std::vector<pros::MotorGroup*>& groups,
+             const std::vector<pros::Rotation*>& wheels,
+             const std::array<pros::adi::DigitalOut*, packets::MAX_ADI>& outputs);
+    ~NanoLink();
+    NanoLink(const NanoLink&) = delete;
+    NanoLink& operator=(const NanoLink&) = delete;
+    packets::Error applyConfiguration(const BrainConfiguration& config);
+    BrainState sample();
+    packets::Error applyOutputs(const NanoCommand& command);
+    packets::Error executeRequest(const packets::CommandFixed& command);
+    void brakeGroups();
+private:
+    void brakeGroupsUnlocked();
+    struct Group {
+        pros::MotorGroup* motor = nullptr;
+        std::vector<double> last;
+        std::vector<bool> valid;
+        double position = 0;
+        pros::MotorGears gear = pros::MotorGears::green;
+        pros::MotorBrake brakeMode = pros::MotorBrake::coast;
+        bool missing = false;
+    };
+    struct Wheel {
+        pros::Rotation* sensor = nullptr;
+        double last = 0, position = 0;
+        bool valid = false, reversed = false, missing = false;
+    };
+    pros::Controller& controller_;
+    std::vector<Group> groups_;
+    std::vector<Wheel> wheels_;
+    std::array<pros::adi::DigitalOut*, packets::MAX_ADI> outputs_{};
+    uint16_t enabled_ = 0, activeLow_ = 0, level_ = 0;
+    uint8_t expander_ = 0;
+    bool expanderMissing_ = false;
+    pros::Mutex mutex_;
 };
 
 } // namespace brain
