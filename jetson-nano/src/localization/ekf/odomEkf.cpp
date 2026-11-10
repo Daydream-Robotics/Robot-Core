@@ -1,5 +1,6 @@
 #include "localization/ekf/odomEkf.hpp"
 
+#include <array>
 #include <cmath>
 
 #include "config/constants.h"
@@ -179,7 +180,71 @@ OdomEkf::Measurement OdomEkf::buildMeasurement(const OdomInputs& in) const {
 }
 
 void OdomEkf::update(const Measurement& m) {
-    // TODO: nu = z - H * s, S = H * P * H^T + R, K = P * H^T * S^-1
-    // TODO: s += K * nu, wrap theta
-    // TODO: P = (I - K * H) * P * (I - K * H)^T + K * R * K^T (Joseph form)
+    // nothing to correct with
+    if (m.z.size() == 0) {
+        return;
+    }
+
+    // rows this cycle
+    const int rows = static_cast<int>(m.z.size());
+    // indices of rows that passed the gate
+    std::array<int, MAX_ROWS> keptRows;
+    // how many of keptRows are filled
+    int keptCount = 0;
+
+    // column i is P * H_i^T
+    const Gain PHt = m_P * m.H.transpose();
+
+    // drop any row whose disagreement with the prediction is too big to be noise
+    for (int i = 0; i < rows; ++i) {
+        // this row of H, 1 x 6, picks the states the source measures
+        const auto hRow = m.H.row(i);
+        // innovation, measured minus predicted
+        const double nuI = m.z(i) - hRow.dot(m_s);
+        // S(i, i), how big the innovation should be: state uncertainty plus sensor noise
+        const double sII = hRow.dot(PHt.col(i)) + m.R(i, i);
+        // innovation in its own standard deviations
+        const double d2 = nuI * nuI / sII;
+        if (d2 <= ODOM_EKF_ROW_GATE) {
+            keptRows[keptCount++] = i;
+        }
+    }
+
+    // every source disagreed, so coast on the prediction
+    if (keptCount == 0) {
+        return;
+    }
+
+    // the surviving rows, packed together
+    MeasVec zKept(keptCount);
+    MeasMat hKept(keptCount, 6);
+    MeasCov rKept = MeasCov::Zero(keptCount, keptCount);
+    Gain PHtKept(6, keptCount);
+
+    // copy each kept row down, PHt's column is reused instead of recomputed
+    for (int i = 0; i < keptCount; ++i) {
+        const int src = keptRows[i];
+        zKept(i) = m.z(src);
+        hKept.row(i) = m.H.row(src);
+        rKept(i, i) = m.R(src, src);
+        PHtKept.col(i) = PHt.col(src);
+    }
+
+    // how far off the prediction was, one entry per kept row
+    const MeasVec nu = zKept - hKept * m_s;
+    // innovation covariance, off-diagonals say how much the rows see the same uncertainty
+    const MeasCov S = hKept * PHtKept + rKept;
+    // gain, 6 x keptCount, how far to move each state per unit of each row's innovation
+    const Gain K = S.ldlt().solve(PHtKept.transpose()).transpose();
+
+    // correct the state, then keep heading in (-pi, pi]
+    m_s += K * nu;
+    m_s[2] = utils::wrapAngle(m_s[2]);
+
+    // Joseph form, a sum of two symmetric products
+    const Cov ikh = Cov::Identity() - K * hKept;
+    m_P = ikh * m_P * ikh.transpose() + K * rKept * K.transpose();
+
+    // remove rounding asymmetry
+    m_P = ((m_P + m_P.transpose()) / 2.0).eval();
 }

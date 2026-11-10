@@ -52,13 +52,20 @@ public:
     void reset(const Pose& pose);
 
 private:
+    static constexpr int MAX_ROWS = 5; ///< parallel, perpendicular, two IMEs, IMU
+
+    using MeasVec = Eigen::Matrix<double, Eigen::Dynamic, 1, 0, MAX_ROWS, 1>; ///< up to MAX_ROWS x 1
+    using MeasMat = Eigen::Matrix<double, Eigen::Dynamic, 6, 0, MAX_ROWS, 6>; ///< up to MAX_ROWS x 6
+    using MeasCov = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, MAX_ROWS, MAX_ROWS>; ///< up to MAX_ROWS x MAX_ROWS
+    using Gain = Eigen::Matrix<double, 6, Eigen::Dynamic, 0, 6, MAX_ROWS>; ///< 6 x up to MAX_ROWS
+
     /**
      * @brief Stacked measurement for one cycle: only the rows for valid sources.
      */
     struct Measurement {
-        Eigen::VectorXd z; ///< measured increments, one row per valid source
-        Eigen::Matrix<double, Eigen::Dynamic, 6> H; ///< maps the state to each row
-        Eigen::MatrixXd R; ///< measurement noise, diagonal
+        MeasVec z; ///< measured increments, one row per valid source
+        MeasMat H; ///< maps the state to each row
+        MeasCov R; ///< measurement noise, diagonal
     };
 
     /**
