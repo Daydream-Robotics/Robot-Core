@@ -32,7 +32,10 @@ set(OSQP_BUILD_DEMO_EXE   OFF CACHE BOOL "" FORCE)
 set(OSQP_BUILD_UNITTESTS  OFF CACHE BOOL "" FORCE)
 set(OSQP_USE_FLOAT        OFF CACHE BOOL "" FORCE)
 set(OSQP_USE_LONG         ON  CACHE BOOL "" FORCE)
+# OSQP's C sources stay out of compile_commands.json, so clangd infers flags for our headers from our C++ files only
+set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
 add_subdirectory(${EXTERNAL}/osqp ${CMAKE_CURRENT_BINARY_DIR}/osqp EXCLUDE_FROM_ALL)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # - - - - - - - - - - - - - - [MPC CORE] - - - - - - - - - - - - - -
 # portable: Eigen + OSQP + std only. This is what DreamSim links.
