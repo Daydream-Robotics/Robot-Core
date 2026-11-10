@@ -2,6 +2,8 @@
 
 #include "config/constants.h"
 
+#include "utils/mathHelpers.hpp"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -33,7 +35,7 @@ constexpr uint8_t MODE_CONFIG = 0x00;
 constexpr uint8_t MODE_IMU = 0x08; // accelerometer + gyro fusion, no magnetometer
 
 constexpr double GYRO_LSB_PER_DPS = 16.0; // default scale, in dps units
-constexpr double DEG_TO_RAD = M_PI / 180.0;
+constexpr double DEG_TO_RAD = utils::PI / 180.0;
 
 /**
  * @brief Current steady_clock time, on the same scale as the serial link's nowUs().
