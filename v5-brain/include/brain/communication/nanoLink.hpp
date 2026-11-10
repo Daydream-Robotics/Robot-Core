@@ -31,24 +31,4 @@ public:
     virtual void brakeGroups() = 0;
 };
 
-/** @brief Protocol link service implemented using the shared SerialLink.
- *
- * The service applies CONFIG through LinkHardware, receives COMMAND, and sends
- * STATE and LOG. It owns protocol bookkeeping, including command validation,
- * request deduplication, watchdog timing, sequence numbers and acknowledged
- * sensor-position history. It converts sampled cumulative radians to wire deltas
- * from the acknowledged baseline. An implementation requires the existing
- * SerialLink to be refactored to use LinkHardware instead of owning devices.
- */
-class NanoLink {
-public:
-    virtual ~NanoLink() = default;
-    /// Open the transport, apply the boot configuration, and start the link.
-    virtual bool start() = 0;
-    /// Stop link activity before destroying its hardware owner.
-    virtual void stop() = 0;
-    /// Enable Nano outputs in autonomous; disable them for local driver control.
-    virtual void setNanoControl(bool enabled) = 0;
-};
-
 } // namespace brain

@@ -24,6 +24,7 @@
 #include "protocol/serialProtocol.hpp"
 
 #ifdef __v5_brain__
+    #include "brain/communication/nanoLink.hpp"
     #include "pros/adi.hpp"
     #include "pros/misc.hpp"
     #include "pros/motor_group.hpp"
@@ -115,6 +116,55 @@ namespace packets {
  *
  * create one global instance per side and call start() once
  */
+#ifdef __v5_brain__
+class SerialLink {
+    struct Snapshot {
+        uint16_t seq = 0;
+        std::array<double, packets::MAX_GROUPS> group{};
+        std::array<double, packets::MAX_ROTATIONS> wheel{};
+    };
+    struct LogEntry {
+        uint8_t level = 0, length = 0;
+        char text[packets::MAX_LOG_TEXT + 1] = {};
+    };
+    static constexpr size_t LOG_QUEUE_SIZE = 8;
+public:
+    SerialLink(brain::LinkHardware& hw, brain::BrainConfiguration config, uint8_t port,
+               int32_t baud, SerialProtocol::Transport transport = SerialProtocol::Transport::RS485);
+    ~SerialLink();
+    SerialLink(const SerialLink&) = delete;
+    SerialLink& operator=(const SerialLink&) = delete;
+    bool start();
+    void stop();
+    void setNanoControl(bool value);
+    void log(uint8_t level, const char* format, ...);
+private:
+    packets::Error applyConfig(const brain::BrainConfiguration& config);
+    packets::Error configFrame(const uint8_t* data, uint16_t size);
+    packets::Error commandFrame(const uint8_t* data, uint16_t size);
+    void readLoop();
+    void writeLoop();
+    void flushOneLog();
+    brain::LinkHardware& hw_;
+    brain::BrainConfiguration boot_, cfg_;
+    uint8_t port_;
+    int32_t baud_;
+    SerialProtocol::Transport transport_;
+    std::unique_ptr<SerialProtocol> serial_;
+    std::unique_ptr<pros::Task> reader_, writer_;
+    pros::Mutex mutex_, m_logMutex;
+    std::atomic<bool> running_{false}, nanoControl_{true};
+    std::array<Snapshot, 8> history_{};
+    Snapshot base_{};
+    uint16_t seq_ = 1, lastCmd_ = 0;
+    uint8_t lastRequest_ = 0;
+    packets::Error error_ = packets::Error::NONE;
+    uint32_t cmdMs_ = 0, cmdUs_ = 0;
+    bool haveCmd_ = false, booted_ = true, braked_ = false;
+    std::array<LogEntry, LOG_QUEUE_SIZE> m_logQueue{};
+    size_t m_logHead = 0, m_logCount = 0;
+};
+#else
 class SerialLink {
 public:
     #ifdef __jetson_nano__
@@ -544,3 +594,5 @@ private:
     std::vector<std::function<void(const Sample&)>> m_callbacks; ///< onSample() callbacks
     #endif
 };
+
+#endif // __v5_brain__
