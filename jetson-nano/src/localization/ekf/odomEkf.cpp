@@ -179,7 +179,7 @@ OdomEkf::Measurement OdomEkf::buildMeasurement(const OdomInputs& in) const {
 }
 
 void OdomEkf::update(const Measurement& m) {
-    // TODO: y = z - H * s, S = H * P * H^T + R, K = P * H^T * S^-1
-    // TODO: s += K * y, wrap theta
+    // TODO: nu = z - H * s, S = H * P * H^T + R, K = P * H^T * S^-1
+    // TODO: s += K * nu, wrap theta
     // TODO: P = (I - K * H) * P * (I - K * H)^T + K * R * K^T (Joseph form)
 }
