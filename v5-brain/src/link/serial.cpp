@@ -14,11 +14,13 @@ SerialLink::~SerialLink() { stop(); }
 
 bool SerialLink::start() {
     if (running_) return true;
+    if (!hw_.bindingsValid()) return false;
 
     serial_.reset(new SerialProtocol());
     if (!(transport_ == SerialProtocol::Transport::USB ? serial_->setUpVexSerial() : serial_->setUpVexSerial(port_, baud_))) {
         serial_.reset(); return false;
     }
+    // Start unconfigured so the Nano can supply a config if the boot payload is rejected.
     cfg_ = {};
     cfg_.fixed.statePeriodMs = 10;
     cfg_.fixed.watchdogMs = 100;
@@ -52,6 +54,7 @@ packets::Error SerialLink::applyConfig(const brain::BrainConfiguration& cfg) {
     if (f.configId && f.configId == cfg_.fixed.configId) return packets::Error::NONE;
     if (!f.configId || f.statePeriodMs < 5 || f.statePeriodMs > 50 || f.watchdogMs < 20 || f.watchdogMs > 1000 || !f.nGroups || f.nGroups > packets::MAX_GROUPS || f.nRotations > packets::MAX_ROTATIONS) return packets::Error::RANGE;
     if (!f.adiExpanderPort && (f.adiOutEnable & 0xff00)) return packets::Error::CFG_PORT;
+    // Reserve the serial port and reject duplicate smart-port assignments.
     bool used[22]{};
     if (transport_ == SerialProtocol::Transport::RS485 && port_ <= 21) used[port_] = true;
     auto claim = [&used](int port) {
@@ -86,6 +89,7 @@ packets::Error SerialLink::applyConfig(const brain::BrainConfiguration& cfg) {
     auto error = hw_.applyConfiguration(cfg);
     if (error != packets::Error::NONE) {
         hw_.brakeGroups();
+        // Hardware settings may be partially applied; brake and return to an unconfigured state.
         cfg_ = {};
         cfg_.fixed.statePeriodMs = 10;
         cfg_.fixed.watchdogMs = 100;
@@ -108,7 +112,7 @@ packets::Error SerialLink::configFrame(const uint8_t* data, uint16_t size) {
     return applyConfig(cfg);
 }
 
-packets::Error SerialLink::commandFrame(const uint8_t* data, uint16_t size) {
+packets::Error SerialLink::commandFrame(const uint8_t* data, uint16_t size, uint32_t receivedUs, uint32_t receivedMs) {
     brain::NanoCommand cmd{};
     packets::PayloadReader reader{data, size};
     if (!reader.get(cmd.fixed)) return packets::Error::SIZE;
@@ -120,12 +124,15 @@ packets::Error SerialLink::commandFrame(const uint8_t* data, uint16_t size) {
         if (!reader.get(cmd.groups[i])) return packets::Error::SIZE;
         if (!std::isfinite(cmd.groups[i].value)) return packets::Error::RANGE;
     }
+    // Do not acknowledge the command or reset the watchdog if output application fails.
     cmd.valid = true;
     if (nanoControl_) { auto error = hw_.applyOutputs(cmd); if (error != packets::Error::NONE) return error; }
-    cmdUs_ = static_cast<uint32_t>(pros::c::micros()); cmdMs_ = pros::millis();
+    cmdUs_ = receivedUs; cmdMs_ = receivedMs;
     haveCmd_ = true; booted_ = false; braked_ = false; lastCmd_ = cmd.fixed.cmdSeq;
+    // Move the delta baseline only to a newer acknowledged snapshot still in history.
     for (const auto& snap : history_) if (snap.seq && snap.seq == cmd.fixed.ackStateSeq && (!base_.seq || static_cast<int16_t>(snap.seq - base_.seq) > 0)) { base_ = snap; break; }
     if (cmd.fixed.requestId && cmd.fixed.requestId != lastRequest_) {
+        // Echo attempted requests even on error so the Nano does not execute them repeatedly.
         lastRequest_ = cmd.fixed.requestId;
         return hw_.executeRequest(cmd.fixed);
     }
@@ -135,8 +142,11 @@ packets::Error SerialLink::commandFrame(const uint8_t* data, uint16_t size) {
 void SerialLink::readLoop() {
     while (running_) {
         while (auto frame = serial_->receive()) {
+            // Observe receipt before mutex contention or device operations can delay processing.
+            const uint32_t receivedUs = static_cast<uint32_t>(pros::c::micros());
+            const uint32_t receivedMs = pros::millis();
             std::lock_guard<pros::Mutex> lock(mutex_);
-            auto error = frame->type == packets::CONFIG ? configFrame(frame->payload, frame->size) : commandFrame(frame->payload, frame->size);
+            auto error = frame->type == packets::CONFIG ? configFrame(frame->payload, frame->size) : commandFrame(frame->payload, frame->size, receivedUs, receivedMs);
             if (error != packets::Error::NONE) error_ = error;
         }
         pros::delay(1);
@@ -151,6 +161,7 @@ void SerialLink::writeLoop() {
         pros::Task::delay_until(&wake, period);
         for (int i = 0; i < 2 && serial_->midFrame(); ++i) pros::delay(1);
         std::unique_lock<pros::Mutex> lock(mutex_);
+        // The timeout is reported in every mode but only brakes during autonomous.
         const bool watchdog = cfg_.fixed.configId && pros::millis() - cmdMs_ > cfg_.fixed.watchdogMs;
         if (watchdog && pros::competition::is_autonomous() && !braked_) { hw_.brakeGroups(); braked_ = true; }
         if (!nanoControl_ && !pros::competition::is_disabled()) { lock.unlock(); flushOneLog(); continue; }
@@ -158,6 +169,7 @@ void SerialLink::writeLoop() {
         if (cfg_.fixed.configId && (state.sensors.motorGroupCount != cfg_.fixed.nGroups || state.sensors.trackingWheelCount != cfg_.fixed.nRotations)) { error_ = packets::Error::GROUP_COUNT; continue; }
         uint8_t payload[packets::MAX_PAYLOAD]{};
         packets::PayloadWriter writer{payload, sizeof(packets::StateFixed)};
+        // Deltas are relative to the last acknowledged state, not the previous sample.
         Snapshot snap; snap.seq = seq_;
         for (size_t i = 0; i < cfg_.fixed.nGroups; ++i) {
             const auto& s = state.sensors.motorGroups[i]; snap.group[i] = s.positionRad;
@@ -176,16 +188,20 @@ void SerialLink::writeLoop() {
         const bool haveCmd = haveCmd_;
         const uint32_t cmdUs = cmdUs_;
         const packets::Error reportedError = error_;
+        // Record the snapshot before releasing the lock so an immediate acknowledgment can find it.
         history_[seq_ % history_.size()] = snap;
         seq_ = seq_ == 0xffff ? 1 : seq_ + 1;
+        // Writes can block; do not hold the shared state lock while transmitting.
         lock.unlock();
         flushOneLog();
         f.tUs = static_cast<uint32_t>(pros::c::micros());
         f.cmdAgeUs = haveCmd ? f.tUs - cmdUs : packets::NO_COMMAND;
         std::memcpy(payload, &f, sizeof f);
         const bool sent = serial_->send(packets::STATE, writer);
+        if (!sent) ++txErrors_;
         if (sent && reportedError != packets::Error::NONE) {
             std::lock_guard<pros::Mutex> guard(mutex_);
+            // Preserve a different error recorded while the frame was in flight.
             if (error_ == reportedError) error_ = packets::Error::NONE;
         }
     }
@@ -242,5 +258,5 @@ void SerialLink::flushOneLog() {
     // bytes 1 onward are the text
     std::memcpy(payload + 1, entry.text, entry.length);
     // send it as a log frame, 1 + text length bytes
-    serial_->send(packets::LOG, payload, static_cast<uint16_t>(1 + entry.length));
+    if (!serial_->send(packets::LOG, payload, static_cast<uint16_t>(1 + entry.length))) ++txErrors_;
 }

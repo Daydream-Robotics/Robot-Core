@@ -118,52 +118,117 @@ namespace packets {
  */
 #ifdef __v5_brain__
 class SerialLink {
-    struct Snapshot {
-        uint16_t seq = 0;
-        std::array<double, packets::MAX_GROUPS> group{};
-        std::array<double, packets::MAX_ROTATIONS> wheel{};
-    };
-    struct LogEntry {
-        uint8_t level = 0, length = 0;
-        char text[packets::MAX_LOG_TEXT + 1] = {};
-    };
-    static constexpr size_t LOG_QUEUE_SIZE = 8;
 public:
+    /**
+     * @brief Binds the Brain link to externally owned devices and a boot config.
+     * @param hw Device binding; it must outlive the link and its tasks.
+     * @param config Shared CONFIG payload applied at startup.
+     * @param port Smart port for RS-485; ignored for USB.
+     * @param baud Baud rate for RS-485; ignored for USB.
+     * @param transport Physical transport used by the link.
+     */
     SerialLink(brain::NanoLink& hw, std::vector<uint8_t> config, uint8_t port,
                int32_t baud, SerialProtocol::Transport transport = SerialProtocol::Transport::RS485);
+    /** @brief Stops the tasks before releasing serial state. */
     ~SerialLink();
+    /** @brief Copy construction is disabled for the active link. */
     SerialLink(const SerialLink&) = delete;
+    /** @brief Copy assignment is disabled for the active link. */
     SerialLink& operator=(const SerialLink&) = delete;
+    /**
+     * @brief Opens the transport and starts the reader and writer tasks.
+     * @return bool False for invalid bindings or a transport setup failure.
+     * @note A rejected boot config is reported in state while the link remains unconfigured.
+     */
     bool start();
+    /** @brief Stops link tasks and brakes the bound groups. */
     void stop();
+    /**
+     * @brief Enables or disables Nano control of motor and ADI outputs.
+     * @param value True to allow Nano outputs; false for local control.
+     */
     void setNanoControl(bool value);
+    /**
+     * @brief Queues a formatted LOG message for transmission.
+     * @param level Log level sent with the text.
+     * @param format Printf-style format string and its arguments.
+     */
     void log(uint8_t level, const char* format, ...);
+    /**
+     * @brief Gets the number of failed frame writes since construction.
+     * @return uint32_t Count of failed STATE and LOG transmissions.
+     */
+    uint32_t transmitErrors() const { return txErrors_.load(); }
 private:
+    /** @brief Captures the cumulative positions associated with a state sequence. */
+    struct Snapshot {
+        uint16_t seq = 0; ///< State sequence, or zero for the configuration origin.
+        std::array<double, packets::MAX_GROUPS> group{}; ///< Group positions in radians.
+        std::array<double, packets::MAX_ROTATIONS> wheel{}; ///< Wheel positions in radians.
+    };
+    /** @brief One queued log entry. */
+    struct LogEntry {
+        uint8_t level = 0; ///< Protocol log level.
+        uint8_t length = 0; ///< Number of text bytes.
+        char text[packets::MAX_LOG_TEXT + 1] = {}; ///< Text with room for a terminator.
+    };
+    static constexpr size_t LOG_QUEUE_SIZE = 8; ///< Maximum queued log entries.
+    /**
+     * @brief Validates and applies a decoded configuration.
+     * @param config Configuration to validate and apply.
+     * @return packets::Error NONE on success, otherwise the rejection reason.
+     */
     packets::Error applyConfig(const brain::BrainConfiguration& config);
+    /**
+     * @brief Decodes and applies a CONFIG payload.
+     * @param data Payload bytes.
+     * @param size Number of payload bytes.
+     * @return packets::Error NONE on success, otherwise the rejection reason.
+     */
     packets::Error configFrame(const uint8_t* data, uint16_t size);
-    packets::Error commandFrame(const uint8_t* data, uint16_t size);
+    /**
+     * @brief Validates and applies a COMMAND payload.
+     * @param data Payload bytes.
+     * @param size Number of payload bytes.
+     * @param receivedUs Brain microsecond clock when the parsed frame was observed.
+     * @param receivedMs Brain millisecond clock at the same observation.
+     * @return packets::Error NONE on success, otherwise the rejection or request error.
+     */
+    packets::Error commandFrame(const uint8_t* data, uint16_t size, uint32_t receivedUs, uint32_t receivedMs);
+    /** @brief Receives frames and dispatches configuration and commands. */
     void readLoop();
+    /** @brief Samples devices, checks the watchdog, and transmits states and logs. */
     void writeLoop();
+    /** @brief Sends at most one queued log entry. */
     void flushOneLog();
-    brain::NanoLink& hw_;
-    std::vector<uint8_t> boot_;
-    brain::BrainConfiguration cfg_;
-    uint8_t port_;
-    int32_t baud_;
-    SerialProtocol::Transport transport_;
-    std::unique_ptr<SerialProtocol> serial_;
-    std::unique_ptr<pros::Task> reader_, writer_;
-    pros::Mutex mutex_, m_logMutex;
-    std::atomic<bool> running_{false}, nanoControl_{true};
-    std::array<Snapshot, 8> history_{};
-    Snapshot base_{};
-    uint16_t seq_ = 1, lastCmd_ = 0;
-    uint8_t lastRequest_ = 0;
-    packets::Error error_ = packets::Error::NONE;
-    uint32_t cmdMs_ = 0, cmdUs_ = 0;
-    bool haveCmd_ = false, booted_ = true, braked_ = false;
-    std::array<LogEntry, LOG_QUEUE_SIZE> m_logQueue{};
-    size_t m_logHead = 0, m_logCount = 0;
+    brain::NanoLink& hw_; ///< Externally owned device binding.
+    std::vector<uint8_t> boot_; ///< Initial CONFIG payload.
+    brain::BrainConfiguration cfg_; ///< Applied configuration; ID zero means unconfigured.
+    uint8_t port_; ///< RS-485 smart port.
+    int32_t baud_; ///< RS-485 baud rate.
+    SerialProtocol::Transport transport_; ///< Selected physical transport.
+    std::unique_ptr<SerialProtocol> serial_; ///< Framing and transport instance.
+    std::unique_ptr<pros::Task> reader_; ///< Receive task.
+    std::unique_ptr<pros::Task> writer_; ///< State and log transmit task.
+    pros::Mutex mutex_; ///< Protects protocol state shared by reader and writer.
+    pros::Mutex m_logMutex; ///< Protects the log queue.
+    std::atomic<bool> running_{false}; ///< Whether the link tasks should run.
+    std::atomic<bool> nanoControl_{true}; ///< Whether Nano commands control outputs.
+    std::atomic<uint32_t> txErrors_{0}; ///< Failed frame writes.
+    std::array<Snapshot, 8> history_{}; ///< Recent state positions for acknowledgment.
+    Snapshot base_{}; ///< Acknowledged position baseline for wire deltas.
+    uint16_t seq_ = 1; ///< Sequence assigned to the next state.
+    uint16_t lastCmd_ = 0; ///< Sequence of the last accepted command.
+    uint8_t lastRequest_ = 0; ///< Most recently attempted one-shot request ID.
+    packets::Error error_ = packets::Error::NONE; ///< Error awaiting successful reporting.
+    uint32_t cmdMs_ = 0; ///< Last accepted command observation time in milliseconds.
+    uint32_t cmdUs_ = 0; ///< Last accepted command observation time in microseconds.
+    bool haveCmd_ = false; ///< Whether a command has been accepted since configuration.
+    bool booted_ = true; ///< Whether the first valid command is still pending.
+    bool braked_ = false; ///< Whether the watchdog has already braked this timeout.
+    std::array<LogEntry, LOG_QUEUE_SIZE> m_logQueue{}; ///< Queued log entries.
+    size_t m_logHead = 0; ///< Index of the oldest queued entry.
+    size_t m_logCount = 0; ///< Number of queued entries.
 };
 #else
 class SerialLink {

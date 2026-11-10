@@ -13,16 +13,28 @@
 
 namespace brain {
 namespace {
+
+// TODO: Move to constants file
 constexpr double PI = 3.14159265358979323846;
 constexpr double DEG_TO_RAD = PI / 180.0;
 constexpr double RPM_TO_RAD_S = PI / 30.0;
 const char* const RUMBLE[] = {".", "-", "..", "--", ".-.", "-.-"};
 
+/**
+ * @brief Maps a validated wire gearset to its PROS equivalent.
+ * @param value Gearset value from GroupCfg.
+ * @return pros::MotorGears Corresponding motor cartridge.
+ */
 pros::MotorGears gears(uint8_t value) {
     if (value == static_cast<uint8_t>(packets::Gearset::RED)) return pros::MotorGears::red;
     if (value == static_cast<uint8_t>(packets::Gearset::BLUE)) return pros::MotorGears::blue;
     return pros::MotorGears::green;
 }
+/**
+ * @brief Maps a validated wire brake mode to its PROS equivalent.
+ * @param value BrakeMode value from GroupCfg.
+ * @return pros::MotorBrake Corresponding PROS brake mode.
+ */
 pros::MotorBrake brake(uint8_t value) {
     if (value == static_cast<uint8_t>(packets::BrakeMode::BRAKE)) return pros::MotorBrake::brake;
     if (value == static_cast<uint8_t>(packets::BrakeMode::HOLD)) return pros::MotorBrake::hold;
@@ -40,6 +52,13 @@ NanoLink::NanoLink(pros::Controller& controller,
 }
 NanoLink::~NanoLink() = default;
 
+bool NanoLink::bindingsValid() const {
+    if (groups_.empty() || groups_.size() > packets::MAX_GROUPS || wheels_.size() > packets::MAX_ROTATIONS) return false;
+    for (const auto& group : groups_) if (!group.motor) return false;
+    for (const auto& wheel : wheels_) if (!wheel.sensor) return false;
+    return true;
+}
+
 packets::Error NanoLink::applyConfiguration(const BrainConfiguration& config) {
     std::lock_guard<pros::Mutex> lock(mutex_);
     const auto& fixed = config.fixed;
@@ -55,9 +74,20 @@ packets::Error NanoLink::applyConfiguration(const BrainConfiguration& config) {
     }
     for (size_t i = 0; i < wheels_.size(); ++i)
         if (!wheels_[i].sensor || wheels_[i].sensor->get_port() != config.trackingWheels[i].port) return packets::Error::CFG_PORT;
-    for (int i = 0; i < packets::MAX_ADI; ++i)
-        if ((fixed.adiOutEnable & (1u << i)) && !outputs_[i]) return packets::Error::CFG_PORT;
+    // Check both the ADI slot and smart port; a non-null output may still refer to the wrong device.
+    for (int i = 0; i < packets::MAX_ADI; ++i) {
+        if (!(fixed.adiOutEnable & (1u << i))) continue;
+        if (!outputs_[i]) return packets::Error::CFG_PORT;
+        const auto port = outputs_[i]->get_port();
+        const auto smart = std::get<0>(port);
+        const auto adi = std::get<1>(port);
+        const int slot = i % 8;
+        const bool validAdi = adi == slot + 1 || adi == 'A' + slot || adi == 'a' + slot;
+        const int expectedSmart = i < 8 ? INTERNAL_ADI_PORT : fixed.adiExpanderPort;
+        if (!validAdi || smart != expectedSmart) return packets::Error::CFG_PORT;
+    }
 
+    // Stop the existing groups before changing settings or resetting accumulated positions.
     brakeGroupsUnlocked();
     for (size_t i = 0; i < groups_.size(); ++i) {
         auto& group = groups_[i];
@@ -78,6 +108,7 @@ packets::Error NanoLink::applyConfiguration(const BrainConfiguration& config) {
         wheel.valid = false; wheel.last = 0; wheel.position = 0;
         if (!wheel.missing && wheel.sensor->set_reversed(wheel.reversed) == PROS_ERR) return packets::Error::REQ_DEVICE;
     }
+    // Retain levels only for outputs still on the same physical pins.
     uint16_t keep = enabled_ & fixed.adiOutEnable;
     if (expander_ != fixed.adiExpanderPort) keep &= 0xff;
     uint16_t levels = (keep & level_) | (~keep & (fixed.adiInitial ^ fixed.adiActiveLow) & fixed.adiOutEnable);
@@ -94,6 +125,7 @@ packets::Error NanoLink::applyConfiguration(const BrainConfiguration& config) {
 BrainState NanoLink::sample() {
     std::lock_guard<pros::Mutex> lock(mutex_);
     BrainState result{};
+    if (!bindingsValid()) return result;
     result.driver = DriverInputReader(controller_).read();
     int battery = pros::battery::get_voltage();
     result.batteryVoltage = battery == PROS_ERR ? 0 : static_cast<uint16_t>(battery);
@@ -110,6 +142,7 @@ BrainState NanoLink::sample() {
         for (int8_t port : g.motor->get_port_all()) if (pros::Device::get_plugged_type(std::abs(port)) != pros::DeviceType::motor) missing = true;
         if (g.missing && !missing) { g.motor->set_gearing_all(g.gear); g.motor->set_encoder_units_all(pros::MotorEncoderUnits::degrees); g.motor->set_brake_mode_all(g.brakeMode); }
         g.missing = missing;
+        // Average changes from motors with consecutive valid readings; a reconnect re-seeds the baseline.
         auto positions = g.motor->get_position_all(); double change = 0; int count = 0;
         for (size_t j = 0; j < g.last.size(); ++j) {
             bool valid = j < positions.size() && positions[j] != PROS_ERR_F && std::isfinite(positions[j]);
@@ -133,6 +166,7 @@ BrainState NanoLink::sample() {
         bool missing = pros::Device::get_plugged_type(w.sensor->get_port()) != pros::DeviceType::rotation;
         if (w.missing && !missing) w.sensor->set_reversed(w.reversed);
         w.missing = missing;
+        // Hold accumulated position across a failed read and re-seed on the next good reading.
         int32_t raw = w.sensor->get_position(); bool valid = raw != PROS_ERR && !missing;
         if (valid) { double rad = raw * DEG_TO_RAD / 100.0; if (w.valid) w.position += rad - w.last; w.last = rad; }
         w.valid = valid; out.positionRad = w.position;
@@ -149,6 +183,7 @@ BrainState NanoLink::sample() {
 
 packets::Error NanoLink::applyOutputs(const NanoCommand& command) {
     std::lock_guard<pros::Mutex> lock(mutex_);
+    if (!bindingsValid()) return packets::Error::CFG_PORT;
     if (command.fixed.nGroups != groups_.size()) return packets::Error::GROUP_COUNT;
     for (size_t i = 0; i < groups_.size(); ++i) {
         const auto& cmd = command.groups[i]; auto& motor = *groups_[i].motor;
@@ -161,6 +196,7 @@ packets::Error NanoLink::applyOutputs(const NanoCommand& command) {
         }
         if (rc == PROS_ERR) { brakeGroupsUnlocked(); return packets::Error::REQ_DEVICE; }
     }
+    // Only configured, masked outputs change; convert logical values to physical levels.
     const uint16_t mask = command.fixed.adiOutMask & enabled_;
     for (int i = 0; i < packets::MAX_ADI; ++i) if (mask & (1u << i)) {
         bool level = ((command.fixed.adiOutState ^ activeLow_) & (1u << i)) != 0;
@@ -172,12 +208,14 @@ packets::Error NanoLink::applyOutputs(const NanoCommand& command) {
 
 packets::Error NanoLink::executeRequest(const packets::CommandFixed& cmd) {
     std::lock_guard<pros::Mutex> lock(mutex_);
+    if (!bindingsValid()) return packets::Error::CFG_PORT;
     switch (static_cast<packets::Request>(cmd.requestType)) {
     case packets::Request::NONE: return packets::Error::NONE;
     case packets::Request::GROUP_TARE: {
         if (cmd.requestTarget >= groups_.size()) return packets::Error::REQ_TARGET;
         auto& group = groups_[cmd.requestTarget];
         if (group.motor->tare_position_all() == PROS_ERR) return packets::Error::REQ_DEVICE;
+        // A tare changes raw encoder positions, so re-seed without reporting it as movement.
         std::fill(group.valid.begin(), group.valid.end(), false);
         return packets::Error::NONE;
     }
@@ -188,7 +226,7 @@ packets::Error NanoLink::executeRequest(const packets::CommandFixed& cmd) {
     }
 }
 
-void NanoLink::brakeGroupsUnlocked() { for (auto& g : groups_) g.motor->brake(); }
+void NanoLink::brakeGroupsUnlocked() { for (auto& g : groups_) if (g.motor) g.motor->brake(); }
 
 void NanoLink::brakeGroups() {
     std::lock_guard<pros::Mutex> lock(mutex_);
