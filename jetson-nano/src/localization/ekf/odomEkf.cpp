@@ -113,14 +113,69 @@ void OdomEkf::predict(double dt) {
 }
 
 OdomEkf::Measurement OdomEkf::buildMeasurement(const OdomInputs& in) const {
-    // TODO: one row per valid source, in the velocity columns (3, 4, 5):
-    //   parallel wheel: dsPar = dt * (v_x + PARALLEL_TRACKING_WHEEL_OFFSET * omega)
-    //   perpendicular wheel: dsPerp = dt * (v_y - PERPENDICULAR_TRACKING_WHEEL_OFFSET * omega)
-    //   left IME: dsLeft = dt * (v_x - omega * TRACK_WIDTH / 2)
-    //   right IME: dsRight = dt * (v_x + omega * TRACK_WIDTH / 2)
-    //   IMU: dTheta = dt * omega
-    // TODO: R, one variance per row
-    return Measurement{};
+    // one row per valid source
+    const int n = in.parValid + in.perpValid + 2 * in.imeValid + in.imuValid;
+    if (n == 0) {
+        return Measurement{};
+    }
+
+    // H columns 0 to 2 and R off-diagonals stay zero, every row below fills z, H columns 3 to 5, and R's diagonal
+    Measurement m;
+    m.z.resize(n);
+    m.H.setZero(n, 6);
+    m.R.setZero(n, n);
+
+    const double dt = in.dt;
+    // IME scrub grows with turn rate in either direction
+    const double absOmega = std::abs(m_s[5]);
+
+    int row = 0;
+
+    // writes one row (measured value, H in the vX, vY, omega columns, sigma squared into R) and moves to the next
+    const auto addRow = [&](double zVal, double hVx, double hVy, double hOmega, double sigma) {
+        m.z(row) = zVal;
+        m.H(row, 3) = hVx;
+        m.H(row, 4) = hVy;
+        m.H(row, 5) = hOmega;
+        m.R(row, row) = sigma * sigma;
+        ++row;
+    };
+
+    // parallel wheel: dt * (vX + offset * omega), offset positive to the right
+    if (in.parValid) {
+        const double hOmega = dt * PARALLEL_TRACKING_WHEEL_OFFSET;
+        const double sigma = ODOM_EKF_TRACKING_SIGMA_PER_IN * std::abs(in.dsPar) + ODOM_EKF_TRACKING_SIGMA_FLOOR;
+        addRow(in.dsPar, dt, 0.0, hOmega, sigma);
+    }
+
+    // perpendicular wheel: dt * (vY - offset * omega), offset positive behind
+    if (in.perpValid) {
+        const double hOmega = -dt * PERPENDICULAR_TRACKING_WHEEL_OFFSET;
+        const double sigma = ODOM_EKF_TRACKING_SIGMA_PER_IN * std::abs(in.dsPerp) + ODOM_EKF_TRACKING_SIGMA_FLOOR;
+        addRow(in.dsPerp, 0.0, dt, hOmega, sigma);
+    }
+
+    // drive IMEs: dt * (vX -/+ omega * track / 2), noisier and worse in turns
+    if (in.imeValid) {
+        const double hOmega = dt * TRACK_WIDTH / 2.0;
+        const double turnSigma = ODOM_EKF_IME_SIGMA_PER_OMEGA * absOmega + ODOM_EKF_IME_SIGMA_FLOOR;
+        const double sigmaLeft = ODOM_EKF_IME_SIGMA_PER_IN * std::abs(in.dsLeft) + turnSigma;
+        const double sigmaRight = ODOM_EKF_IME_SIGMA_PER_IN * std::abs(in.dsRight) + turnSigma;
+        addRow(in.dsLeft, dt, 0.0, -hOmega, sigmaLeft);
+        addRow(in.dsRight, dt, 0.0, hOmega, sigmaRight);
+    }
+
+    // IMU: dt * omega, gyro noise grows with sqrt(dt) and leftover bias with dt
+    if (in.imuValid) {
+        const double sigma = ODOM_EKF_IMU_NOISE_DENSITY * std::sqrt(dt) + ODOM_EKF_IMU_BIAS_SIGMA * dt;
+        addRow(in.dTheta, 0.0, 0.0, dt, sigma);
+    }
+
+    // a source counted but not added (or the reverse) would leave bad rows, skip the update instead
+    if (row != n) {
+        return Measurement{};
+    }
+    return m;
 }
 
 void OdomEkf::update(const Measurement& m) {
