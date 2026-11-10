@@ -65,6 +65,17 @@ target_include_directories(robotcore_lidar PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen/include
 )
 
+# - - - - - - - - - - - - - - [EKF CORE] - - - - - - - - - - - - - -
+# portable: Eigen + std only, so the simulator and tests can link it too
+add_library(robotcore_ekf STATIC
+    src/localization/ekf/se2.cpp
+)
+target_include_directories(robotcore_ekf PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen/include
+)
+
 # - - - - - - - - - - - - - - [NANO EXECUTABLE] - - - - - - - - - - - - - -
 # only built when jetson-nano/ is the top-level project (DreamSim's add_subdirectory skips it)
 # CMAKE_SOURCE_DIR check instead of PROJECT_IS_TOP_LEVEL, which needs cmake 3.21
