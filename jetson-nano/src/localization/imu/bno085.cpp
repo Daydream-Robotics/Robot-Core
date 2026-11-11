@@ -1,11 +1,12 @@
-#include "localization/imu/bno055.hpp"
+#include "localization/imu/bno085.hpp"
 
 #include "config/constants.h"
+#include "utils/mathHelpers.hpp"
 
-#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <utility>
 
 #include <fcntl.h>
@@ -15,28 +16,42 @@
 
 namespace {
 
-// BNO055 registers. Check every value against the Bosch BNO055 datasheet.
-constexpr uint8_t REG_CHIP_ID = 0x00; // reads CHIP_ID_VALUE
-constexpr uint8_t REG_PAGE_ID = 0x07;
-constexpr uint8_t REG_GYR_DATA_Z_LSB = 0x18; // 0x18 LSB, 0x19 MSB
-constexpr uint8_t REG_CALIB_STAT = 0x35; // gyro calibration is bits 5:4
-constexpr uint8_t REG_UNIT_SEL = 0x3B;
-constexpr uint8_t REG_OPR_MODE = 0x3D;
-constexpr uint8_t REG_PWR_MODE = 0x3E;
-constexpr uint8_t REG_SYS_TRIGGER = 0x3F; // bit 5 resets the chip
-constexpr uint8_t REG_AXIS_MAP_CONFIG = 0x41;
-constexpr uint8_t REG_AXIS_MAP_SIGN = 0x42;
-constexpr uint8_t REG_GYR_OFFSET_X_LSB = 0x61; // gyro calibration offsets, 0x61–0x66
+// SHTP and SH-2 values
+// SHTP channels
+constexpr uint8_t CH_EXECUTABLE = 1; // reset in, reset complete out
+constexpr uint8_t CH_CONTROL = 2; // commands, feature settings, product ID
+constexpr uint8_t CH_REPORTS = 3; // sensor reports
+constexpr uint8_t CH_WAKE_REPORTS = 4; // sensor reports enabled as wake-up sensors
 
-constexpr uint8_t CHIP_ID_VALUE = 0xA0;
-constexpr uint8_t MODE_CONFIG = 0x00;
-constexpr uint8_t MODE_IMU = 0x08; // accelerometer + gyro fusion, no magnetometer
+// executable channel
+constexpr uint8_t EXEC_RESET = 0x01; // host -> chip: soft reset
+constexpr uint8_t EXEC_RESET_COMPLETE = 0x01; // chip -> host: finished booting
 
-constexpr double GYRO_LSB_PER_DPS = 16.0; // default scale, in dps units
-constexpr double DEG_TO_RAD = M_PI / 180.0;
+// control channel report IDs
+constexpr uint8_t COMMAND_RESPONSE = 0xF1;
+constexpr uint8_t COMMAND_REQUEST = 0xF2;
+constexpr uint8_t PRODUCT_ID_RESPONSE = 0xF8;
+constexpr uint8_t PRODUCT_ID_REQUEST = 0xF9;
+constexpr uint8_t GET_FEATURE_RESPONSE = 0xFC;
+constexpr uint8_t SET_FEATURE = 0xFD;
+
+// command IDs
+constexpr uint8_t CMD_SAVE_DCD = 0x06; // save calibration (dynamic calibration data) to the chip's flash
+constexpr uint8_t CMD_ME_CALIBRATION = 0x07; // pick which sensors the chip calibrates while running
+
+// input report IDs
+constexpr uint8_t TIMESTAMP_REBASE = 0xFA;
+constexpr uint8_t BASE_TIMESTAMP = 0xFB;
+constexpr uint8_t GAME_ROTATION_VECTOR = 0x08; // gyro + accel quaternion, no magnetometer
+constexpr uint8_t STABILITY_CLASSIFIER = 0x13;
+
+constexpr int STABILITY_RATE_HZ = 10;
+constexpr double Q14 = 1.0 / (1 << 14); // quaternion fixed point scale
+constexpr size_t MAX_PACKET = 4096; // larger lengths mean a bad read (a floating bus reads 0x7FFF)
+
 
 /**
- * @brief Current steady_clock time, on the same scale as the serial link's nowUs().
+ * @brief Current steady_clock time.
  *
  * @return int64_t Microseconds since a fixed point.
  */
@@ -45,91 +60,123 @@ int64_t nowUs() {
                std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
-} // namespace
+/**
+ * @brief Reads a little-endian int16.
+ *
+ * @param p First byte.
+ * @return int16_t The value.
+ */
+int16_t le16(const uint8_t* p) {
+    return static_cast<int16_t>(p[0] | (p[1] << 8));
+}
 
-Bno055::Bno055(Config cfg) : m_cfg(std::move(cfg)) {}
+/**
+ * @brief Reads a little-endian int32.
+ *
+ * @param p First byte.
+ * @return int32_t The value.
+ */
+int32_t le32(const uint8_t* p) {
+    return static_cast<int32_t>(static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
+                                (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24));
+}
 
-Bno055::~Bno055() {
+/**
+ * @brief Length of an input report, so the parser can find the next one in a packet.
+ *
+ * @param id Report ID.
+ * @return size_t Bytes including the ID, 0 for a report this driver doesn't enable.
+ */
+size_t reportLength(uint8_t id) {
+    switch (id) {
+        case TIMESTAMP_REBASE:
+        case BASE_TIMESTAMP:
+            return 5;
+        case GAME_ROTATION_VECTOR:
+            return 12;
+        case STABILITY_CLASSIFIER:
+            return 6;
+        default:
+            return 0;
+    }
+}
+
+
+} 
+
+Bno085::Bno085(Config cfg) : m_cfg(std::move(cfg)) {}
+
+Bno085::~Bno085() {
     // join the read thread first so it can't touch the bus after it's closed
     stop();
-    // -1 means the bus was never opened (or is already closed)
+    // -1 means the bus was never opened (or is closed)
     if (m_fd >= 0) {
         close(m_fd);
         m_fd = -1;
     }
 }
 
-bool Bno055::start() {
-    // already running, nothing to do
+bool Bno085::start() {
+    // already running
     if (m_running) {
         return true;
     }
 
     // the static asserts only cover the NANO_IMU defaults, so check a caller's own Config here
-    if (m_cfg.rateHz <= 0 || m_cfg.rateHz > 1000) {
-        std::fprintf(stderr, "[bno055] rateHz %d out of range (1-1000)\n", m_cfg.rateHz);
+    if (m_cfg.rateHz <= 0 || m_cfg.rateHz > 400) {
+        std::fprintf(stderr, "[bno085] rateHz %d out of range (1-400)\n", m_cfg.rateHz);
+        return false;
+    }
+    if (m_cfg.pollHz < m_cfg.rateHz || m_cfg.pollHz > 2000) {
+        std::fprintf(stderr, "[bno085] pollHz %d must be between rateHz and 2000\n", m_cfg.pollHz);
         return false;
     }
     if (m_cfg.historySec * m_cfg.rateHz < 2) {
-        std::fprintf(stderr, "[bno055] historySec %.3f too short, need at least 2 samples\n", m_cfg.historySec);
+        std::fprintf(stderr, "[bno085] historySec %.3f too short, need at least 2 samples\n", m_cfg.historySec);
         return false;
     }
-    if (m_cfg.maxReadErrors < 1) {
-        std::fprintf(stderr, "[bno055] maxReadErrors must be at least 1\n");
+    if (m_cfg.maxReadErrors < 1 || m_cfg.reportTimeoutMs * m_cfg.rateHz <= 1000) {
+        std::fprintf(stderr, "[bno085] maxReadErrors must be at least 1 and reportTimeoutMs longer than one report\n");
         return false;
     }
 
-    // open the I2C bus, where m_fd is the handle every later read/write uses
+
+    // open the I2C bus
     m_fd = open(m_cfg.device.c_str(), O_RDWR);
     if (m_fd < 0) {
-        std::fprintf(stderr, "[bno055] can't open %s\n", m_cfg.device.c_str());
+        std::fprintf(stderr, "[bno085] can't open %s\n", m_cfg.device.c_str());
         return false;
     }
-    // point later reads/writes on this handle at the BNO055's address
+    // point later reads/writes on this handle at the BNO085's address
     if (ioctl(m_fd, I2C_SLAVE, m_cfg.address) < 0) {
-        std::fprintf(stderr, "[bno055] no device at 0x%02X\n", m_cfg.address);
+        std::fprintf(stderr, "[bno085] no device at 0x%02X\n", m_cfg.address);
         close(m_fd);
         m_fd = -1;
         return false;
     }
 
-    // one slot per sample over historySec, allocated now so the read thread never resizes it
+    // one slot per sample over historySec, allocated now so the read thread doesn't resize it
     m_history.assign(static_cast<size_t>(m_cfg.historySec * m_cfg.rateHz), ThetaSample{});
-    // empty ring buffer
-    m_historyHead = 0;
-    m_historyCount = 0;
+    
+    invalidate();
+    m_calibrationSaved = false;
 
-    // set before configure() so stop() can cut its chip ID retries short, and before the thread since run() loops while m_running
     m_running = true;
 
-    // set IMU mode, then measure gyro bias (robot must be still)
-    const BiasResult bias = configure() ? estimateBias() : BiasResult::READ_ERRORS;
-    if (bias == BiasResult::READ_ERRORS) {
-        // the chip isn't answering, so close the bus so a retry starts clean
+    if (!resetAndConfigure()) {
+        // the chip isn't answering, so close the bus
         m_running = false;
         close(m_fd);
         m_fd = -1;
         return false;
     }
 
-    // a moving robot gives a wrong bias, but run() re-measures it once the chip calibrates,
-    // so keep going and flag it for whoever reads health()
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        m_health.movedAtStart = bias == BiasResult::MOVING;
-    }
-    if (bias == BiasResult::MOVING) {
-        std::fprintf(stderr,
-                     "[bno055] ******** WARNING: ROBOT MOVED DURING IMU STARTUP ********\n"
-                     "[bno055] heading stays invalid until the robot sits still after the gyro calibrates\n");
-    }
-
     // run() on this object in its own thread
-    m_thread = std::thread(&Bno055::run, this);
+    m_thread = std::thread(&Bno085::run, this);
     return true;
 }
 
-void Bno055::stop() {
+void Bno085::stop() {
     // tell run() to exit its loop
     m_running = false;
     // wait for the thread to finish. joinable() is false if it was never started or is already joined
@@ -143,7 +190,7 @@ void Bno055::stop() {
     }
 }
 
-std::optional<double> Bno055::headingIncrement(int64_t t0Us, int64_t t1Us) const {
+std::optional<double> Bno085::headingIncrement(int64_t t0Us, int64_t t1Us) const {
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         if (!m_health.valid){
@@ -161,337 +208,318 @@ std::optional<double> Bno055::headingIncrement(int64_t t0Us, int64_t t1Us) const
     return *theta1 - *theta0;
 }
 
-Bno055::Health Bno055::health() const {
+Bno085::Health Bno085::health() const {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_health;
 }
 
-bool Bno055::configure() {
+bool Bno085::resetAndConfigure() {
     using namespace std::chrono_literals;
 
-    // select register page 0 (the chip ID and all config registers are on page 0)
-    if (!writeReg(REG_PAGE_ID, 0x00)) {
-        return false;
-    }
-
-    // check we're talking to a BNO055 and retry briefly in case it's still booting
-    uint8_t id = 0;
-    for (int i = 0; i < 10 && id != CHIP_ID_VALUE && m_running; ++i) {
-        // a failed read is seen as a wrong ID, so the loop retries
-        if (!readRegs(REG_CHIP_ID, &id, 1)) {
-            id = 0;
-        }
-        // only wait if this attempt didn't succeed
-        if (id != CHIP_ID_VALUE) {
+    // soft reset, retried for about 1s in case the chip is still booting and NAKs the write
+    bool sent = false;
+    for (int i = 0; i < 10 && !sent && m_running; ++i) {
+        sent = writePacket(CH_EXECUTABLE, {EXEC_RESET});
+        if (!sent) {
             std::this_thread::sleep_for(100ms);
         }
     }
-    // stop() was called mid-retry, so give up without blaming the wiring
+    // stop() was called mid-retry
     if (!m_running) {
         return false;
     }
-    // still wrong after ~1 s: wrong address, or wiring problem
-    if (id != CHIP_ID_VALUE) {
-        std::fprintf(stderr, "[bno055] chip ID 0x%02X, expected 0x%02X\n", id, CHIP_ID_VALUE);
+    if (!sent) {
+        std::fprintf(stderr, "[bno085] no answer at 0x%02X, check wiring and that PS0/PS1 are low (I2C mode)\n", m_cfg.address);
         return false;
     }
 
-    // config registers can only be written in CONFIG mode, writes in other modes are ignored
-    if (!writeReg(REG_OPR_MODE, MODE_CONFIG)) {
-        return false;
-    }
-    // switching any mode -> CONFIG takes 19 ms
-    std::this_thread::sleep_for(25ms);
-
-    // normal power mode (0x00): all sensors always on, no sleeping between samples
-    if (!writeReg(REG_PWR_MODE, 0x00)) {
-        return false;
-    }
-
-    // units: bit 1 = 0 -> gyro in dps (readGyroZ() converts to rad/s), bit 7 = 0 -> Windows orientation
-    // the other bits (accel m/s², Euler degrees, temp °C) are 0 too; only the gyro unit matters
-    if (!writeReg(REG_UNIT_SEL, 0x00)) {
+    // after booting, the chip sends its advertisement and then reset complete on the executable channel
+    Packet p;
+    auto resetComplete = [](const Packet& q) {
+        return q.channel == CH_EXECUTABLE && q.payload[0] == EXEC_RESET_COMPLETE;
+    };
+    if (!waitFor(1000, resetComplete, p)) {
+        std::fprintf(stderr, "[bno085] chip didn't finish booting after reset\n");
         return false;
     }
 
-    // axis remap: datasheet defaults (0x24 / 0x00) keep the chip's own axes
-    // AXIS_MAP_CONFIG picks which chip axis becomes X/Y/Z; AXIS_MAP_SIGN flips their signs
-    // TODO: change once the board's mounting is known, so gyro Z is up and CCW+
-    if (!writeReg(REG_AXIS_MAP_CONFIG, 0x24) || !writeReg(REG_AXIS_MAP_SIGN, 0x00)) {
+    // product ID: proves an SH-2 chip is answering, and says why it last booted
+    auto productId = [](const Packet& q) {
+        return q.channel == CH_CONTROL && q.payload[0] == PRODUCT_ID_RESPONSE && q.payload.size() >= 16;
+    };
+    if (!writePacket(CH_CONTROL, {PRODUCT_ID_REQUEST, 0x00}) || !waitFor(500, productId, p)) {
+        std::fprintf(stderr, "[bno085] no product ID response\n");
         return false;
     }
-
-    // restore saved gyro offsets, which can only be written in CONFIG mode
-    if (loadGyroOffsets()) {
-        m_offsetsSaved = true;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_health.resetCause = p.payload[1];
     }
+    std::fprintf(stderr, "[bno085] firmware %u.%u.%u, reset cause %u\n", p.payload[2], p.payload[3],
+                 static_cast<unsigned>(le16(&p.payload[12])), p.payload[1]);
 
-    // IMU fusion mode (accel + gyro, 100 Hz, no magnetometer); this also starts the sensors
-    if (!writeReg(REG_OPR_MODE, MODE_IMU)) {
-        return false;
-    }
-    // switching CONFIG -> any mode takes 7 ms; 10 ms adds margin before the first read
-    std::this_thread::sleep_for(10ms);
-
-    return true;
+    m_reconfigure = false;
+    return configure();
 }
 
-void Bno055::run() {
+bool Bno085::configure() {
+    // calibrate accel and gyro while running.
+    // params: P0 accel, P1 gyro, P2 mag, P3 subcommand (0 = configure), P4 planar accel
+    if (!sendCommand(CMD_ME_CALIBRATION, {1, 1, 0, 0, 1})) {
+        return false;
+    }
+    Packet p;
+    auto meResponse = [](const Packet& q) {
+        return q.channel == CH_CONTROL && q.payload[0] == COMMAND_RESPONSE && q.payload.size() >= 6 &&
+               q.payload[2] == CMD_ME_CALIBRATION;
+    };
+    if (!waitFor(300, meResponse, p)) {
+        std::fprintf(stderr, "[bno085] no response to the calibration setup\n");
+        return false;
+    }
+    // R0 (byte 5) is the status, 0 = success. Keep going on failure, the chip still runs with its default calibration
+    if (p.payload[5] != 0) {
+        std::fprintf(stderr, "[bno085] calibration setup returned status %u, using the chip's defaults\n", p.payload[5]);
+    }
+
+    // heading source, and whether the robot is still (for logs and later zero-velocity updates)
+    return enableReport(GAME_ROTATION_VECTOR, 1'000'000 / m_cfg.rateHz) &&
+           enableReport(STABILITY_CLASSIFIER, 1'000'000 / STABILITY_RATE_HZ);
+}
+
+
+void Bno085::run() {
     // monotonic clock for scheduling
     using clock = std::chrono::steady_clock;
 
-    // time between reads: 1 s / 100 Hz = 10 ms
-    const auto period = std::chrono::microseconds(1000000 / m_cfg.rateHz);
-    // when the next read is due
+    // time between polls: 1 s / 400 Hz = 2.5 ms
+    const auto period = std::chrono::microseconds(1'000'000 / m_cfg.pollHz);
+    // when the next poll is due
     auto nextTick = clock::now();
 
     // for the once-a-second health update
     auto lastHealthCheck = clock::now();
-    // good reads since the last health update, used to measure the actual rate
-    int samplesSinceCheck = 0;
-
-    // first sample has nothing to integrate from (0 = no previous sample)
-    m_lastTUs = 0;
+    m_reportsSinceCheck = 0;
+    // the timeout counts from now, not from the last report before start() returned
+    m_lastReportUs = nowUs();
 
     // runs until stop() sets m_running to false
     while (m_running) {
-        // wait until this read's slot, then schedule the next one
+        // wait until this poll's slot, then schedule the next one
         nextTick += period;
         std::this_thread::sleep_until(nextTick);
 
-        // read turn rate (rad/s, CCW+, bias already subtracted)
-        std::optional<double> rate = readGyroZ();
-        if (!rate) {
-            // count the error; reset the chip after maxReadErrors in a row
-            m_errorStreak++;
-            // lock while changing shared health
-            {
+        // read everything queued
+        for (int i = 0; i < 16 && m_running; ++i) {
+            Packet p;
+            if (!readPacket(p)) {
+                m_errorStreak++;
                 std::lock_guard<std::mutex> lock(m_mutex);
                 m_health.readErrors++;
+                break;
             }
-            if (m_errorStreak >= m_cfg.maxReadErrors) {
-                // reset and reconfigure the chip (takes ~650 ms)
+            // good read ends any error streak
+            m_errorStreak = 0;
+            // empty packet means the chip has nothing more to send
+            if (p.payload.empty()) {
+                break;
+            }
+            handlePacket(p);
+        }
+
+        // the chip reset itself
+        if (m_reconfigure) {
+            m_reconfigure = false;
+            if (!configure()) {
                 recover();
-                m_errorStreak = 0;
-                // integration restarts after a reset
-                m_lastTUs = 0;
-                // restart the schedule from now
-                nextTick = clock::now();
             }
-            // skip to the next slot
+            m_lastReportUs = nowUs();
+            nextTick = clock::now();
             continue;
         }
-        // good read ends any error streak
-        m_errorStreak = 0;
 
-        // integrate rate into heading with the trapezoid rule: average of this and last rate * time step
-        const int64_t t = nowUs();
-        // integrate only if there's a previous sample
-        if (m_lastTUs != 0) {
-            // time since the last good read, µs -> s
-            const double dt = (t - m_lastTUs) * 1e-6;
-            m_theta += 0.5 * (*rate + m_lastRateRadS) * dt;
-        }
-        // remember this read for the next step
-        m_lastTUs = t;
-        m_lastRateRadS = *rate;
-        samplesSinceCheck++;
-
-        // store (time, heading) in the ring buffer, overwriting the oldest sample when full
-        {
-            // lock while writing shared history
-            std::lock_guard<std::mutex> lock(m_mutex);
-            m_history[m_historyHead] = {t, m_theta};
-            // move to the next slot, wrapping to 0 at the end
-            m_historyHead = (m_historyHead + 1) % m_history.size();
-            // count grows until the buffer is full, then stays at its size
-            if (m_historyCount < m_history.size()) {
-                m_historyCount++;
-            }
+        // too many read errors, or the chip went quiet then reset it (takes about 1 s)
+        const bool timedOut = nowUs() - m_lastReportUs > static_cast<int64_t>(m_cfg.reportTimeoutMs) * 1000;
+        if (m_errorStreak >= m_cfg.maxReadErrors || timedOut) {
+            recover();
+            m_errorStreak = 0;
+            m_lastReportUs = nowUs();
+            // restart the schedule from now
+            nextTick = clock::now();
+            continue;
         }
 
-        // re-measure the bias from the normal reads, so integration never pauses for it
-        if (m_biasWindowActive) {
-            m_biasWindowSum += *rate;
-            m_biasWindowSumSq += *rate * *rate;
-            m_biasWindowCount++;
-
-            if (m_biasWindowCount >= static_cast<int>(NANO_IMU_BIAS_SEC * m_cfg.rateHz)) {
-                // no log on failure, since this retries every window while the robot moves
-                if (applyBiasStats(m_biasWindowSum, m_biasWindowSumSq, m_biasWindowCount, false)) {
-                    m_biasSettled = true;
-                    m_biasWindowActive = false;
-                    std::lock_guard<std::mutex> lock(m_mutex);
-                    // older samples were integrated with the stale bias, so headingIncrement() can't span them
-                    m_historyHead = 0;
-                    m_historyCount = 0;
-                    m_health.valid = m_health.calibGyro >= NANO_IMU_GYRO_CALIB_TRUSTED;
-                }
-                // robot moved during the window: start another and stay invalid until one is still
-                m_biasWindowSum = 0.0;
-                m_biasWindowSumSq = 0.0;
-                m_biasWindowCount = 0;
-            }
-        }
-
-        // about once a second: calibration and status into health
+        // about once a second: report rate into health, and save calibration once it's trusted
         const auto now = clock::now();
         if (now - lastHealthCheck >= std::chrono::seconds(1)) {
-            // read calibration status
-            uint8_t calib = 0;
-            const bool calibOk = readRegs(REG_CALIB_STAT, &calib, 1);
-            // time since the last health update, in seconds
             const double seconds = std::chrono::duration<double>(now - lastHealthCheck).count();
-
-            bool calibrated = false;
+            bool valid = false;
             {
                 std::lock_guard<std::mutex> lock(m_mutex);
-                if (calibOk) {
-                    // gyro calibration is bits 5:4 of CALIB_STAT: shift down, keep 2 bits (0-3)
-                    m_health.calibGyro = (calib >> 4) & 0x03;
-                }
-                calibrated = m_health.calibGyro >= NANO_IMU_GYRO_CALIB_TRUSTED;
-                // valid once the gyro reports full calibration and the bias was re-measured after it
-                m_health.valid = calibrated && m_biasSettled;
-                m_health.lastRateHz = samplesSinceCheck / seconds;
+                m_health.lastRateHz = m_reportsSinceCheck / seconds;
+                valid = m_health.valid;
             }
-
-            // start the next one-second window
             lastHealthCheck = now;
-            samplesSinceCheck = 0;
+            m_reportsSinceCheck = 0;
 
-            if (!calibrated) {
-                // the chip's offset may change again before it's trusted, so measure the bias after that
-                m_biasSettled = false;
-                m_biasWindowActive = false;
-            } else if (!m_biasSettled && !m_biasWindowActive) {
-                // the chip now removes its own offset, so the bias measured before is stale
-                m_biasWindowActive = true;
-                m_biasWindowSum = 0.0;
-                m_biasWindowSumSq = 0.0;
-                m_biasWindowCount = 0;
-            }
-
-            // save the offsets the first time the gyro is fully calibrated
-            if (calibrated && !m_offsetsSaved && !m_cfg.calibFile.empty()) {
-                // reset the chip if it couldn't go back to IMU mode
-                if (!saveGyroOffsets()) {
-                    recover();
-                    m_lastTUs = 0;
-                }
-                // the save paused the loop, so restart the schedule instead of catching up with back-to-back reads
-                nextTick = clock::now();
+            // the chip keeps calibration in its own flash, so the next boot starts calibrated
+            if (valid && m_cfg.saveCalibration && !m_calibrationSaved) {
+                m_calibrationSaved = true;
+                sendCommand(CMD_SAVE_DCD, {});
             }
         }
     }
 }
 
-void Bno055::recover() {
-    // mark the IMU invalid and count the reset
+
+void Bno085::recover() {
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_health.valid = false;
         m_health.resets++;
-        // the reset clears the chip's calibration, so don't trust the level read before it
-        m_health.calibGyro = 0;
-        // clear the history so headingIncrement() can't span the reset gap
-        m_historyHead = 0;
-        m_historyCount = 0;
     }
-    // the chip recalibrates after the reset, so the bias must be re-measured once it's trusted again
-    m_biasSettled = false;
-    m_biasWindowActive = false;
+    // headingIncrement() can't span the reset gap
+    invalidate();
 
     // reset and reconfigure, retrying up to NANO_IMU_RESET_ATTEMPTS times
     bool configured = false;
     for (int attempt = 0; attempt < NANO_IMU_RESET_ATTEMPTS && m_running && !configured; ++attempt) {
-        // reset the chip with the RST_SYS bit (bit 5 of SYS_TRIGGER)
-        // the write may fail if the chip is stuck, so wait and reconfigure either way
-        writeReg(REG_SYS_TRIGGER, 0x20);
-
-        // the chip takes 650 ms to boot after a reset
-        std::this_thread::sleep_for(std::chrono::milliseconds(650));
-
-        // set IMU mode again
-        configured = configure();
+        configured = resetAndConfigure();
     }
-    if (!configured) {
-        std::fprintf(stderr, "[bno055] reconfigure after reset failed\n");
-        return;
+    if (!configured && m_running) {
+        std::fprintf(stderr, "[bno085] reconfigure after reset failed\n");
     }
-
-    // re-measure gyro bias, keep the old bias if the robot is moving
-    if (estimateBias() != BiasResult::OK) {
-        std::fprintf(stderr, "[bno055] bias not re-estimated, keeping previous bias\n");
-    }
-
-    // integration restarts from the next good read
-    m_lastRateRadS = 0.0;
 }
 
-Bno055::BiasResult Bno055::estimateBias() {
-    // one sample per 1 / rateHz for NANO_IMU_BIAS_SEC
-    const auto period = std::chrono::microseconds(1'000'000 / m_cfg.rateHz);
-    const int wanted = static_cast<int>(NANO_IMU_BIAS_SEC * m_cfg.rateHz);
 
-    double sum = 0.0;
-    double sumSq = 0.0;
-    int count = 0;
+void Bno085::handlePacket(const Packet& p) {
+    switch (p.channel) {
+        case CH_EXECUTABLE:
+            // a reset complete we didn't ask for: brownout, watchdog, or the reset pin. Every report is off now
+            if (p.payload[0] == EXEC_RESET_COMPLETE) {
+                {
+                    std::lock_guard<std::mutex> lock(m_mutex);
+                    m_health.chipResets++;
+                }
+                invalidate();
+                m_reconfigure = true;
+                std::fprintf(stderr, "[bno085] chip reset itself, reconfiguring\n");
+            }
+            break;
+        case CH_CONTROL:
+            // the only command run() sends is the calibration save, R0 (byte 5) is its status
+            if (p.payload[0] == COMMAND_RESPONSE && p.payload.size() >= 6 && p.payload[2] == CMD_SAVE_DCD) {
+                if (p.payload[5] != 0) {
+                    std::fprintf(stderr, "[bno085] calibration save failed, status %u\n", p.payload[5]);
+                }
+            }
+            break;
+        case CH_REPORTS:
+        case CH_WAKE_REPORTS:
+            handleReports(p);
+            break;
+        default:
+            // advertisement and anything else isn't needed
+            break;
+    }
+}
 
-    for (int i = 0; i < wanted; ++i) {
-        std::this_thread::sleep_for(period);
+void Bno085::handleReports(const Packet& p) {
+    // without the INT pin the chip raised its interrupt sometime in the last poll period, so take the middle
+    const int64_t hostIntUs = p.readUs - 500'000 / m_cfg.pollHz;
+    // offset from hostIntUs to the batch's base time, in 100 us ticks. Same math as CEVA's sh2.c:
+    // sample time = interrupt time - base delta + rebase + report delay
+    int64_t referenceTicks = 0;
 
-        // readGyroZ() already subtracts the current bias, so this is the leftover error
-        std::optional<double> rate = readGyroZ();
-        if (!rate) {
-            continue;
+    const std::vector<uint8_t>& b = p.payload;
+    size_t i = 0;
+    while (i < b.size()) {
+        const uint8_t id = b[i];
+        const size_t len = reportLength(id);
+        if (len == 0 || i + len > b.size()) {
+            break;
         }
-        sum += *rate;
-        sumSq += *rate * *rate;
-        count++;
-    }
-    // need most of the samples to trust the average
-    if (count < wanted * 8 / 10) {
-        std::fprintf(stderr, "[bno055] bias: only %d of %d reads succeeded\n", count, wanted);
-        return BiasResult::READ_ERRORS;
-    }
+        const uint8_t* r = &b[i];
 
-    return applyBiasStats(sum, sumSq, count, true) ? BiasResult::OK : BiasResult::MOVING;
-}
+        switch (id) {
+            case BASE_TIMESTAMP:
+                referenceTicks = -static_cast<int64_t>(le32(r + 1));
+                break;
+            case TIMESTAMP_REBASE:
+                referenceTicks += le32(r + 1);
+                break;
+            case GAME_ROTATION_VECTOR: {
+                // status byte: bits 1:0 accuracy, bits 7:2 the top 6 bits of the 14-bit delay
+                const uint8_t accuracy = r[2] & 0x03;
+                const int64_t delayTicks = ((r[2] & 0xFC) << 6) | r[3];
+                int64_t tUs = hostIntUs + (referenceTicks + delayTicks) * 100;
+                // a sample can't be newer than the read that brought it
+                if (tUs > p.readUs) {
+                    tUs = p.readUs;
+                }
 
-bool Bno055::applyBiasStats(double sum, double sumSq, int count, bool logIfMoving) {
-    // mean and standard deviation of the leftover rate
-    const double mean = sum / count;
-    const double stdDev = std::sqrt(std::max(0.0, sumSq / count - mean * mean));
-
-    // a still robot reads near-constant rate, so a big spread or a big mean means it was moving
-    if (stdDev > NANO_IMU_BIAS_MAX_STDDEV || std::abs(mean) > NANO_IMU_BIAS_MAX_MEAN) {
-        if (logIfMoving) {
-            std::fprintf(stderr, "[bno055] bias: robot moving (mean %.4f, std %.4f rad/s)\n", mean, stdDev);
+                // unit quaternion i, j, k, real in Q14
+                const double qi = le16(r + 4) * Q14;
+                const double qj = le16(r + 6) * Q14;
+                const double qk = le16(r + 8) * Q14;
+                const double qr = le16(r + 10) * Q14;
+                // yaw about the chip's Z axis, CCW+, (-pi, pi]
+                const double yaw = std::atan2(2.0 * (qr * qk + qi * qj), 1.0 - 2.0 * (qj * qj + qk * qk));
+                addHeading(tUs, yaw, accuracy);
+                break;
+            }
+            case STABILITY_CLASSIFIER: {
+                std::lock_guard<std::mutex> lock(m_mutex);
+                m_health.stability = r[4];
+                break;
+            }
+            default:
+                break;
         }
-        return false;
+        i += len;
     }
-
-    // add the leftover error to the bias already being subtracted
-    m_biasRadS += mean;
-    return true;
 }
 
-std::optional<double> Bno055::readGyroZ() {
-    // GYR_DATA_Z is two bytes, LSB at 0x18 and MSB at 0x19
-    uint8_t buf[2];
-    if (!readRegs(REG_GYR_DATA_Z_LSB, buf, 2)) {
-        return std::nullopt;
+void Bno085::addHeading(int64_t tUs, double yaw, uint8_t accuracy) {
+    yaw *= m_cfg.yawSign;
+    // unwrap and add the short way around from the last yaw, so theta keeps counting past +-pi
+    if (m_haveYaw) {
+        m_theta += utils::wrapAngle(yaw - m_lastYaw);
     }
+    m_lastYaw = yaw;
+    m_haveYaw = true;
 
-    // combine little-endian bytes into a signed 16-bit value
-    const int16_t raw = static_cast<int16_t>((buf[1] << 8) | buf[0]);
+    // check if strictly increasing
+    if (tUs <= m_lastSampleUs) {
+        tUs = m_lastSampleUs + 1;
+    }
+    m_lastSampleUs = tUs;
+    m_lastReportUs = nowUs();
+    m_reportsSinceCheck++;
 
-    // raw counts -> dps (16 counts per dps) -> rad/s, minus the bias
-    return raw / GYRO_LSB_PER_DPS * DEG_TO_RAD - m_biasRadS;
+    // store (time, heading) in the ring buffer, overwriting the oldest sample when full
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_history[m_historyHead] = {tUs, m_theta};
+    m_historyHead = (m_historyHead + 1) % m_history.size();
+    if (m_historyCount < m_history.size()) {
+        m_historyCount++;
+    }
+    // the chip's own accuracy estimate decides validity, updated every report
+    m_health.accuracy = accuracy;
+    m_health.valid = accuracy >= NANO_IMU_ACCURACY_TRUSTED;
 }
 
-std::optional<double> Bno055::thetaAt(int64_t tUs) const {
+void Bno085::invalidate() {
+    // the next report starts a new unwrap, theta carries on from where it was
+    m_haveYaw = false;
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_health.valid = false;
+    m_health.accuracy = 0;
+    m_historyHead = 0;
+    m_historyCount = 0;
+}
+
+
+std::optional<double> Bno085::thetaAt(int64_t tUs) const {
     std::lock_guard<std::mutex> lock(m_mutex);
 
     // no samples yet
@@ -531,94 +559,116 @@ std::optional<double> Bno055::thetaAt(int64_t tUs) const {
     return std::nullopt;
 }
 
-bool Bno055::loadGyroOffsets() {
-    if (m_cfg.calibFile.empty()) {
+bool Bno085::enableReport(uint8_t reportId, uint32_t intervalUs) {
+    // Set Feature: ID, report, flags, change sensitivity (2), report interval (4), batch interval (4), sensor config (4)
+    std::vector<uint8_t> cmd(17, 0);
+    cmd[0] = SET_FEATURE;
+    cmd[1] = reportId;
+    for (int b = 0; b < 4; ++b) {
+        cmd[5 + b] = static_cast<uint8_t>(intervalUs >> (8 * b));
+    }
+    if (!writePacket(CH_CONTROL, cmd)) {
         return false;
     }
 
-    // 6 bytes: gyro X, Y, Z offsets, each LSB then MSB
-    uint8_t buf[6];
-    std::FILE* f = std::fopen(m_cfg.calibFile.c_str(), "rb");
-    if (!f) {
+    // the chip answers with the settings it actually used
+    Packet p;
+    auto featureResponse = [reportId](const Packet& q) {
+        return q.channel == CH_CONTROL && q.payload[0] == GET_FEATURE_RESPONSE && q.payload.size() >= 9 &&
+               q.payload[1] == reportId;
+    };
+    if (!waitFor(300, featureResponse, p)) {
+        std::fprintf(stderr, "[bno085] report 0x%02X not confirmed\n", reportId);
         return false;
     }
-    const size_t got = std::fread(buf, 1, sizeof(buf), f);
-    std::fclose(f);
-    if (got != sizeof(buf)) {
-        std::fprintf(stderr, "[bno055] %s is not a gyro offset file, ignoring it\n", m_cfg.calibFile.c_str());
-        return false;
+    const uint32_t actualUs = static_cast<uint32_t>(le32(&p.payload[5]));
+    if (actualUs != intervalUs) {
+        std::fprintf(stderr, "[bno085] report 0x%02X runs every %u us, asked for %u us\n", reportId, actualUs, intervalUs);
     }
+    return true;
+}
 
-    // write the offsets one register at a time, starting at GYR_OFFSET_X_LSB
-    for (size_t i = 0; i < sizeof(buf); ++i) {
-        if (!writeReg(static_cast<uint8_t>(REG_GYR_OFFSET_X_LSB + i), buf[i])) {
-            return false;
+bool Bno085::sendCommand(uint8_t command, const std::vector<uint8_t>& params) {
+    // Command Request: ID, sequence, command, P0-P8
+    std::vector<uint8_t> cmd(12, 0);
+    cmd[0] = COMMAND_REQUEST;
+    cmd[1] = m_commandSeq++;
+    cmd[2] = command;
+    for (size_t i = 0; i < params.size() && i < 9; ++i) {
+        cmd[3 + i] = params[i];
+    }
+    return writePacket(CH_CONTROL, cmd);
+}
+
+bool Bno085::waitFor(int timeoutMs, const std::function<bool(const Packet&)>& match, Packet& out) {
+    using namespace std::chrono_literals;
+    const int64_t deadline = nowUs() + static_cast<int64_t>(timeoutMs) * 1000;
+
+    while (m_running && nowUs() < deadline) {
+        // read errors are expected while the chip boots, so keep trying until the deadline
+        if (!readPacket(out) || out.payload.empty()) {
+            std::this_thread::sleep_for(1ms);
+            continue;
+        }
+        if (match(out)) {
+            return true;
         }
     }
-    return true;
+    return false;
 }
 
-bool Bno055::saveGyroOffsets() {
-    using namespace std::chrono_literals;
 
-    // try once per run, so a failed save doesn't pause the gyro every second
-    m_offsetsSaved = true;
-
-    // offsets can only be read in CONFIG mode
-    if (!writeReg(REG_OPR_MODE, MODE_CONFIG)) {
-        return false;
-    }
-    std::this_thread::sleep_for(25ms);
-
-    // 6 bytes: gyro X, Y, Z offsets, each LSB then MSB
-    uint8_t buf[6];
-    const bool readOk = readRegs(REG_GYR_OFFSET_X_LSB, buf, sizeof(buf));
-
-    // back to IMU mode
-    if (!writeReg(REG_OPR_MODE, MODE_IMU)) {
-        return false;
-    }
-    std::this_thread::sleep_for(10ms);
-
-    if (!readOk) {
-        std::fprintf(stderr, "[bno055] couldn't read gyro offsets\n");
-        return true;
-    }
-
-    std::FILE* f = std::fopen(m_cfg.calibFile.c_str(), "wb");
-    if (!f || std::fwrite(buf, 1, sizeof(buf), f) != sizeof(buf)) {
-        std::fprintf(stderr, "[bno055] couldn't write %s\n", m_cfg.calibFile.c_str());
-    }
-    if (f) {
-        std::fclose(f);
-    }
-    return true;
-}
-
-bool Bno055::writeReg(uint8_t reg, uint8_t value) {
-    //bus not open
-    if (m_fd < 0) {
-        return false;
-    }
-
-    // register address first, then the value, sent as one I2C write
-    const uint8_t buf[2] = {reg, value};
-    // write() returns how many bytes were sent, anything other than 2 is a failure
-    return write(m_fd, buf, 2) == 2;
-}
-
-bool Bno055::readRegs(uint8_t reg, uint8_t* out, size_t len) {
+bool Bno085::writePacket(uint8_t channel, const std::vector<uint8_t>& payload) {
     // bus not open
     if (m_fd < 0) {
         return false;
     }
 
-    // tell the chip which register to start reading from
-    if (write(m_fd, &reg, 1) != 1) {
+    // header: total length (LSB, MSB), channel, this channel's sequence number
+    const size_t len = payload.size() + 4;
+    std::vector<uint8_t> buf;
+    buf.reserve(len);
+    buf.push_back(static_cast<uint8_t>(len & 0xFF));
+    buf.push_back(static_cast<uint8_t>(len >> 8));
+    buf.push_back(channel);
+    buf.push_back(m_writeSeq[channel]++);
+    buf.insert(buf.end(), payload.begin(), payload.end());
+
+    // whole packet as one I2C write
+    return write(m_fd, buf.data(), buf.size()) == static_cast<ssize_t>(buf.size());
+}
+
+bool Bno085::readPacket(Packet& out) {
+    out.payload.clear();
+    out.readUs = nowUs();
+
+    // bus not open
+    if (m_fd < 0) {
         return false;
     }
 
-    // read len bytes, the chip moves to the next register after each byte
-    const ssize_t got = read(m_fd, out, len);
-    return got == static_cast<ssize_t>(len);
+    // the header says how long the waiting packet is, 0 when there's nothing
+    uint8_t header[4];
+    if (read(m_fd, header, sizeof(header)) != static_cast<ssize_t>(sizeof(header))) {
+        return false;
+    }
+    // bit 15 is the continuation flag, not part of the length
+    const size_t len = (header[0] | (header[1] << 8)) & 0x7FFF;
+    out.channel = header[2];
+    if (len <= sizeof(header)) {
+        return true;
+    }
+    if (len > MAX_PACKET) {
+        return false;
+    }
+
+    // every I2C read starts at the header again, so read the whole packet and skip it
+    std::vector<uint8_t> buf(len);
+    if (read(m_fd, buf.data(), len) != static_cast<ssize_t>(len)) {
+        return false;
+    }
+    out.channel = buf[2];
+    out.payload.assign(buf.begin() + 4, buf.end());
+    return true;
 }
+
