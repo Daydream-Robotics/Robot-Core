@@ -16,10 +16,12 @@ merge does not connect the robot or require the project to build.
 - The incoming helper header and source are preserved as `odomHelpers.hpp` and
   `odomHelpers.cpp` beside integration's existing Nano helpers. Their original
   includes and Brain dependencies have not been connected or adapted.
-- Incoming `Autonomous` takes the active Nano autonomous header and source paths.
-  Integration's displaced Nano autonomous header and source are preserved in
-  `archive/merge-odom-updates/integration/`, together with its Nano odometry
-  header. The Nano entry point still uses integration's autonomous interface.
+- Integration's Nano autonomous header and source remain at the active paths,
+  since the Nano entry point and `MPCController` target depend on them. The
+  incoming `Autonomous` header and source are preserved in
+  `archive/merge-odom-updates/odomUpdates/`. Incoming odometry takes the active
+  Nano odometry header path, and integration's displaced Nano odometry header
+  is preserved in `archive/merge-odom-updates/integration/`.
 - Integration's Nano spline, JerryIO path loader, serial implementation, MPC
   and MPC reference remain in place. The Nano spline and incoming spline both
   use compass headings, but their curvature conventions differ. Integration's
@@ -44,8 +46,8 @@ layout. The Nano does not yet receive the IMU and distance-sensor data needed
 by these algorithms. No adapters, protocol changes, startup connections or
 placeholder implementations were added in this merge.
 
-Nano `main.cpp` still expects integration's autonomous interface and its pose
-source still returns no pose. The Nano CMake source lists have not been updated
+The archived incoming `Autonomous` is not connected to the Nano entry point,
+and the pose source in Nano `main.cpp` still returns no pose. The Nano CMake source lists have not been updated
 to compile the relocated localization or controller files. The incoming code
 uses C++ facilities and dependencies that need separate platform integration.
 Consequently neither a successful existing target build nor this merge should
