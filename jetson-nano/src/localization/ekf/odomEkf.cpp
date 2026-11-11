@@ -27,8 +27,14 @@ struct OdomInputs {
 
 void OdomEkf::step(const OdomInputs& in) {
     // skip a duplicate, out-of-order, or NaN dt
-    if (in.dt <= 0.0 || std::isnan(in.dt)) {
+    if (in.dt <= 0.0 || !std::isfinite(in.dt)) {
         return;
+    }
+
+    if (in.dt > ODOM_EKF_MAX_DT) {
+        m_P.bottomRightCorner<3, 3>() = initialP.bottomRightCorner<3, 3>();
+        m_P.topRightCorner<3, 3>().setZero();
+        m_P.bottomLeftCorner<3, 3>().setZero();
     }
 
     // move the state forward and grow P
@@ -52,6 +58,10 @@ const OdomEkf::Cov& OdomEkf::covariance() const {
 }
 
 void OdomEkf::reset(const Pose& pose) {
+    if (!std::isfinite(pose.x) || !std::isfinite(pose.y) || !std::isfinite(pose.theta)) {
+        return;
+    }
+
     // zero everything, so v_x, v_y, omega start at rest
     m_s.setZero();
 
@@ -92,22 +102,35 @@ void OdomEkf::predict(double dt) {
     F(1, 5) = dx * dt / 2.0; // dy/domega
     F(2, 5) = dt; // dtheta/domega
 
-    // process noise on the velocities only, the next predict carries it into the pose through F
+    // process noise is a change in velocity this cycle
     const double accelStep = ODOM_EKF_ACCEL_SIGMA * dt; // in/s the speed may change this cycle
     const double angAccelStep = ODOM_EKF_ANG_ACCEL_SIGMA * dt; // rad/s the turn rate may change this cycle
 
-    Cov Q = Cov::Zero();
-    Q(3, 3) = accelStep * accelStep;
-    Q(4, 4) = accelStep * accelStep;
-    Q(5, 5) = angAccelStep * angAccelStep;
+    Eigen::Matrix3d Qv = Eigen::Matrix3d::Zero();
+    Qv(0, 0) = accelStep * accelStep;
+    Qv(1, 1) = accelStep * accelStep;
+    Qv(2, 2) = angAccelStep * angAccelStep;
+
+    // G maps a velocity change (vX, vY, omega) into the state, with the same rotation as the prediction
+    Eigen::Matrix<double, 6, 3> G = Eigen::Matrix<double, 6, 3>::Zero();
+    G(0, 0) = dt * cosThetaMid;
+    G(0, 1) = -dt * sinThetaMid;
+    G(1, 0) = dt * sinThetaMid;
+    G(1, 1) = dt * cosThetaMid;
+    G(2, 2) = dt;
+    G(3, 0) = 1.0;
+    G(4, 1) = 1.0;
+    G(5, 2) = 1.0;
+
 
     // new state, velocities stay constant
     m_s[0] += dx;
     m_s[1] += dy;
     m_s[2] = utils::wrapAngle(theta + omega * dt);
 
-    // propagate the uncertainty and add this cycle's process noise
-    m_P = F * m_P * F.transpose() + Q;
+    // propagate the uncertainty and add this cycle's process noise, in both velocity and pose
+    m_P = F * m_P * F.transpose() + G * Qv * G.transpose();
+
 
     // remove rounding asymmetry
     m_P = ((m_P + m_P.transpose()) / 2.0).eval();

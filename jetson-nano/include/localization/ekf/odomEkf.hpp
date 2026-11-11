@@ -91,12 +91,13 @@ private:
     void update(const Measurement& m);
 
     /**
-     * @brief Covariance at startup and after reset(), built once.
+     * @brief Covariance at startup, after reset(), and for the velocities after a link stall.
      *
      * Pose variances are tiny because the odometry frame starts where the filter starts.
-     * Velocity variances are large (1 in/s, 0.1 rad/s) because the robot may be moving at a reset.
+     * Velocity std devs are the robot's top speeds (60 in/s, 4 rad/s), because the robot may be
+     * moving at full speed when reset() runs on a link reconnect.
      */
-    static inline const Cov initialP = (State() << 1e-4, 1e-4, 1e-6, 1.0, 1.0, 0.01).finished().asDiagonal().toDenseMatrix();
+    static inline const Cov initialP = (State() << 1e-4, 1e-4, 1e-6, 3600.0, 3600.0, 16.0).finished().asDiagonal().toDenseMatrix();
 
     State m_s = State::Zero(); ///< starts at the odometry-frame origin, at rest
     Cov m_P = initialP; ///< same start as reset()
