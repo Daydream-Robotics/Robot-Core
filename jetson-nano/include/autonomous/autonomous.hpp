@@ -1,54 +1,65 @@
-// include/autonomous.hpp
 #pragma once
+#include <cstddef>
+#include <vector>
+#include "motion/control/motionController.hpp"
+#include "motion/pathFollower.hpp"
+#include "motion/pathing/arclengthSplining.hpp"
+#include "protocol/serial.hpp"
+#include "utils/helpers.hpp"
 
-#include "daydream/motion/control/pid.hpp"
-#include "daydream/motion/odometry.hpp"
-#include "daydream/subsystems/drivetrain.hpp"
-#include "daydream/subsystems/pneumatics.hpp"
-
-// Autonomous class containing
+/**
+ * @class Autonomous
+ * @brief runs the paths during each autonomous period the brain reports
+ */
 class Autonomous {
-    // Allow AutoTuner to access private members (PIDs)
-    friend class AutoTuner;
-
     public:
-        Autonomous(
-            daydream::Drivetrain& drivetrain,
-            Odometry& odometry,
-            daydream::Pneumatics& pneumatics);
+        /**
+         * @param pathFollower follower to drive the paths with
+         * @param link brain link, read for the competition state
+         * @param paths paths to run in order, every autonomous period
+         * @param flags direction of each path, same order as paths
+         */
+        Autonomous(PathFollower& pathFollower, const SerialLink& link, const std::vector<ALS_Path>& paths, const std::vector<PathFlag>& flags);
 
-        void runExample();
-
-        // Turn to a target_heading [-180, 180]
-        void turnTo(double targetHeading);
-
-        // Travel a specified distance with speed and heading with a timer (s) exit
-        double travel(double distance, double speed, double targetHeading, double timer_s = 0.0);
-
-        bool travelToPoint(double targetX, double targetY, double maxSpeed=200, bool reverse=false, int timer=-1);
+        /**
+         * @brief runs until shutdown is requested: waits for autonomous, runs every path, holds still until it ends
+         * @note leaves the drive stopped when it returns
+         */
+        void run();
 
     private:
+        /**
+         * @brief whether the brain reports an enabled autonomous period
+         */
+        bool enabled() const;
 
-        daydream::Drivetrain& m_drivetrain;
-        Odometry& m_odometry;
-        daydream::Pneumatics& m_pneumatics;
+        /**
+         * @brief whether the current autonomous period is over
+         * @returns true on shutdown, or when the brain reports it's no longer in an enabled autonomous.
+         *          false while no state arrives (a link dropout pauses the routine)
+         */
+        bool autonOver();
 
-        // Distance PID controller
-        PID distancePID;
+        /**
+         * @brief holds the drive stopped until an enabled autonomous starts (or shutdown)
+         */
+        void waitForAuton();
 
-        // Heading PID controller
-        PID headingPID;
+        /**
+         * @brief holds the drive stopped until the autonomous period is over (or shutdown)
+         */
+        void waitForAutonEnd();
 
-        // Turning PID controller
-        PID turnPID;
+        /**
+         * @brief follows one path to its end. a short link dropout pauses it, then it carries on
+         * @returns false if autonomous ended or shutdown was requested first
+         */
+        bool runPath(std::size_t index);
 
-        // Acceleration limit for takeoff (in/s^2)
-        double accelLimitRate = 200.0; // TODO: lo: 90 hi: 140 
-
-        // Time for takeoff (s)
-        double takeoffRampTime = 0.35; // TODO: tune
-
-        // Immediate stop threshold for movement (in)
-        double STOPTHRESHOLD = 0.1; // TODO: tune
-
+        PathFollower& m_pathFollower; /**< drives the paths */
+        const SerialLink& m_link; /**< competition state */
+        const std::vector<ALS_Path>& m_paths; /**< paths, in run order */
+        const std::vector<PathFlag>& m_flags; /**< direction of each path */
+        Ticker m_ticker; /**< one tick per MPC_SAMPLE_PERIOD */
+        bool m_linkLost = false; /**< no state from the brain right now, for the lost/back messages */
 };
