@@ -1,0 +1,24 @@
+diff --git a/sdk/src/sl_lidar_driver.cpp b/sdk/src/sl_lidar_driver.cpp
+index 4fd719c..6428220 100644
+--- a/sdk/src/sl_lidar_driver.cpp
++++ b/sdk/src/sl_lidar_driver.cpp
+@@ -217,13 +217,18 @@ namespace sl {
+ 
+                 size_t copiedCount = 0;
+ 
+-                while (maxcount--) {
++                while (copiedCount < maxcount && !_data_queue.empty()) {
+                     node[copiedCount++] = _data_queue.front();
+                     _data_queue.pop_front();
+                 }
+ 
++                if (_data_queue.empty()) {
++                    _data_waiter.set(false);
++                }
++
+                 return copiedCount;
+             }
++
+             return 0;
+         }
+     protected:

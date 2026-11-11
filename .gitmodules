@@ -7,3 +7,6 @@
 [submodule "jetson-nano/external/rplidar_sdk"]
 	path = jetson-nano/external/rplidar_sdk
 	url = https://github.com/Slamtec/rplidar_sdk.git
+[submodule "jetson-nano/jetson-nano/external/rplidar_sdk"]
+	path = jetson-nano/jetson-nano/external/rplidar_sdk
+	url = https://github.com/Slamtec/rplidar_sdk.git
