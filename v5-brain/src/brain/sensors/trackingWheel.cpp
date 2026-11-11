@@ -11,29 +11,6 @@
 
 namespace brain {
 
-namespace {
-
-/**
- * @brief Convert angular encoder ticks into linear travel distance.
- * @param ticks Angular displacement in PROS rotation ticks (centidegrees).
- * @param wheelDiameter Diameter of the tracking wheel in target length units.
- * @param ticksPerRev Number of encoder ticks per full wheel revolution.
- * @return Linear travel distance in the same units as @p wheelDiameter.
- */
-double ticksToDistance(double ticks, double wheelDiameter, double ticksPerRev) {
-    // Guard against invalid configuration values to prevent division by zero.
-    if (ticksPerRev <= 0.0 || wheelDiameter <= 0.0) {
-        return 0.0;
-    }
-
-    // Convert raw ticks to full wheel revolutions, then multiply by circumference (pi * d).
-    const double revolutions = ticks / ticksPerRev;
-    const double circumference = 3.14159265358979323846 * wheelDiameter;
-    return revolutions * circumference;
-}
-
-} // namespace
-
 /**
  * @brief Construct a TrackingWheel bound to @p encoder and @p geometry.
  * @param encoder Non-owning reference to the rotation encoder.
@@ -55,8 +32,8 @@ TrackingWheel::TrackingWheel(Encoder& encoder, shared::TrackingWheelGeometry geo
  */
 void TrackingWheel::update() {
     // Convert total accumulated ticks and per-tick delta ticks into linear distance.
-    distance_ = ticksToDistance(encoder_.getPosition(), geometry_.diameter, TICKS_PER_REVOLUTION);
-    deltaDistance_ = ticksToDistance(encoder_.getDelta(), geometry_.diameter, TICKS_PER_REVOLUTION);
+    distance_ = ticksToDistance(encoder_.getPosition(), geometry_.diameter);
+    deltaDistance_ = ticksToDistance(encoder_.getDelta(), geometry_.diameter);
 }
 
 /**
@@ -81,6 +58,24 @@ double TrackingWheel::deltaDistance() const {
  */
 double TrackingWheel::offset() const {
     return geometry_.offset;
+}
+
+/**
+ * @brief Convert angular encoder ticks into linear travel distance using @ref PI.
+ * @param ticks Angular displacement in PROS rotation ticks (centidegrees).
+ * @param wheelDiameter Diameter of the tracking wheel in target length units.
+ * @return Linear travel distance in the same units as @p wheelDiameter.
+ */
+double TrackingWheel::ticksToDistance(double ticks, double wheelDiameter) {
+    // Guard against invalid configuration values to prevent division by zero.
+    if (TICKS_PER_REVOLUTION <= 0.0 || wheelDiameter <= 0.0) {
+        return 0.0;
+    }
+
+    // Convert raw ticks to full wheel revolutions, then multiply by circumference (PI * d).
+    const double revolutions = ticks / TICKS_PER_REVOLUTION;
+    const double circumference = PI * wheelDiameter;
+    return revolutions * circumference;
 }
 
 } // namespace brain

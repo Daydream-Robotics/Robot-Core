@@ -63,6 +63,14 @@ public:
     double offset() const;
 
 private:
+    /**
+     * @brief Convert angular encoder ticks into linear travel distance.
+     * @param ticks Angular displacement in PROS rotation ticks (centidegrees).
+     * @param wheelDiameter Diameter of the tracking wheel in target length units.
+     * @return Linear travel distance in the same units as @p wheelDiameter.
+     */
+    static double ticksToDistance(double ticks, double wheelDiameter);
+
     /// Number of PROS rotation sensor ticks (centidegrees) per full wheel revolution.
     static constexpr double TICKS_PER_REVOLUTION = 36000.0;
 
@@ -83,4 +91,5 @@ private:
 };
 
 } // namespace brain
+
 
