@@ -1,11 +1,28 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <vector>
+
 #include <Eigen/Dense>
 
+#include "localization/ekf/se2.hpp"
 #include "localization/odometry.hpp"
 
 // one cycle of odometry increments, defined by the odometry input adapter
 struct OdomInputs;
+
+/**
+ * @brief Velocity output for the full EKF and the MPC.
+ */
+struct Twist {
+    int64_t tUs = 0; ///< Nano steady_clock time (us)
+    double v = 0.0; ///< forward speed (in/s)
+    double omega = 0.0; ///< turn rate (rad/s)
+    Eigen::Matrix2d cov = Eigen::Matrix2d::Zero(); ///< covariance of (v, omega), in²/s² and rad²/s²
+};
 
 /**
  * @brief Odometry EKF: fuses tracking wheels, IMEs, and IMU. Takes relative movements.
@@ -51,6 +68,45 @@ public:
      */
     void reset(const Pose& pose);
 
+    using PoseCallback = std::function<void(const StampedPose&)>;
+    using IncrementCallback = std::function<void(const PoseIncrement&)>;
+
+    /**
+     * @brief Subscribes to the odometry-frame pose, called after every step (100 Hz).
+     *
+     * Feeds the LiDAR pose buffer. Every subscriber gets every sample, not only the latest.
+     *
+     * @param cb Called with the pose, its time, and the pose block of P.
+     */
+    void onPose(PoseCallback cb);
+
+    /**
+     * @brief Subscribes to the per-cycle increment, called after every step.
+     *
+     * The full EKF's prediction input.
+     *
+     * @param cb Called with this cycle's motion in the previous pose's frame and its covariance.
+     */
+    void onIncrement(IncrementCallback cb);
+
+    /**
+     * @brief Motion between two times, composed from the per-cycle increments (for KISS-ICP).
+     *
+     * Treats cycles as independent when combining covariance, which is an approximation.
+     *
+     * @param t0Us Start time, Nano steady_clock (us).
+     * @param t1Us End time, Nano steady_clock (us).
+     * @return std::optional<PoseIncrement> Nothing if the span isn't in the buffer or crosses a reset().
+     */
+    std::optional<PoseIncrement> increment(int64_t t0Us, int64_t t1Us) const;
+
+    /**
+     * @brief Latest forward speed and turn rate.
+     *
+     * @return Twist v_x and omega from the state, with their 2x2 block of P.
+     */
+    Twist twist() const;
+
 private:
     static constexpr int MAX_ROWS = 5; ///< parallel, perpendicular, two IMEs, IMU
 
@@ -91,6 +147,24 @@ private:
     void update(const Measurement& m);
 
     /**
+     * @brief This cycle's increment, from the pose before predict() to the pose after update().
+     *
+     * @param before State at the start of the step.
+     * @param t0Us Start of the step, Nano steady_clock (us).
+     * @return PoseIncrement Motion in before's frame, with this step's covariance only.
+     */
+    PoseIncrement stepIncrement(const State& before, int64_t t0Us) const;
+
+    /**
+     * @brief Sends the pose and the increment to every subscriber and stores the increment.
+     *
+     * @param inc This cycle's increment from stepIncrement().
+     */
+    void publish(const PoseIncrement& inc);
+
+    static constexpr int INCREMENT_HISTORY = 100; ///< increments kept for increment(t0, t1), 1 s at 100 Hz
+
+    /**
      * @brief Covariance at startup, after reset(), and for the velocities after a link stall.
      *
      * Pose variances are tiny because the odometry frame starts where the filter starts.
@@ -101,4 +175,15 @@ private:
 
     State m_s = State::Zero(); ///< starts at the odometry-frame origin, at rest
     Cov m_P = initialP; ///< same start as reset()
+
+    int64_t m_tUs = 0; ///< time of the latest step, Nano steady_clock (us)
+
+    std::vector<PoseCallback> m_poseCallbacks; ///< onPose() subscribers
+    std::vector<IncrementCallback> m_incrementCallbacks; ///< onIncrement() subscribers
+
+    // TODO: per-step increment = between(previous pose, new pose), with its own covariance
+    // TODO: keep a short ring buffer of increments so increment(t0, t1) can be composed on request
+    std::array<PoseIncrement, INCREMENT_HISTORY> m_increments{}; ///< ring buffer, oldest overwritten first
+    int m_incrementHead = 0; ///< index the next increment is written to
+    int m_incrementCount = 0; ///< how many of m_increments are filled
 };

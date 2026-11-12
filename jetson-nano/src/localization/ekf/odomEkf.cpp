@@ -31,6 +31,8 @@ void OdomEkf::step(const OdomInputs& in) {
         return;
     }
 
+    // TODO (#185): save the state before predict() for stepIncrement()
+
     if (in.dt > ODOM_EKF_MAX_DT) {
         m_P.bottomRightCorner<3, 3>() = initialP.bottomRightCorner<3, 3>();
         m_P.topRightCorner<3, 3>().setZero();
@@ -43,10 +45,13 @@ void OdomEkf::step(const OdomInputs& in) {
     Measurement measurement = buildMeasurement(in);
     // no valid source this cycle: coast on the prediction
     if (measurement.z.size() == 0) {
+        // TODO (#185): still publish when coasting, so subscribers get every cycle
         return;
     }
 
     update(measurement);
+
+    // TODO (#185): m_tUs = in.tUs, then publish(stepIncrement(before, in.tUs - dt in us))
 }
 
 const OdomEkf::State& OdomEkf::state() const {
@@ -72,6 +77,41 @@ void OdomEkf::reset(const Pose& pose) {
 
     // drop the old covariance and correlations, start from the initial P
     m_P = initialP;
+
+    // TODO (#185): clear the increment buffer, the odometry frame jumped so old increments can't be composed across it
+}
+
+void OdomEkf::onPose(PoseCallback cb) {
+    // TODO (#185): add cb to m_poseCallbacks
+}
+
+void OdomEkf::onIncrement(IncrementCallback cb) {
+    // TODO (#185): add cb to m_incrementCallbacks
+}
+
+std::optional<PoseIncrement> OdomEkf::increment(int64_t t0Us, int64_t t1Us) const {
+    // TODO (#185): reject t0Us >= t1Us, or a span older than the oldest buffered increment
+    // TODO (#185): walk the ring buffer from oldest to newest, keeping increments inside [t0Us, t1Us]
+    // TODO (#185): delta = compose(delta, inc.delta), cov = J_A cov J_Aᵀ + J_B inc.cov J_Bᵀ (se2::composeJacA / composeJacB)
+    // TODO (#185): cycles treated as independent (no cross terms), an approximation
+    return std::nullopt;
+}
+
+Twist OdomEkf::twist() const {
+    // TODO (#185): v = m_s[3], omega = m_s[5], cov from P rows/cols 3 and 5, tUs = m_tUs
+    return Twist{};
+}
+
+PoseIncrement OdomEkf::stepIncrement(const State& before, int64_t t0Us) const {
+    // TODO (#185): delta = se2::between(pose of before, pose of m_s)
+    // TODO (#185): cov = pose block of P propagated over this step only, not the growing absolute pose covariance
+    return PoseIncrement{};
+}
+
+void OdomEkf::publish(const PoseIncrement& inc) {
+    // TODO (#185): write inc into m_increments at m_incrementHead, advance the head, grow m_incrementCount up to INCREMENT_HISTORY
+    // TODO (#185): call every pose callback with StampedPose{m_tUs, pose of m_s, P.topLeftCorner<3, 3>()}
+    // TODO (#185): call every increment callback with inc
 }
 
 void OdomEkf::predict(double dt) {
