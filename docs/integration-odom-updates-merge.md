@@ -37,6 +37,12 @@ merge does not connect the robot or require the project to build.
 - Integration's Brain startup, Brain code, style guide and serial protocol are
   retained. The incoming Brain-side odometry task startup is not wired into
   the Nano. The unrelated, unconfigured `rplidar_sdk` gitlink is excluded.
+  Clones that previously checked out `dev/odomUpdates` with submodules may
+  report `unable to rmdir 'jetson-nano/external/rplidar_sdk': Directory not
+  empty` and show the directory as untracked. Git does not delete a
+  submodule's files on checkout. Remove the leftover directory with
+  `rm -rf jetson-nano/external/rplidar_sdk`; its Git data remains under
+  `.git/modules/`.
 
 ## Deferred work
 
