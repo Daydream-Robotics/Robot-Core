@@ -34,7 +34,7 @@ constexpr double PERPENDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behin
 /* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
 
 constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 3.25;
-constexpr double DRIVE_GEAR_RATIO = 450.0/600.0; //450 rpm wheel / 600 rpm cartridge
+constexpr double DRIVE_GEAR_RATIO = 600.0/600.0; //600 rpm wheel / 600 rpm cartridge (direct drive)
 constexpr double TRACK_WIDTH = 10.5; // drive wheel track width (in), also used by the Nano's MPC
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
@@ -92,8 +92,9 @@ constexpr double MPC_SAMPLE_PERIOD = 0.02; // control step (s)
 constexpr double MPC_COMMAND_DELAY = 0.01; // s from solving to the brain applying the command (it goes out with the next state)
 
 // motor model at the wheel: omega_dot = -a*omega + b*V
+// a doesn't depend on the gear ratio, b scales with it (identifyMotorModel fits b on motor speed * gear ratio)
 constexpr double MPC_MOTOR_A = 16.7211; // motor time-constant (1/s)
-constexpr double MPC_MOTOR_B = 71.3105; // motor gain constant (rad/s^2 per V)
+constexpr double MPC_MOTOR_B = 95.0807; // motor gain constant (rad/s^2 per V), the 71.3105 fit redone for DRIVE_GEAR_RATIO 600/600 instead of 450/600
 
 // reference generation
 constexpr double MPC_A_MAX = 60.0; // max accel/decel of the reference (in/s^2)
@@ -115,6 +116,33 @@ constexpr double MPC_DELTA_U_MIN = -8.0; // max voltage decrease per step (V)
 constexpr double MPC_X_FIELD_MAX = 140.0; // max |x| on the field (in)
 constexpr double MPC_Y_FIELD_MAX = 140.0; // max |y| on the field (in)
 constexpr double MPC_OMEGA_WHEEL_MAX = 100.0; // max wheel speed (rad/s)
+constexpr double MPC_A_LAT_MAX = 40.0; // X and H drive reference cornering accel cap (in/s^2), tune on tiles
+
+/* - - - - - - - - - - - - - - [MPC X DRIVE] - - - - - - - - - - - - - - */
+// used by the Nano's MPC when it runs kinematics::XDrive. group order FL, FR, BL, BR (see mpc/drivetrain.hpp)
+// PLACEHOLDERS until the X drive is built: measure the geometry, identify a and b per wheel
+// the motor model is the diff drive's, geared from its ratio to XDRIVE_GEAR_RATIO
+constexpr double XDRIVE_WHEEL_DIAMETER_INCHES = 3.25; // omni wheel diameter (in)
+constexpr double XDRIVE_GEAR_RATIO = 450.0/600.0; // 450 rpm wheel / 600 rpm cartridge
+constexpr double XDRIVE_RHO = 7.0; // robot center to each wheel's contact point (in)
+constexpr double XDRIVE_MOTOR_A = MPC_MOTOR_A; // motor time-constant per wheel (1/s)
+constexpr double XDRIVE_MOTOR_B = MPC_MOTOR_B * XDRIVE_GEAR_RATIO / DRIVE_GEAR_RATIO; // motor gain constant per wheel (rad/s^2 per V)
+
+/* - - - - - - - - - - - - - - [MPC H DRIVE] - - - - - - - - - - - - - - */
+// used by the Nano's MPC when it runs kinematics::HDrive. group order L, R, strafe (see mpc/drivetrain.hpp)
+// positive strafe voltage must push the robot left, reverse the strafe motor on the brain if it doesn't
+// PLACEHOLDERS copied from the diff drive until the H drive is built: measure the geometry, identify a and b per group
+// the motor model is the diff drive's, geared from its ratio to each group's ratio
+constexpr double HDRIVE_WHEEL_DIAMETER_INCHES = 3.25; // side wheel diameter (in)
+constexpr double HDRIVE_GEAR_RATIO = 600.0/600.0; // side wheel rpm / cartridge rpm
+constexpr double HDRIVE_STRAFE_GEAR_RATIO = 600.0/600.0; // strafe wheel rpm / cartridge rpm
+constexpr double HDRIVE_TRACK_WIDTH = 10.5; // side wheel track width (in)
+constexpr double HDRIVE_STRAFE_WHEEL_DIAMETER_INCHES = 3.25; // strafe wheel diameter (in)
+constexpr double HDRIVE_STRAFE_OFFSET = 0.0; // strafe wheel forward offset from the robot center (in)
+constexpr double HDRIVE_SIDE_MOTOR_A = MPC_MOTOR_A; // side groups motor time-constant (1/s)
+constexpr double HDRIVE_SIDE_MOTOR_B = MPC_MOTOR_B * HDRIVE_GEAR_RATIO / DRIVE_GEAR_RATIO; // side groups motor gain constant (rad/s^2 per V)
+constexpr double HDRIVE_STRAFE_MOTOR_A = MPC_MOTOR_A; // strafe group motor time-constant (1/s)
+constexpr double HDRIVE_STRAFE_MOTOR_B = MPC_MOTOR_B * HDRIVE_STRAFE_GEAR_RATIO / DRIVE_GEAR_RATIO; // strafe group motor gain constant (rad/s^2 per V)
 
 enum class DriveType {
     SPLIT_ARCADE,

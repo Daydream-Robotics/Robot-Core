@@ -1,5 +1,6 @@
 #include "motion/pathFollower.hpp"
 #include "config/constants.h"
+#include "config/robotDrive.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -20,8 +21,9 @@ void PathFollower::setPath(const ALS_Path& path, PathFlag flag) {
 }
 
 void PathFollower::stop() {
-    m_link.setGroup(packets::LEFT_DRIVE_SLOT, packets::GroupMode::STOP, 0);
-    m_link.setGroup(packets::RIGHT_DRIVE_SLOT, packets::GroupMode::STOP, 0);
+    for (std::size_t j = 0; j < packets::DRIVE_GROUPS; j++) {
+        m_link.setGroup(packets::driveSlot(j), packets::GroupMode::STOP, 0);
+    }
 }
 
 void PathFollower::stopAndReset() {
@@ -37,7 +39,7 @@ bool PathFollower::step() {
 
     // measurements from the brain. without a live link there's nothing to control with
     const std::optional<SerialLink::Sample> sample = m_link.latestSample();
-    if (!sample || !m_link.linkUp() || sample->omegaRadS.size() <= packets::RIGHT_DRIVE_SLOT) {
+    if (!sample || !m_link.linkUp() || sample->omegaRadS.size() < packets::DRIVE_GROUPS) {
         stopAndReset();
         return false;
     }
@@ -51,15 +53,15 @@ bool PathFollower::step() {
         stopAndReset();
         return false;
     }
-    // omegaRadS is at the motor output shaft, controllers work at the wheel
+    // omegaRadS is at the motor output shaft, controllers work at the wheel, each group with its own gearing
     const int64_t nowUs = std::chrono::duration_cast<std::chrono::microseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
-    DriveState drive{
-        sample->omegaRadS[packets::LEFT_DRIVE_SLOT] * DRIVE_GEAR_RATIO,
-        sample->omegaRadS[packets::RIGHT_DRIVE_SLOT] * DRIVE_GEAR_RATIO,
-        sample->batteryMv / 1000.0,
-        (nowUs - sample->tNanoUs) / 1e6
-    };
+    DriveState drive;
+    for (std::size_t j = 0; j < packets::DRIVE_GROUPS; j++) {
+        drive.omega[j] = sample->omegaRadS[packets::driveSlot(j)] * driveGearRatio(j);
+    }
+    drive.batteryVolts = sample->batteryMv / 1000.0;
+    drive.age = (nowUs - sample->tNanoUs) / 1e6;
     // the wheel speeds are from the brain's last state and the command applies a little after this step,
     // so the controller works from where the robot will be then
     Pose currentPose = *pose;
@@ -90,19 +92,11 @@ bool PathFollower::step() {
         return true;
     }
 
-    WheelVelocities wheelVelocities = m_controller.compute(currentPose, drive, *m_path, m_currentSampleIdx, flag);
+    const DriveCommand command = m_controller.compute(currentPose, drive, *m_path, m_currentSampleIdx, flag);
 
-    switch(wheelVelocities.input){
-        case ControlMode::INPUT_VELOCITY:
-            m_link.setGroup(packets::LEFT_DRIVE_SLOT, packets::GroupMode::VELOCITY, static_cast<float>(wheelVelocities.left));
-            m_link.setGroup(packets::RIGHT_DRIVE_SLOT, packets::GroupMode::VELOCITY, static_cast<float>(wheelVelocities.right));
-            break;
-        case ControlMode::INPUT_VOLTAGE:
-            m_link.setGroup(packets::LEFT_DRIVE_SLOT, packets::GroupMode::VOLTAGE, static_cast<float>(wheelVelocities.left));
-            m_link.setGroup(packets::RIGHT_DRIVE_SLOT, packets::GroupMode::VOLTAGE, static_cast<float>(wheelVelocities.right));
-            break;
-        default:
-            break;
+    const packets::GroupMode mode = command.input == ControlMode::INPUT_VOLTAGE ? packets::GroupMode::VOLTAGE : packets::GroupMode::VELOCITY;
+    for (std::size_t j = 0; j < packets::DRIVE_GROUPS; j++) {
+        m_link.setGroup(packets::driveSlot(j), mode, static_cast<float>(command.value[j]));
     }
 
     return false;
