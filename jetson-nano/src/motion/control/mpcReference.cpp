@@ -77,11 +77,14 @@ typename MPCReference<Drive, F>::ZRef MPCReference<Drive, F>::build(const Pose& 
                 cap = std::min(cap, wheel_max[j] / per_v);
             }
         }
-        //X and H drives: nothing else slows them in corners, so cap the cornering accel v^2 * kappa
+        //X and H drives not facing along the path: they don't turn, so the group speeds above don't slow them in corners.
+        //cap the cornering accel v^2 * kappa. TANGENT turns like a diff drive, so the group speed cap above already covers it
         if constexpr (Drive::HOLONOMIC) {
-            double kappa_p = std::abs(utils::wrapAngle(b.theta - a.theta)) / ds;
-            if (kappa_p > 1e-6) {
-                cap = std::min(cap, std::sqrt(m_params.a_lat_max / kappa_p));
+            if (mode != HeadingMode::TANGENT) {
+                double kappa_p = std::abs(utils::wrapAngle(b.theta - a.theta)) / ds;
+                if (kappa_p > 1e-6) {
+                    cap = std::min(cap, std::sqrt(m_params.a_lat_max / kappa_p));
+                }
             }
         }
         return cap;

@@ -116,7 +116,7 @@ constexpr double MPC_DELTA_U_MIN = -8.0; // max voltage decrease per step (V)
 constexpr double MPC_X_FIELD_MAX = 140.0; // max |x| on the field (in)
 constexpr double MPC_Y_FIELD_MAX = 140.0; // max |y| on the field (in)
 constexpr double MPC_OMEGA_WHEEL_MAX = 100.0; // max wheel speed (rad/s)
-constexpr double MPC_A_LAT_MAX = 40.0; // X and H drive reference cornering accel cap (in/s^2), tune on tiles
+constexpr double MPC_A_LAT_MAX = 40.0; // X and H drive reference cornering accel cap when heading isn't TANGENT (in/s^2), tune on tiles
 
 /* - - - - - - - - - - - - - - [MPC X DRIVE] - - - - - - - - - - - - - - */
 // used by the Nano's MPC when it runs kinematics::XDrive. group order FL, FR, BL, BR (see mpc/drivetrain.hpp)
