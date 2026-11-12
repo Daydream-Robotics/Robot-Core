@@ -20,6 +20,12 @@ constexpr int LEVER_TWO_PORT = 22;
 
 constexpr int IMU_PORT = 1; 
 
+// MCL distance sensors (from dev/odomUpdates).
+constexpr int FRONT_DISTANCE_PORT = 3;
+constexpr int LEFT_DISTANCE_PORT = 2;
+constexpr int BACK_DISTANCE_PORT = 8;
+constexpr int RIGHT_DISTANCE_PORT = 9;
+
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 
@@ -34,7 +40,7 @@ constexpr double PERPENDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behin
 /* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
 
 constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 3.25;
-constexpr double DRIVE_GEAR_RATIO = 600.0/600.0; //600 rpm wheel / 600 rpm cartridge (direct drive)
+constexpr double DRIVE_GEAR_RATIO = 450.0/600.0; //450 rpm wheel / 600 rpm cartridge
 constexpr double TRACK_WIDTH = 10.5; // drive wheel track width (in), also used by the Nano's MPC
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
