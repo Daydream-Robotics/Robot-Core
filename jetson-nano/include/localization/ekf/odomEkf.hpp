@@ -175,6 +175,7 @@ private:
 
     State m_s = State::Zero(); ///< starts at the odometry-frame origin, at rest
     Cov m_P = initialP; ///< same start as reset()
+    Cov m_Pstep = Cov::Zero(); ///< covariance of this cycle's motion only, pose part starts at zero each step
 
     int64_t m_tUs = 0; ///< time of the latest step, Nano steady_clock (us)
 

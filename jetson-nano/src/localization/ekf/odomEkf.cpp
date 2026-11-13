@@ -31,7 +31,11 @@ void OdomEkf::step(const OdomInputs& in) {
         return;
     }
 
-    // TODO (#185): save the state before predict() for stepIncrement()
+    // state at the start of this cycle, the increment is measured from here
+    const State before = m_s;
+
+    // start of this cycle, Nano steady_clock (us)
+    const int64_t t0Us = in.tUs - std::llround(in.dt * 1e6);
 
     if (in.dt > ODOM_EKF_MAX_DT) {
         m_P.bottomRightCorner<3, 3>() = initialP.bottomRightCorner<3, 3>();
@@ -39,19 +43,26 @@ void OdomEkf::step(const OdomInputs& in) {
         m_P.bottomLeftCorner<3, 3>().setZero();
     }
 
+    // this cycle's covariance starts with the pose known exactly, only the velocity uncertainty carries in
+    m_Pstep = m_P;
+    m_Pstep.topRows<3>().setZero();
+    m_Pstep.leftCols<3>().setZero();
+
+
     // move the state forward and grow P
     predict(in.dt);
 
     Measurement measurement = buildMeasurement(in);
     // no valid source this cycle: coast on the prediction
-    if (measurement.z.size() == 0) {
-        // TODO (#185): still publish when coasting, so subscribers get every cycle
-        return;
+    if (measurement.z.size() != 0) {
+        update(measurement);
     }
 
-    update(measurement);
+    // this cycle ends now
+    m_tUs = in.tUs;
 
-    // TODO (#185): m_tUs = in.tUs, then publish(stepIncrement(before, in.tUs - dt in us))
+    publish(stepIncrement(before, t0Us));
+
 }
 
 const OdomEkf::State& OdomEkf::state() const {
@@ -82,11 +93,11 @@ void OdomEkf::reset(const Pose& pose) {
 }
 
 void OdomEkf::onPose(PoseCallback cb) {
-    // TODO (#185): add cb to m_poseCallbacks
+    m_poseCallbacks.push_back(std::move(cb));
 }
 
 void OdomEkf::onIncrement(IncrementCallback cb) {
-    // TODO (#185): add cb to m_incrementCallbacks
+    m_incrementCallbacks.push_back(std::move(cb));
 }
 
 std::optional<PoseIncrement> OdomEkf::increment(int64_t t0Us, int64_t t1Us) const {
@@ -98,14 +109,29 @@ std::optional<PoseIncrement> OdomEkf::increment(int64_t t0Us, int64_t t1Us) cons
 }
 
 Twist OdomEkf::twist() const {
-    // TODO (#185): v = m_s[3], omega = m_s[5], cov from P rows/cols 3 and 5, tUs = m_tUs
-    return Twist{};
+    const double v = m_s[3];
+    const double omega = m_s[5];
+    Eigen::Matrix2d cov;
+    cov << m_P(3, 3), m_P(3, 5),
+           m_P(5, 3), m_P(5, 5);
+    return Twist{m_tUs, v, omega, cov};
 }
 
 PoseIncrement OdomEkf::stepIncrement(const State& before, int64_t t0Us) const {
-    // TODO (#185): delta = se2::between(pose of before, pose of m_s)
-    // TODO (#185): cov = pose block of P propagated over this step only, not the growing absolute pose covariance
-    return PoseIncrement{};
+    // pose at the start and end of this cycle, odometry frame
+    const Pose p0{before[0], before[1], before[2]};
+    const Pose p1{m_s[0], m_s[1], m_s[2]};
+
+    // motion from p0 to p1 in p0's frame, theta wrapped
+    const Pose delta = se2::between(p0, p1);
+
+    // rotate x, y into p0's frame
+    Eigen::Matrix3d J = Eigen::Matrix3d::Identity();
+    J.topLeftCorner<2, 2>() = Eigen::Rotation2Dd(-before[2]).toRotationMatrix();
+    const Eigen::Matrix3d cov = J * m_Pstep.topLeftCorner<3, 3>() * J.transpose();
+
+
+    return PoseIncrement{t0Us, m_tUs, delta, cov};
 }
 
 void OdomEkf::publish(const PoseIncrement& inc) {
@@ -170,10 +196,13 @@ void OdomEkf::predict(double dt) {
 
     // propagate the uncertainty and add this cycle's process noise, in both velocity and pose
     m_P = F * m_P * F.transpose() + G * Qv * G.transpose();
-
+    // same propagation for this cycle's covariance
+    m_Pstep = F * m_Pstep * F.transpose() + G * Qv * G.transpose();
 
     // remove rounding asymmetry
     m_P = ((m_P + m_P.transpose()) / 2.0).eval();
+    m_Pstep = ((m_Pstep + m_Pstep.transpose()) / 2.0).eval();
+
 }
 
 OdomEkf::Measurement OdomEkf::buildMeasurement(const OdomInputs& in) const {
@@ -307,7 +336,11 @@ void OdomEkf::update(const Measurement& m) {
     // Joseph form, a sum of two symmetric products
     const Cov ikh = Cov::Identity() - K * hKept;
     m_P = ikh * m_P * ikh.transpose() + K * rKept * K.transpose();
+    // same correction for this cycle's covariance, with the gain from the full P
+    m_Pstep = ikh * m_Pstep * ikh.transpose() + K * rKept * K.transpose();
+
 
     // remove rounding asymmetry
     m_P = ((m_P + m_P.transpose()) / 2.0).eval();
+    m_Pstep = ((m_Pstep + m_Pstep.transpose()) / 2.0).eval();
 }
