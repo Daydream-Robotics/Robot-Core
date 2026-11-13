@@ -442,3 +442,5 @@ compile_commands.json
 .DS_Store
 
 .idea/
+build/
+cmake-build-*/
