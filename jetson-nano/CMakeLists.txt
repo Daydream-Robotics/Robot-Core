@@ -70,6 +70,7 @@ target_include_directories(robotcore_lidar PUBLIC
 add_library(robotcore_ekf STATIC
     src/localization/ekf/se2.cpp
     src/localization/ekf/odomEkf.cpp
+    src/localization/ekf/fullEkf.cpp
 )
 target_include_directories(robotcore_ekf PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include

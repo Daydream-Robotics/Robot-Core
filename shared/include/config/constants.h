@@ -108,6 +108,16 @@ constexpr double ODOM_EKF_IMU_BIAS_SIGMA = 0.005; // gyro bias left after calibr
 // per-row outlier gate on nu^2 / S, chi-squared 1 DOF at 99%
 constexpr double ODOM_EKF_ROW_GATE = 6.63;
 
+/* - - - - - - - - - - - - - - [FULL EKF] - - - - - - - - - - - - - - */
+// starting guesses, tune with robot logs (jetson-nano/src/localization/ekf/fullEkf.cpp)
+
+// extra process noise per predict, for what odometry can't see (collisions, being pushed)
+constexpr double FULL_EKF_Q_EXTRA_XY_SIGMA = 0.01; // per-cycle position std dev (in)
+constexpr double FULL_EKF_Q_EXTRA_THETA_SIGMA = 0.0005; // per-cycle heading std dev (rad)
+
+// update gate on d^2 = nu^T S^-1 nu, chi-squared 3 DOF at 99%
+constexpr double FULL_EKF_GATE = 11.34;
+
 /* - - - - - - - - - - - - - - [LIDAR] - - - - - - - - - - - - - - */
 // starting values from the LiDAR plan's parameter table; tune with the simulator and robot logs
 
