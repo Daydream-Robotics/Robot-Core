@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\10fd51cb2cf0010d053a12b3d4d8278f\algebra_impl.h.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\10fd51cb2cf0010d053a12b3d4d8278f\csc_math.h.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\10fd51cb2cf0010d053a12b3d4d8278f\csc_utils.h.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\10fd51cb2cf0010d053a12b3d4d8278f\kkt.h.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\10fd51cb2cf0010d053a12b3d4d8278f\qdldl.h.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\10fd51cb2cf0010d053a12b3d4d8278f\qdldl_interface.h.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\10fd51cb2cf0010d053a12b3d4d8278f\qdldl_types.h.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\10fd51cb2cf0010d053a12b3d4d8278f\qdldl_version.h.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\24daa75e84c54967416bf14a2cff792b\algebra_libs.c.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\24daa75e84c54967416bf14a2cff792b\csc_math.c.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\24daa75e84c54967416bf14a2cff792b\csc_utils.c.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\24daa75e84c54967416bf14a2cff792b\kkt.c.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\24daa75e84c54967416bf14a2cff792b\matrix.c.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\24daa75e84c54967416bf14a2cff792b\qdldl.c.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\24daa75e84c54967416bf14a2cff792b\qdldl_interface.c.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\24daa75e84c54967416bf14a2cff792b\vector.c.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\CMakeFiles\a9aaced1007ec2a95f62cb7e03c684c1\copy_codegen_linalg.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\osqp\algebra\builtin\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\marco\Desktop\Robot-Core\build\lidar\osqp\algebra\builtin\CMakeFiles\copy_codegen_linalg" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{26245FE6-F66D-3F6A-925C-1F3DE70FAE23}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

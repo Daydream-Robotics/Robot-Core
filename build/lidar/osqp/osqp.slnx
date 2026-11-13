@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Solution>
+	<Configurations>
+		<BuildType Name="Debug"/>
+		<BuildType Name="Release"/>
+		<BuildType Name="MinSizeRel"/>
+		<BuildType Name="RelWithDebInfo"/>
+		<Platform Name="x64"/>
+	</Configurations>
+	<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="4115111e-6881-3b7e-be53-9c7f50ffd2ef" DefaultStartup="true">
+		<BuildDependency Project="OSQPLIB.vcxproj"/>
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="copy_codegen_files.vcxproj"/>
+		<BuildDependency Project="osqpstatic.vcxproj"/>
+		<BuildDependency Project="../_deps/qdldl-build/qdldlobject.vcxproj"/>
+	</Project>
+	<Project Path="INSTALL.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="58064866-d19c-35e2-928a-52826bf19ed9">
+		<BuildDependency Project="ALL_BUILD.vcxproj"/>
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+		<Build Solution="Debug|*" Project="false"/>
+		<Build Solution="Release|*" Project="false"/>
+		<Build Solution="MinSizeRel|*" Project="false"/>
+		<Build Solution="RelWithDebInfo|*" Project="false"/>
+	</Project>
+	<Project Path="OSQPLIB.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e51d0592-41b5-3988-a1a2-542fa03fd0bc">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="../_deps/qdldl-build/qdldlobject.vcxproj"/>
+	</Project>
+	<Project Path="../ZERO_CHECK.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="f014d301-3b7d-3496-b606-9c0edd482f47"/>
+	<Project Path="copy_codegen_files.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="0121521e-1f88-30d3-a7ab-8c5e0b222a3e">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="include/copy_codegen_incs.vcxproj"/>
+		<BuildDependency Project="algebra/builtin/copy_codegen_linalg.vcxproj"/>
+		<BuildDependency Project="copy_codegen_makefile.vcxproj"/>
+		<BuildDependency Project="src/copy_codegen_srcs.vcxproj"/>
+	</Project>
+	<Project Path="include/copy_codegen_incs.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e2751d5f-44a5-3e2d-a68e-cb87ca8abbf6">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="algebra/builtin/copy_codegen_linalg.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="6cd347d3-d661-3ffa-bda4-4d8a98a248af">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="copy_codegen_makefile.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="ac053427-c023-36be-8c80-450d1d5a385b">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="src/copy_codegen_srcs.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="ee9a4478-2753-3a75-bc7e-d7483313d327">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="osqpstatic.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="8915490a-a8e4-310a-8724-d580d635092e">
+		<BuildDependency Project="OSQPLIB.vcxproj"/>
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="../_deps/qdldl-build/qdldlobject.vcxproj"/>
+	</Project>
+	<Project Path="../_deps/qdldl-build/qdldlobject.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="b746830f-a292-368b-811b-633fd7943986">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="uninstall.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="4675e354-1d66-3ae2-ac89-9d2dd5ca9464">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+		<Build Solution="Debug|*" Project="false"/>
+		<Build Solution="Release|*" Project="false"/>
+		<Build Solution="MinSizeRel|*" Project="false"/>
+		<Build Solution="RelWithDebInfo|*" Project="false"/>
+	</Project>
+</Solution>

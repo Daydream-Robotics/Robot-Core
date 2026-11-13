@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\sl_lidar_driver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\hal\thread.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\sl_crc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\sl_serial_channel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\sl_lidarprotocol_codec.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\sl_async_transceiver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\sl_tcp_channel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\sl_udp_channel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\dataunpacker\dataunpacker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\dataunpacker\unpacker\handler_capsules.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\dataunpacker\unpacker\handler_hqnode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\dataunpacker\unpacker\handler_normalnode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\arch\win32\net_serial.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\arch\win32\net_socket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\external\rplidar_sdk\sdk\src\arch\win32\timer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\marco\Desktop\Robot-Core\jetson-nano\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{A7DEA873-C35B-35B2-87DB-862E796F4F30}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

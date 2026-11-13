@@ -35,12 +35,22 @@ struct LidarConfig {
     uint64_t latencyUs = 0;       // calibrate on the actual UART; zero = uncalibrated
     uint64_t timeoutUs = 500000; // no data or sync for 0.5 s -> recovery
     std::size_t minPoints = 50;   // tune after measuring your sensor's valid return count
+    uint64_t startupGraceUs = 5000000; // allow motor spin-up before timeout checks
+    uint64_t retryBackoffUs = 500000;  // delay between reconnection attempts
+    int readThreadPriority = 70;       // Linux SCHED_FIFO priority, 0 disables elevation
+    uint64_t emptyReadSleepUs = 250;   // faster polling reduces batch-read timing variance
 };
 
 struct LidarHealth {
     uint64_t sweeps = 0;        // accepted, published sweeps
     uint64_t droppedSweeps = 0;
-    uint64_t readErrors = 0;    // SDK API errors, NOT raw UART framing error count
+    uint64_t readErrors = 0;    // SDK failures + UART error indications (may overlap)
+    uint64_t framingErrors = 0; // Linux TIOCGICOUNT; only if uartCountersAvailable is true
+    uint64_t parityErrors = 0;
+    uint64_t overrunErrors = 0;
+    uint64_t checksumErrors = 0;
+    uint64_t bufferOverrunErrors = 0;
+    bool uartCountersAvailable = false; // not supported by all USB-UART drivers
     uint64_t syncLoss = 0;
     uint64_t callbackErrors = 0; // callback exceptions, not sensor errors
     uint64_t restarts = 0;
@@ -74,12 +84,15 @@ private:
 
     void run();
     bool connectAndStart();
-    void recover();
+    void recover(bool wasStreaming);
     void shutdownConnection(bool reset);
     void onSamples(const sl_lidar_response_measurement_node_hq_t* nodes,
                    size_t count, uint64_t rxUs);
     void finishSweep(uint64_t tEndUs);
     void resetSweepState();
+    void openUartCounters();
+    void pollUartCounters();
+    void closeUartCounters();
 
     LidarConfig m_cfg;
     ScanCallback m_onScan;
@@ -94,6 +107,15 @@ private:
     double m_startAngleCwRad = 0.0;
     std::vector<RawSample> m_building;
     bool m_buildingOverflow = false;
+
+    // Separate diagnostic fd; never reads or consumes the SDK's stream data.
+    int m_uartCountersFd = -1;
+    uint32_t m_lastFrame = 0;
+    uint32_t m_lastParity = 0;
+    uint32_t m_lastOverrun = 0;
+    uint32_t m_lastBufferOverrun = 0;
+    uint64_t m_lastUartPollUs = 0;
+    bool m_reportedUartCountersUnavailable = false;
 
     std::thread m_thread;
     std::atomic<bool> m_running{false};

@@ -7,15 +7,20 @@
 #include <ctime>
 #include <utility>
 
+#if defined(__linux__)
+#include <fcntl.h>
+#include <linux/serial.h>
+#include <pthread.h>
+#include <sched.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+#endif
+
 namespace {
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kTwoPi = 2.0 * kPi;
 constexpr double kInchesPerMm = 1.0 / 25.4;
 constexpr size_t kMaxSamples = 4096;
-constexpr uint64_t kRetryBackoffUs = 500000;
-// A newly started motor/scan may not yield samples immediately. Do not reset
-// the sensor until it has had time to spin up and produce its first sync.
-constexpr uint64_t kStartupGraceUs = 5000000;
 
 uint64_t nowUs() {
 #ifdef _WIN32
@@ -60,11 +65,29 @@ LidarDriver::~LidarDriver() { stop(); }
 
 bool LidarDriver::start(ScanCallback onScan) {
     if (!onScan || m_cfg.device.empty() || m_cfg.baud <= 0 ||
-        m_cfg.timeoutUs < 250000 || m_cfg.minPoints == 0) return false;
+        m_cfg.timeoutUs < 250000 || m_cfg.minPoints == 0 ||
+        m_cfg.startupGraceUs < m_cfg.timeoutUs || m_cfg.retryBackoffUs == 0 ||
+        m_cfg.readThreadPriority < 0 || m_cfg.readThreadPriority > 99 ||
+        m_cfg.emptyReadSleepUs < 100 || m_cfg.emptyReadSleepUs > 10000) return false;
     if (m_running.exchange(true)) return false;
     m_onScan = std::move(onScan);
     try {
         m_thread = std::thread(&LidarDriver::run, this);
+#if defined(__linux__)
+        if (m_cfg.readThreadPriority > 0) {
+            // Same mechanism as SerialLink::makeRealtime (reader=80, writer=81).
+            // Lack of CAP_SYS_NICE is nonfatal; continue under normal scheduling.
+            sched_param param{};
+            param.sched_priority = m_cfg.readThreadPriority;
+            const int error = pthread_setschedparam(
+                m_thread.native_handle(), SCHED_FIFO, &param);
+            if (error != 0) {
+                std::fprintf(stderr,
+                    "[LiDAR %u] SCHED_FIFO priority %d unavailable (error=%d); using normal priority\n",
+                    unsigned(m_cfg.sensorId), m_cfg.readThreadPriority, error);
+            }
+        }
+#endif
     } catch (...) {
         m_running = false;
         return false;
@@ -154,14 +177,17 @@ bool LidarDriver::connectAndStart() {
     m_usPerSample = scanMode.us_per_sample;
     m_lastDataRxUs = m_lastSyncRxUs = nowUs();
     m_connected = true;
+    openUartCounters();
     std::fprintf(stderr, "[LiDAR %u] scan started: port=%s baud=%d mode=%s us_per_sample=%.1f "
                          "(allowing %.1f s for first samples)\n",
                  unsigned(m_cfg.sensorId), device.c_str(), m_cfg.baud, scanMode.scan_mode,
-                 double(m_usPerSample), double(kStartupGraceUs) / 1000000.0);
+                 double(m_usPerSample), double(m_cfg.startupGraceUs) / 1000000.0);
     return true;
 }
 
 void LidarDriver::shutdownConnection(bool reset) {
+    pollUartCounters();
+    closeUartCounters();
     m_connected = false;
     if (m_channel && m_drv && m_drv->isConnected())
         m_channel->clearReadCache(); // flush buffered incoming bytes
@@ -191,9 +217,9 @@ void LidarDriver::shutdownConnection(bool reset) {
     resetSweepState();
 }
 
-void LidarDriver::recover() {
+void LidarDriver::recover(bool wasStreaming) {
     shutdownConnection(true);
-    if (m_running) {
+    if (m_running && wasStreaming) {
         std::lock_guard<std::mutex> lock(m_healthMutex);
         ++m_health.restarts;
     }
@@ -208,8 +234,8 @@ void LidarDriver::run() {
     while (m_running) {
         if (!m_drv) {
             if (!connectAndStart()) {
-                recover();
-                sleepInterruptibly(m_running, kRetryBackoffUs);
+                // Failed initial/retry connects are not stream recoveries.
+                sleepInterruptibly(m_running, m_cfg.retryBackoffUs);
                 continue;
             }
             startedUs = nowUs();
@@ -219,6 +245,11 @@ void LidarDriver::run() {
         size_t count = sizeof(nodes) / sizeof(nodes[0]);
         const sl_result result = m_drv->getScanDataWithIntervalHq(nodes, count);
         const uint64_t rxUs = nowUs(); // never use time of full-sweep grab
+        // Poll health occasionally rather than performing an ioctl per node.
+        if (rxUs - m_lastUartPollUs >= 1000000ULL) {
+            pollUartCounters();
+            m_lastUartPollUs = rxUs;
+        }
 
         if (SL_IS_OK(result) && count > 0) {
             if (!reportedData) {
@@ -241,17 +272,17 @@ void LidarDriver::run() {
                 std::lock_guard<std::mutex> lock(m_healthMutex);
                 ++m_health.readErrors;
             }
-            recover();
-            sleepInterruptibly(m_running, kRetryBackoffUs);
+            recover(reportedData && reportedSync);
+            sleepInterruptibly(m_running, m_cfg.retryBackoffUs);
             continue;
         } else {
             // getScanDataWithIntervalHq() can return SL_RESULT_OK with count=0.
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::sleep_for(std::chrono::microseconds(m_cfg.emptyReadSleepUs));
         }
 
         // A working C1 may take longer than 500 ms to spin up. Wait for a
         // bounded startup grace period before judging the stream's health.
-        if (rxUs - startedUs < kStartupGraceUs) continue;
+        if (rxUs - startedUs < m_cfg.startupGraceUs) continue;
 
         const bool noData = rxUs - m_lastDataRxUs > m_cfg.timeoutUs;
         const bool noSync = !m_tStartUs || rxUs - m_lastSyncRxUs > m_cfg.timeoutUs;
@@ -267,8 +298,8 @@ void LidarDriver::run() {
                 ++m_health.syncLoss;
                 if (m_tStartUs) ++m_health.droppedSweeps;
             }
-            recover();
-            sleepInterruptibly(m_running, kRetryBackoffUs);
+            recover(reportedData && reportedSync);
+            sleepInterruptibly(m_running, m_cfg.retryBackoffUs);
         }
     }
     shutdownConnection(false);
@@ -362,4 +393,81 @@ void LidarDriver::finishSweep(uint64_t tEndUs) {
         std::lock_guard<std::mutex> lock(m_healthMutex);
         ++m_health.callbackErrors;
     }
+}
+
+// The SDK owns its serial fd. This optional second fd is used for diagnostics
+// only. Some USB serial adapters / drivers do not implement TIOCGICOUNT.
+void LidarDriver::openUartCounters() {
+#if defined(__linux__)
+    closeUartCounters();
+    m_uartCountersFd = ::open(m_cfg.device.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+    if (m_uartCountersFd >= 0) {
+        struct serial_icounter_struct counters{};
+        if (::ioctl(m_uartCountersFd, TIOCGICOUNT, &counters) == 0) {
+            m_lastFrame = static_cast<uint32_t>(counters.frame);
+            m_lastParity = static_cast<uint32_t>(counters.parity);
+            m_lastOverrun = static_cast<uint32_t>(counters.overrun);
+            m_lastBufferOverrun = static_cast<uint32_t>(counters.buf_overrun);
+            m_lastUartPollUs = nowUs();
+            std::lock_guard<std::mutex> lock(m_healthMutex);
+            m_health.uartCountersAvailable = true;
+            return;
+        }
+        ::close(m_uartCountersFd);
+        m_uartCountersFd = -1;
+    }
+    if (!m_reportedUartCountersUnavailable) {
+        std::fprintf(stderr,
+            "[LiDAR %u] UART TIOCGICOUNT counters unavailable for %s; "
+            "framing/parity/overrun counts cannot be measured\n",
+            unsigned(m_cfg.sensorId), m_cfg.device.c_str());
+        m_reportedUartCountersUnavailable = true;
+    }
+#endif
+    std::lock_guard<std::mutex> lock(m_healthMutex);
+    m_health.uartCountersAvailable = false;
+}
+
+void LidarDriver::pollUartCounters() {
+#if defined(__linux__)
+    if (m_uartCountersFd < 0) return;
+    struct serial_icounter_struct counters{};
+    if (::ioctl(m_uartCountersFd, TIOCGICOUNT, &counters) != 0) {
+        closeUartCounters();
+        std::lock_guard<std::mutex> lock(m_healthMutex);
+        m_health.uartCountersAvailable = false;
+        return;
+    }
+    const auto frame = static_cast<uint32_t>(counters.frame);
+    const auto parity = static_cast<uint32_t>(counters.parity);
+    const auto overrun = static_cast<uint32_t>(counters.overrun);
+    const auto bufferOverrun = static_cast<uint32_t>(counters.buf_overrun);
+    // Unsigned subtraction also handles ordinary 32-bit counter wraparound.
+    const uint32_t newFrames = frame - m_lastFrame;
+    const uint32_t newParity = parity - m_lastParity;
+    const uint32_t newOverruns = overrun - m_lastOverrun;
+    const uint32_t newBufferOverruns = bufferOverrun - m_lastBufferOverrun;
+    m_lastFrame = frame;
+    m_lastParity = parity;
+    m_lastOverrun = overrun;
+    m_lastBufferOverrun = bufferOverrun;
+    std::lock_guard<std::mutex> lock(m_healthMutex);
+    m_health.framingErrors += newFrames;
+    m_health.parityErrors += newParity;
+    m_health.overrunErrors += newOverruns;
+    m_health.bufferOverrunErrors += newBufferOverruns;
+    m_health.readErrors += static_cast<uint64_t>(newFrames) + newParity +
+                           newOverruns + newBufferOverruns;
+#endif
+}
+
+void LidarDriver::closeUartCounters() {
+#if defined(__linux__)
+    if (m_uartCountersFd >= 0) {
+        ::close(m_uartCountersFd);
+        m_uartCountersFd = -1;
+    }
+#endif
+    // Retain the last stream's availability for the final test report.
+    // openUartCounters() will update it on the next connection.
 }

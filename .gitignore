@@ -440,3 +440,5 @@ FodyWeavers.xsd
 /jetson-nano/.vscode/
 compile_commands.json
 .DS_Store
+
+.idea/

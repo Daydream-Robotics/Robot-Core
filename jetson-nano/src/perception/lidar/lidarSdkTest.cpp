@@ -37,7 +37,8 @@ void report(const LidarDriver& drv, const Counters& c, const char* name) {
     auto h = drv.health();
     std::printf("%s connected=%d sweeps=%llu dropped=%llu samples=%llu "
         "rate=%.2f Hz period=%llu us jitter=%llu us latency_cfg=%llu us "
-        "sdk_errors=%llu callback_errors=%llu sync_loss=%llu restarts=%llu bad_stamps=%llu\n",
+        "read_errors=%llu framing=%llu parity=%llu overrun=%llu buffer_overrun=%llu uart_counters=%s "
+        "callback_errors=%llu sync_loss=%llu restarts=%llu bad_stamps=%llu\n",
         name, drv.connected(),
         static_cast<unsigned long long>(h.sweeps),
         static_cast<unsigned long long>(h.droppedSweeps),
@@ -47,6 +48,11 @@ void report(const LidarDriver& drv, const Counters& c, const char* name) {
         static_cast<unsigned long long>(h.lastSweepJitterUs),
         static_cast<unsigned long long>(h.configuredLatencyUs),
         static_cast<unsigned long long>(h.readErrors),
+        static_cast<unsigned long long>(h.framingErrors),
+        static_cast<unsigned long long>(h.parityErrors),
+        static_cast<unsigned long long>(h.overrunErrors),
+        static_cast<unsigned long long>(h.bufferOverrunErrors),
+        h.uartCountersAvailable ? "yes" : "unavailable",
         static_cast<unsigned long long>(h.callbackErrors),
         static_cast<unsigned long long>(h.syncLoss),
         static_cast<unsigned long long>(h.restarts),
@@ -65,8 +71,14 @@ int main(int argc, char** argv) {
     const uint64_t latencyB = argc > 5 ? std::strtoull(argv[5], nullptr, 10) : 0;
     if (seconds < 1) return 2;
     Counters a{}, b{};
-    LidarDriver sensorA({argv[1], 460800, 0, latencyA, 2000000, 50});
-    LidarDriver sensorB({portB, 460800, 1, latencyB, 2000000, 50});
+    LidarConfig configA{argv[1], 460800, 0, latencyA, 2000000, 50};
+    LidarConfig configB{portB, 460800, 1, latencyB, 2000000, 50};
+    // Bench start-up grace matches its 2 s data/sync timeout; the robot can
+    // override startupGraceUs separately when its motor takes longer to spin up.
+    configA.startupGraceUs = 2000000;
+    configB.startupGraceUs = 2000000;
+    LidarDriver sensorA(configA);
+    LidarDriver sensorB(configB);
     if (!sensorA.start([&](const Scan& scan) { acceptScan(scan, a); })) return 1;
     const bool second = std::string(portB) != "-";
     if (second && !sensorB.start([&](const Scan& scan) { acceptScan(scan, b); })) {
