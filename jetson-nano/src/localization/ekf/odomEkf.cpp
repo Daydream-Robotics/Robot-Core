@@ -1,5 +1,6 @@
 #include "localization/ekf/odomEkf.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -89,7 +90,10 @@ void OdomEkf::reset(const Pose& pose) {
     // drop the old covariance and correlations, start from the initial P
     m_P = initialP;
 
-    // TODO (#185): clear the increment buffer, the odometry frame jumped so old increments can't be composed across it
+    // the odometry frame jumped, so no increment can be composed across this point
+    m_incrementHead = 0;
+    m_incrementCount = 0;
+    m_Pstep.setZero();
 }
 
 void OdomEkf::onPose(PoseCallback cb) {
@@ -101,11 +105,56 @@ void OdomEkf::onIncrement(IncrementCallback cb) {
 }
 
 std::optional<PoseIncrement> OdomEkf::increment(int64_t t0Us, int64_t t1Us) const {
-    // TODO (#185): reject t0Us >= t1Us, or a span older than the oldest buffered increment
-    // TODO (#185): walk the ring buffer from oldest to newest, keeping increments inside [t0Us, t1Us]
-    // TODO (#185): delta = compose(delta, inc.delta), cov = J_A cov J_Aᵀ + J_B inc.cov J_Bᵀ (se2::composeJacA / composeJacB)
-    // TODO (#185): cycles treated as independent (no cross terms), an approximation
-    return std::nullopt;
+    if (t0Us >= t1Us || m_incrementCount == 0) {
+        return std::nullopt;
+    }
+
+    // oldest stored increment, the slot just past the newest once the buffer wraps
+    const int oldest = (m_incrementHead - m_incrementCount + INCREMENT_HISTORY) % INCREMENT_HISTORY;
+    // newest stored increment, the slot just before the head
+    const int newest = (m_incrementHead - 1 + INCREMENT_HISTORY) % INCREMENT_HISTORY;
+
+    // the span starts before the buffer (too old, or before a reset), or ends after the latest step
+    if (t0Us < m_increments[oldest].t0Us || t1Us > m_increments[newest].t1Us) {
+        return std::nullopt;
+    }
+
+    // start with no motion and no uncertainty
+    Pose delta{0.0, 0.0, 0.0};
+    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
+    // span actually covered
+    int64_t firstUs = 0;
+    int64_t lastUs = 0;
+    bool any = false;
+
+    for (int k = 0; k < m_incrementCount; ++k) {
+        const PoseIncrement& inc = m_increments[(oldest + k) % INCREMENT_HISTORY];
+
+        // skip cycles fully outside [t0Us, t1Us]
+        if (inc.t1Us <= t0Us || inc.t0Us >= t1Us) {
+            continue;
+        }
+
+        // both Jacobians at the old delta, before it's overwritten
+        const Eigen::Matrix3d Ja = se2::composeJacA(delta, inc.delta);
+        const Eigen::Matrix3d Jb = se2::composeJacB(delta);
+
+        // cycles treated as independent, an approximation
+        cov = Ja * cov * Ja.transpose() + Jb * inc.cov * Jb.transpose();
+        delta = se2::compose(delta, inc.delta);
+
+        if (!any) {
+            firstUs = inc.t0Us;
+            any = true;
+        }
+        lastUs = inc.t1Us;
+    }
+
+    if (!any) {
+        return std::nullopt;
+    }
+    
+    return PoseIncrement{firstUs, lastUs, delta, cov};
 }
 
 Twist OdomEkf::twist() const {
@@ -135,9 +184,21 @@ PoseIncrement OdomEkf::stepIncrement(const State& before, int64_t t0Us) const {
 }
 
 void OdomEkf::publish(const PoseIncrement& inc) {
-    // TODO (#185): write inc into m_increments at m_incrementHead, advance the head, grow m_incrementCount up to INCREMENT_HISTORY
-    // TODO (#185): call every pose callback with StampedPose{m_tUs, pose of m_s, P.topLeftCorner<3, 3>()}
-    // TODO (#185): call every increment callback with inc
+    m_increments[m_incrementHead] = inc;
+    m_incrementHead = (m_incrementHead + 1) % INCREMENT_HISTORY;
+    m_incrementCount = std::min(m_incrementCount + 1, INCREMENT_HISTORY);
+
+    // latest odometry-frame pose with its absolute covariance
+    const StampedPose pose{m_tUs, Pose{m_s[0], m_s[1], m_s[2]}, m_P.topLeftCorner<3,3>()};
+    for (const PoseCallback& cb : m_poseCallbacks) {
+        cb(pose);
+    }
+
+    for (const IncrementCallback& cb : m_incrementCallbacks) {
+        cb(inc);
+    }
+
+
 }
 
 void OdomEkf::predict(double dt) {
