@@ -37,14 +37,14 @@ add_subdirectory(${EXTERNAL}/osqp ${CMAKE_CURRENT_BINARY_DIR}/osqp EXCLUDE_FROM_
 # - - - - - - - - - - - - - - [MPC CORE] - - - - - - - - - - - - - -
 # portable: Eigen + OSQP + std only. This is what DreamSim links.
 add_library(robotcore_mpc STATIC
-        src/motion/control/mpc.cpp
-        src/motion/pathing/arclengthSplining.cpp
-        src/motion/control/mpcReference.cpp
+    src/motion/control/mpc.cpp
+    src/motion/pathing/arclengthSplining.cpp
+    src/motion/control/mpcReference.cpp
 )
 target_include_directories(robotcore_mpc PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen/include
 )
 target_link_libraries(robotcore_mpc PUBLIC osqpstatic)
 if(MSVC)
@@ -54,12 +54,12 @@ endif()
 # - - - - - - - - - - - - - - [LIDAR CORE] - - - - - - - - - - - - - -
 # portable: Eigen + std only, so the simulator and tests can link it too
 add_library(robotcore_lidar STATIC
-        src/perception/lidar/adaptiveThreshold.cpp
+    src/perception/lidar/adaptiveThreshold.cpp
 )
 target_include_directories(robotcore_lidar PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen/include
 )
 
 # - - - - - - - - - - - - - - [NANO EXECUTABLE] - - - - - - - - - - - - - -
@@ -76,10 +76,10 @@ option(ROBOTCORE_BUILD_NANO_EXE "Build the Nano's MPCController serial program" 
 if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(Threads REQUIRED)
     add_executable(MPCController
-            src/main.cpp
-            src/link/serial.cpp
-            src/link/serialProtocol.cpp
-            ../shared/src/protocol/serialProtocol.cpp
+        src/main.cpp
+        src/link/serial.cpp
+        src/link/serialProtocol.cpp
+        ../shared/src/protocol/serialProtocol.cpp
     )
     target_compile_definitions(MPCController PRIVATE __jetson_nano__)
     target_link_libraries(MPCController PRIVATE robotcore_mpc robotcore_lidar Threads::Threads m)
@@ -112,7 +112,7 @@ if((WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
         )
     endif()
 
-    # Apply the required SDK queue safety fix.
+    # Apply the required SDK queue safety fix (also exposes the checksum error count).
     # Safe to run on both fresh and previously configured builds.
     find_package(Git REQUIRED)
 
@@ -234,11 +234,14 @@ if((WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
             slamtec_lidar_sdk
             Threads::Threads
     )
+
+    # Nano-only code (UART counters, SCHED_FIFO) is guarded by __jetson_nano__
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_compile_definitions(robotcore_lidar_driver PRIVATE __jetson_nano__)
+    endif()
 endif()
 
-# ============================================================
-# LIDAR INTEGRATION TEST
-# ============================================================
+# - - - - - - - - - - - - - - [LIDAR SDK TEST] - - - - - - - - - - - - - -
 
 if(ROBOTCORE_BUILD_LIDAR_TEST
         AND TARGET robotcore_lidar_driver)

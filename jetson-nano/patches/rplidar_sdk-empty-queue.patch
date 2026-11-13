@@ -1,5 +1,20 @@
+diff --git a/sdk/include/sl_lidar_driver.h b/sdk/include/sl_lidar_driver.h
+index 9dade3c..8227029 100644
+--- a/sdk/include/sl_lidar_driver.h
++++ b/sdk/include/sl_lidar_driver.h
+@@ -484,6 +484,10 @@ namespace sl {
+         ///
+         /// The interface will return SL_RESULT_OPERATION_TIMEOUT to indicate that not even a single node can be retrieved since last call. 
+         virtual sl_result getScanDataWithIntervalHq(sl_lidar_response_measurement_node_hq_t* nodebuffer, size_t& count) = 0;
++
++        /// Number of sample packets dropped for a bad checksum since this driver was created
++        virtual sl_u64 getChecksumErrorCount() { return 0; }
++
+         /// Set lidar motor speed
+         /// The host system can use this operation to set lidar motor speed.
+         ///
 diff --git a/sdk/src/sl_lidar_driver.cpp b/sdk/src/sl_lidar_driver.cpp
-index 4fd719c..6428220 100644
+index 4fd719c..a29d48f 100644
 --- a/sdk/src/sl_lidar_driver.cpp
 +++ b/sdk/src/sl_lidar_driver.cpp
 @@ -217,13 +217,18 @@ namespace sl {
@@ -22,3 +37,31 @@ index 4fd719c..6428220 100644
              return 0;
          }
      protected:
+@@ -1652,6 +1657,19 @@ namespace sl {
+             _scanHolder.rewindCurrentScanData();
+         }
+ 
++        // Counts sample packets the unpacker dropped for a bad checksum.
++        virtual void onDecodingError(int errMsg, _u8 ansType, const void* payload, size_t size)
++        {
++            if (errMsg == internal::LIDARSampleDataUnpacker::ERR_EVENT_ON_EXP_CHECKSUM_ERR) {
++                ++_checksumErrorCount;
++            }
++        }
++
++        virtual sl_u64 getChecksumErrorCount()
++        {
++            return _checksumErrorCount.load();
++        }
++
+         virtual void onProtocolMessageDecoded(const internal::ProtocolMessage& msg)
+         {
+             internal::message_autoptr_t message = std::make_shared<internal::ProtocolMessage>(msg);
+@@ -1677,6 +1695,7 @@ namespace sl {
+         std::shared_ptr<internal::LIDARSampleDataUnpacker> _dataunpacker;
+ 
+         bool _isConnected;
++        std::atomic<sl_u64> _checksumErrorCount{0};
+ 
+         MotorCtrlSupport          _isSupportingMotorCtrl;
+ 

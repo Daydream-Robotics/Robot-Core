@@ -7,7 +7,7 @@
 #include <ctime>
 #include <utility>
 
-#if defined(__linux__)
+#ifdef __jetson_nano__
 #include <fcntl.h>
 #include <linux/serial.h>
 #include <pthread.h>
@@ -17,10 +17,16 @@
 #endif
 
 namespace {
-constexpr double kPi = 3.14159265358979323846;
-constexpr double kTwoPi = 2.0 * kPi;
-constexpr double kInchesPerMm = 1.0 / 25.4;
-constexpr size_t kMaxSamples = 4096;
+constexpr double PI = 3.14159265358979323846;
+constexpr double TWO_PI = 2.0 * PI;
+constexpr double INCHES_PER_MM = 1.0 / 25.4;
+constexpr size_t MAX_SAMPLES = 4096;
+// Sync times are fitted over this many recent sweeps (~1.6 s at 10 Hz).
+constexpr size_t SYNC_FIT_WINDOW = 16;
+// The fitted sample period must stay this close to the scan mode's us_per_sample.
+constexpr double MAX_SLOPE_ERROR = 0.02;
+// A sync this much later than the fit is a read delay once, or dropped samples twice in a row.
+constexpr double SYNC_RESYNC_US = 3000.0;
 
 uint64_t nowUs() {
 #ifdef _WIN32
@@ -45,14 +51,14 @@ void sleepInterruptibly(const std::atomic<bool>& running, uint64_t us) {
 
 // Normalize into [-pi, pi]. 2pi and 0 correspond to the same direction.
 double signedBearing(double angleCw) {
-    double rad = std::remainder(-angleCw, kTwoPi);
-    return rad >= kPi ? rad - kTwoPi : rad;
+    double rad = std::remainder(-angleCw, TWO_PI);
+    return rad >= PI ? rad - TWO_PI : rad;
 }
 
 // Travel distance in clockwise angle from the start of this revolution.
 double sweepAngle(double current, double start) {
-    double d = std::fmod(current - start + kTwoPi, kTwoPi);
-    return d < 0.0 ? d + kTwoPi : d;
+    double d = std::fmod(current - start + TWO_PI, TWO_PI);
+    return d < 0.0 ? d + TWO_PI : d;
 }
 } // namespace
 
@@ -73,7 +79,7 @@ bool LidarDriver::start(ScanCallback onScan) {
     m_onScan = std::move(onScan);
     try {
         m_thread = std::thread(&LidarDriver::run, this);
-#if defined(__linux__)
+#ifdef __jetson_nano__
         if (m_cfg.readThreadPriority > 0) {
             // Same mechanism as SerialLink::makeRealtime (reader=80, writer=81).
             // Lack of CAP_SYS_NICE is nonfatal; continue under normal scheduling.
@@ -110,7 +116,9 @@ void LidarDriver::resetSweepState() {
     m_building.clear();
     m_buildingOverflow = false;
     m_tStartUs = 0;
-    m_lastNodeUs = 0;
+    m_sampleIndex = 0;
+    m_syncObs.clear();
+    m_lateSyncs = 0;
     m_lastPeriodUs = 0;
     m_startAngleCwRad = 0.0;
 }
@@ -175,6 +183,7 @@ bool LidarDriver::connectAndStart() {
     }
 
     m_usPerSample = scanMode.us_per_sample;
+    m_lastChecksumErrors = 0; // new SDK driver, its count starts at zero
     m_lastDataRxUs = m_lastSyncRxUs = nowUs();
     m_connected = true;
     openUartCounters();
@@ -187,6 +196,7 @@ bool LidarDriver::connectAndStart() {
 
 void LidarDriver::shutdownConnection(bool reset) {
     pollUartCounters();
+    pollChecksumErrors();
     closeUartCounters();
     m_connected = false;
     if (m_channel && m_drv && m_drv->isConnected())
@@ -248,6 +258,7 @@ void LidarDriver::run() {
         // Poll health occasionally rather than performing an ioctl per node.
         if (rxUs - m_lastUartPollUs >= 1000000ULL) {
             pollUartCounters();
+            pollChecksumErrors();
             m_lastUartPollUs = rxUs;
         }
 
@@ -307,37 +318,88 @@ void LidarDriver::run() {
 
 void LidarDriver::onSamples(const sl_lidar_response_measurement_node_hq_t* nodes,
                             size_t count, uint64_t rxUs) {
-    // The SDK returns nodes in acquisition order. Assign earlier times to
-    // nodes nearer the beginning of this read batch.
+    // The SDK returns nodes in acquisition order. Nodes earlier in the batch
+    // arrived earlier, one sample period apart.
     for (size_t i = 0; i < count; ++i) {
-        const double backUs = (count - 1 - i) * static_cast<double>(m_usPerSample);
-        const uint64_t delayUs = static_cast<uint64_t>(std::llround(backUs)) + m_cfg.latencyUs;
-        uint64_t sampleUs = rxUs > delayUs ? rxUs - delayUs : 0;
-        // Independent read batches can overlap. Never move backward in time.
-        if (m_lastNodeUs && sampleUs <= m_lastNodeUs) sampleUs = m_lastNodeUs + 1;
-        m_lastNodeUs = sampleUs;
-
+        const uint64_t index = m_sampleIndex++;
         const auto& n = nodes[i];
         const double angleCw = static_cast<double>(n.angle_z_q14) *
-                               (90.0 / 16384.0) * (kPi / 180.0);
+                               (90.0 / 16384.0) * (PI / 180.0);
         if (n.flag & SL_LIDAR_RESP_HQ_FLAG_SYNCBIT) {
+            const auto backUs = static_cast<uint64_t>(
+                std::llround((count - 1 - i) * static_cast<double>(m_usPerSample)));
+            const uint64_t rawUs = rxUs > backUs ? rxUs - backUs : 0;
+            const uint64_t syncUs = fitSyncTime(index, rawUs);
             // The sync sample ends the previous revolution and begins the next.
             m_lastSyncRxUs = rxUs;
-            if (m_tStartUs) finishSweep(sampleUs);
-            m_tStartUs = sampleUs;
+            if (m_tStartUs) finishSweep(syncUs);
+            m_tStartUs = syncUs;
             m_startAngleCwRad = angleCw;
             m_building.clear();
             m_buildingOverflow = false;
         }
         if (!m_tStartUs) continue; // discard partial first revolution
         if (n.dist_mm_q2 == 0 || n.quality == 0) continue;
-        if (m_building.size() >= kMaxSamples) {
+        if (m_building.size() >= MAX_SAMPLES) {
             m_buildingOverflow = true;
             continue;
         }
         m_building.push_back({angleCw,
-            static_cast<double>(n.dist_mm_q2) * 0.25 * kInchesPerMm, n.quality});
+            static_cast<double>(n.dist_mm_q2) * 0.25 * INCHES_PER_MM, n.quality});
     }
+}
+
+// rawUs is worked back from when its batch was read, so read delays make it late
+// by a varying amount but never early. Fitting a line through the last few syncs
+// (time vs sample index) and moving it down to the earliest one removes that
+// jitter. The configured latency is then subtracted.
+uint64_t LidarDriver::fitSyncTime(uint64_t index, uint64_t rawUs) {
+    m_syncObs.push_back({index, rawUs});
+    if (m_syncObs.size() > SYNC_FIT_WINDOW) m_syncObs.pop_front();
+
+    const SyncObservation& first = m_syncObs.front();
+    auto dIndex = [&](const SyncObservation& o) { return static_cast<double>(o.index - first.index); };
+    auto dTime = [&](const SyncObservation& o) {
+        return static_cast<double>(static_cast<int64_t>(o.rawUs - first.rawUs));
+    };
+
+    // Least-squares slope in us per sample, or the scan mode's value with too few syncs.
+    double slope = m_usPerSample;
+    if (m_syncObs.size() >= 3) {
+        double meanX = 0.0, meanY = 0.0;
+        for (const auto& o : m_syncObs) { meanX += dIndex(o); meanY += dTime(o); }
+        meanX /= m_syncObs.size();
+        meanY /= m_syncObs.size();
+        double sxx = 0.0, sxy = 0.0;
+        for (const auto& o : m_syncObs) {
+            sxx += (dIndex(o) - meanX) * (dIndex(o) - meanX);
+            sxy += (dIndex(o) - meanX) * (dTime(o) - meanY);
+        }
+        const double fitted = sxx > 0.0 ? sxy / sxx : slope;
+        if (std::abs(fitted - m_usPerSample) <= MAX_SLOPE_ERROR * m_usPerSample) slope = fitted;
+    }
+
+    // Lower envelope: the earliest-looking sync had the least read delay.
+    double minResidual = 0.0;
+    for (const auto& o : m_syncObs)
+        minResidual = std::min(minResidual, dTime(o) - slope * dIndex(o));
+    const double newestResidual = dTime(m_syncObs.back()) - slope * dIndex(m_syncObs.back());
+
+    double fittedUs = static_cast<double>(first.rawUs) + minResidual + slope * dIndex(m_syncObs.back());
+    if (newestResidual - minResidual <= SYNC_RESYNC_US) {
+        m_lateSyncs = 0;
+    } else if (++m_lateSyncs < 2 && m_syncObs.size() > 1) {
+        // One late sync is a long read delay, keep the fit and drop this observation.
+        m_syncObs.pop_back();
+    } else {
+        // Late twice in a row means dropped samples shifted the index to time relation,
+        // so restart the fit from this sync.
+        m_syncObs.erase(m_syncObs.begin(), m_syncObs.end() - 1);
+        m_lateSyncs = 0;
+        fittedUs = static_cast<double>(rawUs);
+    }
+    const double stampUs = fittedUs - static_cast<double>(m_cfg.latencyUs);
+    return stampUs > 0.0 ? static_cast<uint64_t>(std::llround(stampUs)) : 0;
 }
 
 void LidarDriver::finishSweep(uint64_t tEndUs) {
@@ -372,7 +434,7 @@ void LidarDriver::finishSweep(uint64_t tEndUs) {
     scan.points.reserve(m_building.size());
     uint64_t lastStamp = scan.t_start_us;
     for (const auto& n : m_building) {
-        const double fraction = sweepAngle(n.angleCwRad, m_startAngleCwRad) / kTwoPi;
+        const double fraction = sweepAngle(n.angleCwRad, m_startAngleCwRad) / TWO_PI;
         uint64_t stamp = scan.t_start_us + static_cast<uint64_t>(fraction * periodUs);
         // Guarantee non-decreasing timestamps even if angles jitter in SDK data.
         stamp = std::max(stamp, lastStamp);
@@ -398,7 +460,7 @@ void LidarDriver::finishSweep(uint64_t tEndUs) {
 // The SDK owns its serial fd. This optional second fd is used for diagnostics
 // only. Some USB serial adapters / drivers do not implement TIOCGICOUNT.
 void LidarDriver::openUartCounters() {
-#if defined(__linux__)
+#ifdef __jetson_nano__
     closeUartCounters();
     m_uartCountersFd = ::open(m_cfg.device.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (m_uartCountersFd >= 0) {
@@ -429,7 +491,7 @@ void LidarDriver::openUartCounters() {
 }
 
 void LidarDriver::pollUartCounters() {
-#if defined(__linux__)
+#ifdef __jetson_nano__
     if (m_uartCountersFd < 0) return;
     struct serial_icounter_struct counters{};
     if (::ioctl(m_uartCountersFd, TIOCGICOUNT, &counters) != 0) {
@@ -461,8 +523,20 @@ void LidarDriver::pollUartCounters() {
 #endif
 }
 
+// Packets the SDK dropped for a bad checksum. Needs the counter added by the SDK patch.
+void LidarDriver::pollChecksumErrors() {
+    if (!m_drv) return;
+    const uint64_t total = m_drv->getChecksumErrorCount();
+    const uint64_t added = total - m_lastChecksumErrors;
+    m_lastChecksumErrors = total;
+    if (added == 0) return;
+    std::lock_guard<std::mutex> lock(m_healthMutex);
+    m_health.checksumErrors += added;
+    m_health.readErrors += added;
+}
+
 void LidarDriver::closeUartCounters() {
-#if defined(__linux__)
+#ifdef __jetson_nano__
     if (m_uartCountersFd >= 0) {
         ::close(m_uartCountersFd);
         m_uartCountersFd = -1;

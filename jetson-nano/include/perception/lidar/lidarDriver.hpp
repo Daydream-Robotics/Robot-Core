@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -89,10 +90,17 @@ private:
     void onSamples(const sl_lidar_response_measurement_node_hq_t* nodes,
                    size_t count, uint64_t rxUs);
     void finishSweep(uint64_t tEndUs);
+    uint64_t fitSyncTime(uint64_t index, uint64_t rawUs);
     void resetSweepState();
     void openUartCounters();
     void pollUartCounters();
     void closeUartCounters();
+    void pollChecksumErrors();
+
+    struct SyncObservation {
+        uint64_t index = 0; // sample count since connect
+        uint64_t rawUs = 0; // receive time worked back from its read batch
+    };
 
     LidarConfig m_cfg;
     ScanCallback m_onScan;
@@ -100,7 +108,10 @@ private:
     sl::ILidarDriver* m_drv = nullptr;
     float m_usPerSample = 0.0f;
     uint64_t m_tStartUs = 0;
-    uint64_t m_lastNodeUs = 0;
+    uint64_t m_sampleIndex = 0;
+    std::deque<SyncObservation> m_syncObs; // recent sync samples, fitted to remove read jitter
+    int m_lateSyncs = 0;                   // consecutive syncs far later than the fit
+    uint64_t m_lastChecksumErrors = 0;     // SDK checksum count already added to health
     uint64_t m_lastSyncRxUs = 0;
     uint64_t m_lastDataRxUs = 0;
     uint64_t m_lastPeriodUs = 0;
