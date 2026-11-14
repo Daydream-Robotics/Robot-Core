@@ -36,6 +36,10 @@ set(OSQP_USE_LONG         ON  CACHE BOOL "" FORCE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
 add_subdirectory(${EXTERNAL}/osqp ${CMAKE_CURRENT_BINARY_DIR}/osqp EXCLUDE_FROM_ALL)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# QDLDL's CMakeLists forces export back on, so turn it off on its target, otherwise our headers infer flags from qdldl.c
+if(TARGET qdldlobject)
+    set_target_properties(qdldlobject PROPERTIES EXPORT_COMPILE_COMMANDS OFF)
+endif()
 
 # - - - - - - - - - - - - - - [MPC CORE] - - - - - - - - - - - - - -
 # portable: Eigen + OSQP + std only. This is what DreamSim links.
