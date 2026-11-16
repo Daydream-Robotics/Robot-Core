@@ -14,7 +14,7 @@
  * @brief Where an absolute pose measurement came from. #188 adds per-source settings and counters.
  */
 enum class MeasurementSource : uint8_t {
-    ICP ///< KISS-ICP scan-to-map match (#188)
+    ICP ///< KISS-ICP scan-to-map match
 };
 
 /**
@@ -28,7 +28,7 @@ struct PoseMeasurement {
 };
 
 /**
- * @brief Result of one measurement update, for logging and #192's consistency checks.
+ * @brief Result of one measurement update, for logging and consistency checks.
  */
 struct UpdateResult {
     int64_t tUs = 0; ///< time of the measurement, Nano steady_clock (us)
@@ -102,9 +102,6 @@ private:
      */
     void drainQueue();
 
-    // TODO: predict: x = compose(x, Δ), then P = F P Fᵀ + G Σ_Δ Gᵀ + Q_extra
-    // TODO: update(m): innovation with wrapped θ, Mahalanobis gate, Joseph update, then return UpdateResult
-    // TODO: drain the measurement queue at the start of predict()
     Pose m_x{0.0, 0.0, 0.0}; ///< field pose
     Eigen::Matrix3d m_P = Eigen::Matrix3d::Identity(); ///< covariance of m_x (x, y, θ order, in² and rad²)
     int64_t m_tUs = 0; ///< time of the latest predict, Nano steady_clock (us)

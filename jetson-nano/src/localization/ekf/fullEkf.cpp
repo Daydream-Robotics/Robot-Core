@@ -4,7 +4,6 @@
 #include <cmath>
 #include <mutex>
 
-#include "config/constants.h"
 #include "utils/mathHelpers.hpp"
 
 FullEkf::FullEkf(const FullEkfNoise& noise) : m_noise(noise) {}
