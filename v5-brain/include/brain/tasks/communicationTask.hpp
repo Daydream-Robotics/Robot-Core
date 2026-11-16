@@ -17,14 +17,17 @@ public:
      */
     explicit CommunicationTask(SerialLink& link);
 
-    /** @brief Start the service; false if startup failed. */
+    /**
+     * @brief Starts the service.
+     * @return bool True when startup succeeds.
+     */
     bool start();
     /** @brief Stop the service. */
     void stop();
 
 private:
     /// Non-owning protocol service, responsible for its own communication tasks.
-    SerialLink& link_;
+    SerialLink& m_link;
 };
 
 } // namespace brain

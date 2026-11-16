@@ -2,10 +2,10 @@
 
 namespace brain {
 
-CommunicationTask::CommunicationTask(SerialLink& link) : link_(link) {}
+CommunicationTask::CommunicationTask(SerialLink& link) : m_link(link) {}
 
-bool CommunicationTask::start() { return link_.start(); }
+bool CommunicationTask::start() { return m_link.start(); }
 
-void CommunicationTask::stop() { link_.stop(); }
+void CommunicationTask::stop() { m_link.stop(); }
 
 } // namespace brain

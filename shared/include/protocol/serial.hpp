@@ -19,19 +19,6 @@
 #include <optional>
 #include <vector>
 
-#include "config/linkConstants.hpp"
-#include "protocol/packets.hpp"
-#include "protocol/serialProtocol.hpp"
-
-#ifdef __v5_brain__
-    #include "brain/communication/nanoLink.hpp"
-    #include "pros/adi.hpp"
-    #include "pros/misc.hpp"
-    #include "pros/motor_group.hpp"
-    #include "pros/rotation.hpp"
-    #include "pros/rtos.hpp"
-#endif
-
 #ifdef __jetson_nano__
     #include <chrono>
     #include <condition_variable>
@@ -41,6 +28,21 @@
     #include <string>
     #include <thread>
 #endif
+
+#ifdef __v5_brain__
+    #include "pros/adi.hpp"
+    #include "pros/misc.hpp"
+    #include "pros/motor_group.hpp"
+    #include "pros/rotation.hpp"
+    #include "pros/rtos.hpp"
+#endif
+
+#ifdef __v5_brain__
+    #include "brain/communication/nanoLink.hpp"
+#endif
+#include "config/linkConstants.hpp"
+#include "protocol/packets.hpp"
+#include "protocol/serialProtocol.hpp"
 
 /*
  * built-in config, shared by the brain and the Nano
@@ -95,10 +97,10 @@ namespace packets {
         writer.put(fixed);
 
         // groups, in slot order
-        const uint8_t blue = static_cast<uint8_t>(Gearset::BLUE);
-        const uint8_t coast = static_cast<uint8_t>(BrakeMode::COAST);
-        writer.put(GroupCfg{3, blue, coast, LEFT_DRIVE_WHEEL_PORTS});
-        writer.put(GroupCfg{3, blue, coast, RIGHT_DRIVE_WHEEL_PORTS});
+        const uint8_t BLUE = static_cast<uint8_t>(Gearset::BLUE);
+        const uint8_t COAST = static_cast<uint8_t>(BrakeMode::COAST);
+        writer.put(GroupCfg{3, BLUE, COAST, LEFT_DRIVE_WHEEL_PORTS});
+        writer.put(GroupCfg{3, BLUE, COAST, RIGHT_DRIVE_WHEEL_PORTS});
 
         // tracking wheels, in slot order
         writer.put(RotationCfg{PARALLEL_TRACKING_WHEEL_PORT, 0});
@@ -158,7 +160,7 @@ public:
      * @brief Gets the number of failed frame writes since construction.
      * @return uint32_t Count of failed STATE and LOG transmissions.
      */
-    uint32_t transmitErrors() const { return txErrors_.load(); }
+    uint32_t transmitErrors() const { return m_txErrors.load(); }
 private:
     /** @brief Captures the cumulative positions associated with a state sequence. */
     struct Snapshot {
@@ -201,36 +203,37 @@ private:
     void writeLoop();
     /** @brief Sends at most one queued log entry. */
     void flushOneLog();
-    brain::NanoLink& hw_; ///< Externally owned device binding.
-    std::vector<uint8_t> boot_; ///< Initial CONFIG payload.
-    brain::BrainConfiguration cfg_; ///< Applied configuration; ID zero means unconfigured.
-    uint8_t port_; ///< RS-485 smart port.
-    int32_t baud_; ///< RS-485 baud rate.
-    SerialProtocol::Transport transport_; ///< Selected physical transport.
-    std::unique_ptr<SerialProtocol> serial_; ///< Framing and transport instance.
-    std::unique_ptr<pros::Task> reader_; ///< Receive task.
-    std::unique_ptr<pros::Task> writer_; ///< State and log transmit task.
-    pros::Mutex mutex_; ///< Protects protocol state shared by reader and writer.
+    brain::NanoLink& m_hw; ///< Externally owned device binding.
+    std::vector<uint8_t> m_boot; ///< Initial CONFIG payload.
+    brain::BrainConfiguration m_cfg; ///< Applied configuration; ID zero means unconfigured.
+    uint8_t m_port; ///< RS-485 smart port.
+    int32_t m_baud; ///< RS-485 baud rate.
+    SerialProtocol::Transport m_transport; ///< Selected physical transport.
+    std::unique_ptr<SerialProtocol> m_serial; ///< Framing and transport instance.
+    std::unique_ptr<pros::Task> m_reader; ///< Receive task.
+    std::unique_ptr<pros::Task> m_writer; ///< State and log transmit task.
+    pros::Mutex m_mutex; ///< Protects protocol state shared by reader and writer.
     pros::Mutex m_logMutex; ///< Protects the log queue.
-    std::atomic<bool> running_{false}; ///< Whether the link tasks should run.
-    std::atomic<bool> nanoControl_{true}; ///< Whether Nano commands control outputs.
-    std::atomic<uint32_t> txErrors_{0}; ///< Failed frame writes.
-    std::array<Snapshot, 8> history_{}; ///< Recent state positions for acknowledgment.
-    Snapshot base_{}; ///< Acknowledged position baseline for wire deltas.
-    uint16_t seq_ = 1; ///< Sequence assigned to the next state.
-    uint16_t lastCmd_ = 0; ///< Sequence of the last accepted command.
-    uint8_t lastRequest_ = 0; ///< Most recently attempted one-shot request ID.
-    packets::Error error_ = packets::Error::NONE; ///< Error awaiting successful reporting.
-    uint32_t cmdMs_ = 0; ///< Last accepted command observation time in milliseconds.
-    uint32_t cmdUs_ = 0; ///< Last accepted command observation time in microseconds.
-    bool haveCmd_ = false; ///< Whether a command has been accepted since configuration.
-    bool booted_ = true; ///< Whether the first valid command is still pending.
-    bool braked_ = false; ///< Whether the watchdog has already braked this timeout.
+    std::atomic<bool> m_running{false}; ///< Whether the link tasks should run.
+    std::atomic<bool> m_nanoControl{true}; ///< Whether Nano commands control outputs.
+    std::atomic<uint32_t> m_txErrors{0}; ///< Failed frame writes.
+    std::array<Snapshot, 8> m_history{}; ///< Recent state positions for acknowledgment.
+    Snapshot m_base{}; ///< Acknowledged position baseline for wire deltas.
+    uint16_t m_seq = 1; ///< Sequence assigned to the next state.
+    uint16_t m_lastCmd = 0; ///< Sequence of the last accepted command.
+    uint8_t m_lastRequest = 0; ///< Most recently attempted one-shot request ID.
+    packets::Error m_error = packets::Error::NONE; ///< Error awaiting successful reporting.
+    uint32_t m_cmdMs = 0; ///< Last accepted command observation time in milliseconds.
+    uint32_t m_cmdUs = 0; ///< Last accepted command observation time in microseconds.
+    bool m_haveCmd = false; ///< Whether a command has been accepted since configuration.
+    bool m_booted = true; ///< Whether the first valid command is still pending.
+    bool m_braked = false; ///< Whether the watchdog has already braked this timeout.
     std::array<LogEntry, LOG_QUEUE_SIZE> m_logQueue{}; ///< Queued log entries.
     size_t m_logHead = 0; ///< Index of the oldest queued entry.
     size_t m_logCount = 0; ///< Number of queued entries.
 };
 #else
+/** @brief Runs the Nano side of the serial link. */
 class SerialLink {
 public:
     #ifdef __jetson_nano__

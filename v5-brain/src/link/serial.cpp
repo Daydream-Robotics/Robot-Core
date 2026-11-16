@@ -1,62 +1,62 @@
-#include "api.h"
 #include "protocol/serial.hpp"
+
+#include <algorithm>
 #include <cmath>
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <mutex>
 #include <utility>
-#include <cstdarg>
-#include <cstdio>
-#include <algorithm>
 
 SerialLink::SerialLink(brain::NanoLink& hw, std::vector<uint8_t> config, uint8_t port, int32_t baud, SerialProtocol::Transport transport)
-    : hw_(hw), boot_(std::move(config)), port_(port), baud_(baud), transport_(transport) {}
+    : m_hw(hw), m_boot(std::move(config)), m_port(port), m_baud(baud), m_transport(transport) {}
 SerialLink::~SerialLink() { stop(); }
 
 bool SerialLink::start() {
-    if (running_) return true;
-    if (!hw_.bindingsValid()) return false;
+    if (m_running) return true;
+    if (!m_hw.bindingsValid()) return false;
 
-    serial_.reset(new SerialProtocol());
-    if (!(transport_ == SerialProtocol::Transport::USB ? serial_->setUpVexSerial() : serial_->setUpVexSerial(port_, baud_))) {
-        serial_.reset(); return false;
+    m_serial.reset(new SerialProtocol());
+    if (!(m_transport == SerialProtocol::Transport::USB ? m_serial->setUpVexSerial() : m_serial->setUpVexSerial(m_port, m_baud))) {
+        m_serial.reset(); return false;
     }
     // Start unconfigured so the Nano can supply a config if the boot payload is rejected.
-    cfg_ = {};
-    cfg_.fixed.statePeriodMs = 10;
-    cfg_.fixed.watchdogMs = 100;
-    booted_ = true;
-    haveCmd_ = false;
-    seq_ = 1; lastCmd_ = 0; lastRequest_ = 0; braked_ = false;
-    history_ = {}; base_ = {}; cmdMs_ = pros::millis(); cmdUs_ = 0;
-    error_ = boot_.size() <= packets::MAX_PAYLOAD && packets::sizeInRange(packets::CONFIG, static_cast<uint16_t>(boot_.size()))
-        ? configFrame(boot_.data(), static_cast<uint16_t>(boot_.size())) : packets::Error::SIZE;
-    running_ = true;
-    reader_ = std::make_unique<pros::Task>([this] { readLoop(); }, transport_ == SerialProtocol::Transport::USB ? TASK_PRIORITY_MIN + 1 : TASK_PRIORITY_MAX - 2, TASK_STACK_DEPTH_DEFAULT, "nano reader");
-    writer_ = std::make_unique<pros::Task>([this] { writeLoop(); }, TASK_PRIORITY_MAX - 2, TASK_STACK_DEPTH_DEFAULT, "nano writer");
+    m_cfg = {};
+    m_cfg.fixed.statePeriodMs = 10;
+    m_cfg.fixed.watchdogMs = 100;
+    m_booted = true;
+    m_haveCmd = false;
+    m_seq = 1; m_lastCmd = 0; m_lastRequest = 0; m_braked = false;
+    m_history = {}; m_base = {}; m_cmdMs = pros::millis(); m_cmdUs = 0;
+    m_error = m_boot.size() <= packets::MAX_PAYLOAD && packets::sizeInRange(packets::CONFIG, static_cast<uint16_t>(m_boot.size()))
+        ? configFrame(m_boot.data(), static_cast<uint16_t>(m_boot.size())) : packets::Error::SIZE;
+    m_running = true;
+    m_reader = std::make_unique<pros::Task>([this] { readLoop(); }, m_transport == SerialProtocol::Transport::USB ? TASK_PRIORITY_MIN + 1 : TASK_PRIORITY_MAX - 2, TASK_STACK_DEPTH_DEFAULT, "nano reader");
+    m_writer = std::make_unique<pros::Task>([this] { writeLoop(); }, TASK_PRIORITY_MAX - 2, TASK_STACK_DEPTH_DEFAULT, "nano writer");
     return true;
 }
 
 void SerialLink::stop() {
-    running_ = false;
+    m_running = false;
     // Do not delete a task while it holds the shared hardware/protocol lock.
-    std::lock_guard<pros::Mutex> lock(mutex_);
+    std::lock_guard<pros::Mutex> lock(m_mutex);
     std::lock_guard<pros::Mutex> logLock(m_logMutex);
-    if (reader_) { reader_->remove(); reader_.reset(); }
-    if (writer_) { writer_->remove(); writer_.reset(); }
-    hw_.brakeGroups();
-    serial_.reset();
+    if (m_reader) { m_reader->remove(); m_reader.reset(); }
+    if (m_writer) { m_writer->remove(); m_writer.reset(); }
+    m_hw.brakeGroups();
+    m_serial.reset();
 }
 
-void SerialLink::setNanoControl(bool value) { nanoControl_ = value; }
+void SerialLink::setNanoControl(bool value) { m_nanoControl = value; }
 
 packets::Error SerialLink::applyConfig(const brain::BrainConfiguration& cfg) {
     const auto& f = cfg.fixed;
-    if (f.configId && f.configId == cfg_.fixed.configId) return packets::Error::NONE;
+    if (f.configId && f.configId == m_cfg.fixed.configId) return packets::Error::NONE;
     if (!f.configId || f.statePeriodMs < 5 || f.statePeriodMs > 50 || f.watchdogMs < 20 || f.watchdogMs > 1000 || !f.nGroups || f.nGroups > packets::MAX_GROUPS || f.nRotations > packets::MAX_ROTATIONS) return packets::Error::RANGE;
     if (!f.adiExpanderPort && (f.adiOutEnable & 0xff00)) return packets::Error::CFG_PORT;
     // Reserve the serial port and reject duplicate smart-port assignments.
     bool used[22]{};
-    if (transport_ == SerialProtocol::Transport::RS485 && port_ <= 21) used[port_] = true;
+    if (m_transport == SerialProtocol::Transport::RS485 && m_port <= 21) used[m_port] = true;
     auto claim = [&used](int port) {
         if (port < 1 || port > 21) return packets::Error::CFG_PORT;
         if (used[port]) return packets::Error::CFG_DUPLICATE;
@@ -86,25 +86,25 @@ packets::Error SerialLink::applyConfig(const brain::BrainConfiguration& cfg) {
         auto error = claim(cfg.trackingWheels[i].port);
         if (error != packets::Error::NONE) return error;
     }
-    auto error = hw_.applyConfiguration(cfg);
+    auto error = m_hw.applyConfiguration(cfg);
     if (error != packets::Error::NONE) {
-        hw_.brakeGroups();
+        m_hw.brakeGroups();
         // Hardware settings may be partially applied; brake and return to an unconfigured state.
-        cfg_ = {};
-        cfg_.fixed.statePeriodMs = 10;
-        cfg_.fixed.watchdogMs = 100;
-        serial_->setCommandGroups(0);
-        base_ = {}; history_ = {}; haveCmd_ = false; lastCmd_ = 0;
+        m_cfg = {};
+        m_cfg.fixed.statePeriodMs = 10;
+        m_cfg.fixed.watchdogMs = 100;
+        m_serial->setCommandGroups(0);
+        m_base = {}; m_history = {}; m_haveCmd = false; m_lastCmd = 0;
         return error;
     }
-    cfg_ = cfg;
-    serial_->setCommandGroups(f.nGroups);
-    base_ = {}; history_ = {}; haveCmd_ = false; braked_ = false; lastCmd_ = 0; cmdMs_ = pros::millis();
+    m_cfg = cfg;
+    m_serial->setCommandGroups(f.nGroups);
+    m_base = {}; m_history = {}; m_haveCmd = false; m_braked = false; m_lastCmd = 0; m_cmdMs = pros::millis();
     return packets::Error::NONE;
 }
 
 packets::Error SerialLink::configFrame(const uint8_t* data, uint16_t size) {
-    brain::BrainConfiguration cfg = cfg_;
+    brain::BrainConfiguration cfg = m_cfg;
     packets::PayloadReader reader{data, size};
     if (!reader.get(cfg.fixed) || cfg.fixed.nGroups > packets::MAX_GROUPS || cfg.fixed.nRotations > packets::MAX_ROTATIONS || size != packets::configSize(cfg.fixed.nGroups, cfg.fixed.nRotations)) return packets::Error::SIZE;
     for (size_t i = 0; i < cfg.fixed.nGroups; ++i) if (!reader.get(cfg.motorGroups[i])) return packets::Error::SIZE;
@@ -116,9 +116,9 @@ packets::Error SerialLink::commandFrame(const uint8_t* data, uint16_t size, uint
     brain::NanoCommand cmd{};
     packets::PayloadReader reader{data, size};
     if (!reader.get(cmd.fixed)) return packets::Error::SIZE;
-    if (!cfg_.fixed.configId) return packets::Error::NOT_CONFIGURED;
-    if (cmd.fixed.configId != cfg_.fixed.configId) return packets::Error::CONFIG_ID;
-    if (cmd.fixed.nGroups != cfg_.fixed.nGroups) return packets::Error::GROUP_COUNT;
+    if (!m_cfg.fixed.configId) return packets::Error::NOT_CONFIGURED;
+    if (cmd.fixed.configId != m_cfg.fixed.configId) return packets::Error::CONFIG_ID;
+    if (cmd.fixed.nGroups != m_cfg.fixed.nGroups) return packets::Error::GROUP_COUNT;
     if (size != packets::commandSize(cmd.fixed.nGroups)) return packets::Error::SIZE;
     for (size_t i = 0; i < cmd.fixed.nGroups; ++i) {
         if (!reader.get(cmd.groups[i])) return packets::Error::SIZE;
@@ -126,28 +126,28 @@ packets::Error SerialLink::commandFrame(const uint8_t* data, uint16_t size, uint
     }
     // Do not acknowledge the command or reset the watchdog if output application fails.
     cmd.valid = true;
-    if (nanoControl_) { auto error = hw_.applyOutputs(cmd); if (error != packets::Error::NONE) return error; }
-    cmdUs_ = receivedUs; cmdMs_ = receivedMs;
-    haveCmd_ = true; booted_ = false; braked_ = false; lastCmd_ = cmd.fixed.cmdSeq;
+    if (m_nanoControl) { auto error = m_hw.applyOutputs(cmd); if (error != packets::Error::NONE) return error; }
+    m_cmdUs = receivedUs; m_cmdMs = receivedMs;
+    m_haveCmd = true; m_booted = false; m_braked = false; m_lastCmd = cmd.fixed.cmdSeq;
     // Move the delta baseline only to a newer acknowledged snapshot still in history.
-    for (const auto& snap : history_) if (snap.seq && snap.seq == cmd.fixed.ackStateSeq && (!base_.seq || static_cast<int16_t>(snap.seq - base_.seq) > 0)) { base_ = snap; break; }
-    if (cmd.fixed.requestId && cmd.fixed.requestId != lastRequest_) {
+    for (const auto& snap : m_history) if (snap.seq && snap.seq == cmd.fixed.ackStateSeq && (!m_base.seq || static_cast<int16_t>(snap.seq - m_base.seq) > 0)) { m_base = snap; break; }
+    if (cmd.fixed.requestId && cmd.fixed.requestId != m_lastRequest) {
         // Echo attempted requests even on error so the Nano does not execute them repeatedly.
-        lastRequest_ = cmd.fixed.requestId;
-        return hw_.executeRequest(cmd.fixed);
+        m_lastRequest = cmd.fixed.requestId;
+        return m_hw.executeRequest(cmd.fixed);
     }
     return packets::Error::NONE;
 }
 
 void SerialLink::readLoop() {
-    while (running_) {
-        while (auto frame = serial_->receive()) {
+    while (m_running) {
+        while (auto frame = m_serial->receive()) {
             // Observe receipt before mutex contention or device operations can delay processing.
             const uint32_t receivedUs = static_cast<uint32_t>(pros::c::micros());
             const uint32_t receivedMs = pros::millis();
-            std::lock_guard<pros::Mutex> lock(mutex_);
+            std::lock_guard<pros::Mutex> lock(m_mutex);
             auto error = frame->type == packets::CONFIG ? configFrame(frame->payload, frame->size) : commandFrame(frame->payload, frame->size, receivedUs, receivedMs);
-            if (error != packets::Error::NONE) error_ = error;
+            if (error != packets::Error::NONE) m_error = error;
         }
         pros::delay(1);
     }
@@ -155,54 +155,54 @@ void SerialLink::readLoop() {
 
 void SerialLink::writeLoop() {
     uint32_t wake = pros::millis();
-    while (running_) {
+    while (m_running) {
         uint8_t period;
-        { std::lock_guard<pros::Mutex> lock(mutex_); period = cfg_.fixed.statePeriodMs; }
+        { std::lock_guard<pros::Mutex> lock(m_mutex); period = m_cfg.fixed.statePeriodMs; }
         pros::Task::delay_until(&wake, period);
-        for (int i = 0; i < 2 && serial_->midFrame(); ++i) pros::delay(1);
-        std::unique_lock<pros::Mutex> lock(mutex_);
+        for (int i = 0; i < 2 && m_serial->midFrame(); ++i) pros::delay(1);
+        std::unique_lock<pros::Mutex> lock(m_mutex);
         // The timeout is reported in every mode but only brakes during autonomous.
-        const bool watchdog = cfg_.fixed.configId && pros::millis() - cmdMs_ > cfg_.fixed.watchdogMs;
-        if (watchdog && pros::competition::is_autonomous() && !braked_) { hw_.brakeGroups(); braked_ = true; }
-        if (!nanoControl_ && !pros::competition::is_disabled()) { lock.unlock(); flushOneLog(); continue; }
-        brain::BrainState state = hw_.sample();
-        if (cfg_.fixed.configId && (state.sensors.motorGroupCount != cfg_.fixed.nGroups || state.sensors.trackingWheelCount != cfg_.fixed.nRotations)) { error_ = packets::Error::GROUP_COUNT; continue; }
+        const bool watchdog = m_cfg.fixed.configId && pros::millis() - m_cmdMs > m_cfg.fixed.watchdogMs;
+        if (watchdog && pros::competition::is_autonomous() && !m_braked) { m_hw.brakeGroups(); m_braked = true; }
+        if (!m_nanoControl && !pros::competition::is_disabled()) { lock.unlock(); flushOneLog(); continue; }
+        brain::BrainState state = m_hw.sample();
+        if (m_cfg.fixed.configId && (state.sensors.motorGroupCount != m_cfg.fixed.nGroups || state.sensors.trackingWheelCount != m_cfg.fixed.nRotations)) { m_error = packets::Error::GROUP_COUNT; continue; }
         uint8_t payload[packets::MAX_PAYLOAD]{};
         packets::PayloadWriter writer{payload, sizeof(packets::StateFixed)};
         // Deltas are relative to the last acknowledged state, not the previous sample.
-        Snapshot snap; snap.seq = seq_;
-        for (size_t i = 0; i < cfg_.fixed.nGroups; ++i) {
+        Snapshot snap; snap.seq = m_seq;
+        for (size_t i = 0; i < m_cfg.fixed.nGroups; ++i) {
             const auto& s = state.sensors.motorGroups[i]; snap.group[i] = s.positionRad;
-            writer.put(packets::GroupState{static_cast<float>(s.positionRad - base_.group[i]), s.velocity, s.faultFlags});
+            writer.put(packets::GroupState{static_cast<float>(s.positionRad - m_base.group[i]), s.velocity, s.faultFlags});
         }
-        for (size_t i = 0; i < cfg_.fixed.nRotations; ++i) {
+        for (size_t i = 0; i < m_cfg.fixed.nRotations; ++i) {
             const auto& s = state.sensors.trackingWheels[i]; snap.wheel[i] = s.positionRad;
-            writer.put(packets::RotationState{static_cast<float>(s.positionRad - base_.wheel[i]), s.faultFlags});
+            writer.put(packets::RotationState{static_cast<float>(s.positionRad - m_base.wheel[i]), s.faultFlags});
         }
         packets::StateFixed f{};
-        f.stateSeq = seq_; f.deltaBaseSeq = base_.seq; f.lastCmdSeq = lastCmd_; f.configId = cfg_.fixed.configId;
-        f.lastRequestId = lastRequest_; f.lastError = static_cast<uint8_t>(error_);
-        f.status = (state.statusFlags & ~(packets::status::WATCHDOG | packets::status::BOOTED | packets::status::CONTROLLER)) | (watchdog ? packets::status::WATCHDOG : 0) | (booted_ ? packets::status::BOOTED : 0) | (state.driver.connected ? packets::status::CONTROLLER : 0);
+        f.stateSeq = m_seq; f.deltaBaseSeq = m_base.seq; f.lastCmdSeq = m_lastCmd; f.configId = m_cfg.fixed.configId;
+        f.lastRequestId = m_lastRequest; f.lastError = static_cast<uint8_t>(m_error);
+        f.status = (state.statusFlags & ~(packets::status::WATCHDOG | packets::status::BOOTED | packets::status::CONTROLLER)) | (watchdog ? packets::status::WATCHDOG : 0) | (m_booted ? packets::status::BOOTED : 0) | (state.driver.connected ? packets::status::CONTROLLER : 0);
         f.batteryMv = state.batteryVoltage; std::memcpy(f.ctrlAxes, state.driver.axes.data(), sizeof f.ctrlAxes); f.ctrlButtons = state.driver.buttons;
-        f.rxErrors = serial_->m_crcErrors + serial_->m_badFrames; f.nGroups = cfg_.fixed.nGroups; f.nRotations = cfg_.fixed.nRotations;
-        const bool haveCmd = haveCmd_;
-        const uint32_t cmdUs = cmdUs_;
-        const packets::Error reportedError = error_;
+        f.rxErrors = m_serial->m_crcErrors + m_serial->m_badFrames; f.nGroups = m_cfg.fixed.nGroups; f.nRotations = m_cfg.fixed.nRotations;
+        const bool haveCmd = m_haveCmd;
+        const uint32_t cmdUs = m_cmdUs;
+        const packets::Error reportedError = m_error;
         // Record the snapshot before releasing the lock so an immediate acknowledgment can find it.
-        history_[seq_ % history_.size()] = snap;
-        seq_ = seq_ == 0xffff ? 1 : seq_ + 1;
+        m_history[m_seq % m_history.size()] = snap;
+        m_seq = m_seq == 0xffff ? 1 : m_seq + 1;
         // Writes can block; do not hold the shared state lock while transmitting.
         lock.unlock();
         flushOneLog();
         f.tUs = static_cast<uint32_t>(pros::c::micros());
         f.cmdAgeUs = haveCmd ? f.tUs - cmdUs : packets::NO_COMMAND;
         std::memcpy(payload, &f, sizeof f);
-        const bool sent = serial_->send(packets::STATE, writer);
-        if (!sent) ++txErrors_;
+        const bool sent = m_serial->send(packets::STATE, writer);
+        if (!sent) ++m_txErrors;
         if (sent && reportedError != packets::Error::NONE) {
-            std::lock_guard<pros::Mutex> guard(mutex_);
+            std::lock_guard<pros::Mutex> guard(m_mutex);
             // Preserve a different error recorded while the frame was in flight.
-            if (error_ == reportedError) error_ = packets::Error::NONE;
+            if (m_error == reportedError) m_error = packets::Error::NONE;
         }
     }
 }
@@ -258,5 +258,5 @@ void SerialLink::flushOneLog() {
     // bytes 1 onward are the text
     std::memcpy(payload + 1, entry.text, entry.length);
     // send it as a log frame, 1 + text length bytes
-    if (!serial_->send(packets::LOG, payload, static_cast<uint16_t>(1 + entry.length))) ++txErrors_;
+    if (!m_serial->send(packets::LOG, payload, static_cast<uint16_t>(1 + entry.length))) ++m_txErrors;
 }

@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include "robotConfig.hpp"
-#include "protocol/packets.hpp"
-
 #include <array>
+
+#include "protocol/packets.hpp"
+#include "robotConfig.hpp"
 
 namespace brain {
 

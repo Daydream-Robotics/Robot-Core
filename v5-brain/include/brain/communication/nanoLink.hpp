@@ -3,15 +3,17 @@
  */
 #pragma once
 
-#include "brain/configuration.hpp"
-#include "brain/types.hpp"
+#include <array>
+#include <vector>
+
 #include "pros/adi.hpp"
 #include "pros/misc.hpp"
 #include "pros/motor_group.hpp"
 #include "pros/rotation.hpp"
 #include "pros/rtos.hpp"
-#include <array>
-#include <vector>
+
+#include "brain/configuration.hpp"
+#include "brain/types.hpp"
 
 namespace brain {
 
@@ -92,16 +94,16 @@ private:
         bool reversed = false; ///< Direction restored on reconnection.
         bool missing = false; ///< Whether the sensor was missing at the last check.
     };
-    pros::Controller& controller_; ///< Non-owning master controller reference.
-    std::vector<Group> groups_; ///< Non-owning motor groups by protocol slot.
-    std::vector<Wheel> wheels_; ///< Non-owning rotation sensors by protocol slot.
-    std::array<pros::adi::DigitalOut*, packets::MAX_ADI> outputs_{}; ///< Non-owning ADI outputs by slot.
-    uint16_t enabled_ = 0; ///< Enabled output slots.
-    uint16_t activeLow_ = 0; ///< Slots whose logical state is inverted.
-    uint16_t level_ = 0; ///< Last physical output level by slot.
-    uint8_t expander_ = 0; ///< Configured ADI expander port, or zero.
-    bool expanderMissing_ = false; ///< Whether the expander was missing at the last check.
-    pros::Mutex mutex_; ///< Serializes access through this object only.
+    pros::Controller& m_controller; ///< Non-owning master controller reference.
+    std::vector<Group> m_groups; ///< Non-owning motor groups by protocol slot.
+    std::vector<Wheel> m_wheels; ///< Non-owning rotation sensors by protocol slot.
+    std::array<pros::adi::DigitalOut*, packets::MAX_ADI> m_outputs{}; ///< Non-owning ADI outputs by slot.
+    uint16_t m_enabled = 0; ///< Enabled output slots.
+    uint16_t m_activeLow = 0; ///< Slots whose logical state is inverted.
+    uint16_t m_level = 0; ///< Last physical output level by slot.
+    uint8_t m_expander = 0; ///< Configured ADI expander port, or zero.
+    bool m_expanderMissing = false; ///< Whether the expander was missing at the last check.
+    pros::Mutex m_mutex; ///< Serializes access through this object only.
 };
 
 } // namespace brain

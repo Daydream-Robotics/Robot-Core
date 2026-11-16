@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include "protocol/packets.hpp"
-
 #include <array>
 #include <cstdint>
+
+#include "protocol/packets.hpp"
 
 namespace brain {
 
