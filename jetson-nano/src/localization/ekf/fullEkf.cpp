@@ -105,6 +105,26 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
 }
 
 void FullEkf::drainQueue() {
-    // TODO (#186): swap m_pending into a local vector under m_pendingMutex, so submit() isn't blocked while updating
-    // TODO (#186): sort by tUs, then update() each under m_stateMutex
+    // take every queued measurement, m_pending is left empty
+    std::vector<PoseMeasurement> batch;
+    {
+        std::lock_guard<std::mutex> lock(m_pendingMutex);
+        batch.swap(m_pending);
+    }
+
+    // nothing queued this cycle
+    if (batch.empty()) {
+        return;
+    }
+
+    // oldest first
+    std::sort(batch.begin(), batch.end(), [](const PoseMeasurement& a, const PoseMeasurement& b) {
+        return a.tUs < b.tUs;
+    });
+
+    // apply each one and keep the latest result
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    for (const PoseMeasurement& m : batch) {
+        m_lastUpdate = update(m);
+    }
 }
