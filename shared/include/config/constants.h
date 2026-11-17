@@ -118,6 +118,12 @@ constexpr double FULL_EKF_Q_EXTRA_THETA_SIGMA = 0.0005; // per-cycle heading std
 // update gate on d^2 = nu^T S^-1 nu, chi-squared 3 DOF at 99%
 constexpr double FULL_EKF_GATE = 11.34;
 
+// recovery: after this many consecutive gate rejections, P is raised to the recovery covariance
+constexpr int FULL_EKF_RECOVERY_REJECTS = 5; // about 0.5 s of ICP
+constexpr double FULL_EKF_RECOVERY_XY_SIGMA = 12.0; // recovery position std dev (in)
+constexpr double FULL_EKF_RECOVERY_THETA_SIGMA = 0.26; // recovery heading std dev (rad)
+
+
 /* - - - - - - - - - - - - - - [LIDAR] - - - - - - - - - - - - - - */
 // starting values from the LiDAR plan's parameter table; tune with the simulator and robot logs
 

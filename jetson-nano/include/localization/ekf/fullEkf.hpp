@@ -41,9 +41,18 @@ struct UpdateResult {
  * @brief Noise settings for FullEkf. Starting values go in constants.h ([FULL EKF] section).
  */
 struct FullEkfNoise {
-    Eigen::Matrix3d qExtra = Eigen::Matrix3d::Zero(); ///< extra inflation per predict for what odometry can't see, such as collisions
+    ///< extra inflation per predict for what odometry can't see, such as collisions
+    Eigen::Matrix3d qExtra = Eigen::Vector3d(FULL_EKF_Q_EXTRA_XY_SIGMA * FULL_EKF_Q_EXTRA_XY_SIGMA,
+                                             FULL_EKF_Q_EXTRA_XY_SIGMA * FULL_EKF_Q_EXTRA_XY_SIGMA,
+                                             FULL_EKF_Q_EXTRA_THETA_SIGMA * FULL_EKF_Q_EXTRA_THETA_SIGMA).asDiagonal();
     double gate = FULL_EKF_GATE; ///< reject an update with d² above this, starts at χ² 3-DOF 99%
+    int recoveryRejects = FULL_EKF_RECOVERY_REJECTS; ///< consecutive rejections before P is raised to recoveryP
+    ///< P is raised to at least this after recoveryRejects consecutive rejections
+    Eigen::Matrix3d recoveryP = Eigen::Vector3d(FULL_EKF_RECOVERY_XY_SIGMA * FULL_EKF_RECOVERY_XY_SIGMA,
+                                                FULL_EKF_RECOVERY_XY_SIGMA * FULL_EKF_RECOVERY_XY_SIGMA,
+                                                FULL_EKF_RECOVERY_THETA_SIGMA * FULL_EKF_RECOVERY_THETA_SIGMA).asDiagonal();
 };
+
 
 /**
  * @brief Full EKF: odometry prediction plus gated absolute pose updates, in the field frame.
@@ -54,11 +63,23 @@ struct FullEkfNoise {
 class FullEkf {
 public:
     /**
-     * @brief Constructs the filter at the field origin.
+     * @brief Constructs the filter at the field origin. Call reset() with the start pose before use.
      *
-     * @param noise Process inflation and gate.
+     * @param noise Process inflation, gate, and recovery settings.
      */
     explicit FullEkf(const FullEkfNoise& noise);
+
+    /**
+     * @brief Sets the field pose and its covariance, and drops queued measurements (thread-safe).
+     *
+     * Call with the known start position for the match or auton. Ignored if the pose or
+     * covariance has a NaN or infinity.
+     *
+     * @param pose Field pose.
+     * @param cov Covariance of pose (x, y, θ order, in² and rad²).
+     */
+    void reset(const Pose& pose, const Eigen::Matrix3d& cov);
+
 
     /**
      * @brief Applies queued measurements, then predicts forward by one odometry increment.
@@ -102,13 +123,14 @@ private:
      */
     void drainQueue();
 
+
     Pose m_x{0.0, 0.0, 0.0}; ///< field pose
     Eigen::Matrix3d m_P = Eigen::Matrix3d::Identity(); ///< covariance of m_x (x, y, θ order, in² and rad²)
     int64_t m_tUs = 0; ///< time of the latest predict, Nano steady_clock (us)
     FullEkfNoise m_noise; ///< process inflation and gate
     UpdateResult m_lastUpdate; ///< most recent update, for lastUpdate()
-    mutable std::mutex m_stateMutex; ///< guards m_x, m_P, m_tUs, m_lastUpdate for readers on other threads
-
+    int m_rejectStreak = 0; ///< consecutive gate rejections, reset on an accepted update
+    mutable std::mutex m_stateMutex; ///< guards m_x, m_P, m_tUs, m_lastUpdate, m_rejectStreak
     std::vector<PoseMeasurement> m_pending; ///< measurements waiting for the next predict()
     std::mutex m_pendingMutex; ///< guards m_pending, submit() runs on other threads
 };
