@@ -49,30 +49,30 @@ void OdomEkf::step(const OdomInputs& in) {
             m_P.bottomRightCorner<3, 3>() = initialP.bottomRightCorner<3, 3>();
             m_P.topRightCorner<3, 3>().setZero();
             m_P.bottomLeftCorner<3, 3>().setZero();
-    }
+        }
 
-    // this cycle's covariance starts with the pose known exactly, only the velocity uncertainty carries in
-    m_Pstep = m_P;
-    m_Pstep.topRows<3>().setZero();
-    m_Pstep.leftCols<3>().setZero();
+        // this cycle's covariance starts with the pose known exactly, only the velocity uncertainty carries in
+        m_Pstep = m_P;
+        m_Pstep.topRows<3>().setZero();
+        m_Pstep.leftCols<3>().setZero();
 
-    // move the state forward and grow P
-    predict(in.dt);
+        // move the state forward and grow P
+        predict(in.dt);
 
-    Measurement measurement = buildMeasurement(in);
-    // no valid source this cycle: coast on the prediction
-    if (measurement.z.size() != 0) {
-        update(measurement);
-    }
+        Measurement measurement = buildMeasurement(in);
+        // no valid source this cycle: coast on the prediction
+        if (measurement.z.size() != 0) {
+            update(measurement);
+        }
 
-    // this cycle ends now
-    m_tUs = in.tUs;
+        // this cycle ends now
+        m_tUs = in.tUs;
 
-    inc = stepIncrement(before, t0Us);
-    storeIncrement(inc);
+        inc = stepIncrement(before, t0Us);
+        storeIncrement(inc);
 
-    // latest odometry-frame pose with its absolute covariance
-    pose = StampedPose{m_tUs, Pose{m_s[0], m_s[1], m_s[2]}, m_P.topLeftCorner<3, 3>()};
+        // latest odometry-frame pose with its absolute covariance
+        pose = StampedPose{m_tUs, Pose{m_s[0], m_s[1], m_s[2]}, m_P.topLeftCorner<3, 3>()};
     }
 
     publish(pose, inc);
