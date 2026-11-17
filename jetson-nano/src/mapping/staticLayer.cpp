@@ -149,3 +149,36 @@ void StaticLayer::samplePolygon(
         sampleSegment(start, end, spacing, sourceName); 
     }
 }
+
+/**
+ * @brief Converts a field coordinate into a grid cell. 
+ */
+StaticLayer::CellKey StaticLayer::cellForPoint(
+    const Point& point
+) const {
+    return {
+        static_cast<int64_t>(
+            std::floor(point.x / m_voxelSizeIn)
+        ), 
+        static_cast<int64_t>(
+            std::floor(point.y / m_voxelSizeIn)
+        )
+    }; 
+}
+
+/**
+ * @brief Builds the spatial hash grid from sampled points. 
+ */
+void StaticLayer::buildGrid() {
+
+    // Clear any previously stored grid data
+    m_grid.clear(); 
+
+    // Insert each sampled point into its corresponding cell
+    for (const Point& point : m_points) {
+
+        const CellKey cell = cellForPoint(point); 
+
+        m_grid[cell].push_back(point); 
+    }
+}

@@ -5,6 +5,9 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <cstdint>
+#include <functional>
+#include <unordered_map>
 
 // A 2D position in the field coordinate system (inches).
 // TODO: Reuse the shared Point type once its definition is confirmed
@@ -111,4 +114,49 @@ class StaticLayer {
             double spacing, 
             const std::string& sourceName
         );
+
+        /** 
+         * @brief Identifies a cell in the 2D spatial hash grid. 
+         */
+        struct CellKey {
+            int64_t x; 
+            int64_t y; 
+
+            bool operator == (const CellKey& other) const {
+                return x == other.x && y == other.y;
+            }
+        };
+
+        /**
+         * @brief Hashes a 2D cell coordinate for unordered_map. 
+         */
+        struct CellKeyHash {
+
+            size_t operator()(const CellKey& key) const {
+                const size_t h1 = std::hash<int64_t>{}(key.x); 
+                const size_t h2 = std::hash<int64_t>{}(key.y); 
+
+                return h1 ^ (
+                    h2 + 0x9e3779b9 +
+                    (h1 << 6) + (h1 >> 2)
+                );
+            }
+        };
+
+        // Stores sampled map points grouped by grid cell. 
+        std::unordered_map<
+            CellKey, 
+            std::vector<Point>, 
+            CellKeyHash
+        > m_grid; 
+
+        /**
+         * @brief Returns the grid cell containing a point. 
+         */
+        CellKey cellForPoint(const Point& point) const; 
+
+        /**
+         * @brief Rebuilds the spatial grid from sampled points. 
+         */
+        void buildGrid(); 
 };
