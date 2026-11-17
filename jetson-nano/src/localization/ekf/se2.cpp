@@ -84,4 +84,4 @@ Eigen::Matrix3d composeJacB(const Pose& a) {
     return jac;
 }
 
-} 
+} // namespace se2
