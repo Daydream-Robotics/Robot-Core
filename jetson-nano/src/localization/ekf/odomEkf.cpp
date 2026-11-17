@@ -26,11 +26,12 @@ struct OdomInputs {
 };
 
 void OdomEkf::step(const OdomInputs& in) {
-    // skip a duplicate, out-of-order, or NaN dt
+    // skip a duplicate, out-of-order, or infinite dt
     if (in.dt <= 0.0 || !std::isfinite(in.dt)) {
         return;
     }
 
+    // link stall: the velocity may have changed arbitrarily, reopen its uncertainty
     if (in.dt > ODOM_EKF_MAX_DT) {
         m_P.bottomRightCorner<3, 3>() = initialP.bottomRightCorner<3, 3>();
         m_P.topRightCorner<3, 3>().setZero();
@@ -122,7 +123,6 @@ void OdomEkf::predict(double dt) {
     G(4, 1) = 1.0;
     G(5, 2) = 1.0;
 
-
     // new state, velocities stay constant
     m_s[0] += dx;
     m_s[1] += dy;
@@ -130,7 +130,6 @@ void OdomEkf::predict(double dt) {
 
     // propagate the uncertainty and add this cycle's process noise, in both velocity and pose
     m_P = F * m_P * F.transpose() + G * Qv * G.transpose();
-
 
     // remove rounding asymmetry
     m_P = ((m_P + m_P.transpose()) / 2.0).eval();
@@ -226,7 +225,7 @@ void OdomEkf::update(const Measurement& m) {
         const double nuI = m.z(i) - hRow.dot(m_s);
         // S(i, i), how big the innovation should be: state uncertainty plus sensor noise
         const double sII = hRow.dot(PHt.col(i)) + m.R(i, i);
-        // innovation in its own standard deviations
+        // innovation in its own standard deviations (squared)
         const double d2 = nuI * nuI / sII;
         if (d2 <= ODOM_EKF_ROW_GATE) {
             keptRows[keptCount++] = i;
