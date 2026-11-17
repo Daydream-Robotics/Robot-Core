@@ -26,7 +26,20 @@ The battery limit is the battery voltage the brain measures under load (`STATE.b
 - heading 0 along +y, 90° (π/2) along +x, so it increases turning from +y toward +x
 - angles are in radians in code
 
-This is JerryIO's frame, so the Nano loads JerryIO paths as they are (field centre origin, cm converted to in) and the file's start heading is used directly. The pose source must use the same frame. The MPC model is `x' = v sinθ`, `y' = v cosθ`, `θ' = r(ω_L − ω_R)/L`.
+This is JerryIO's frame, so the Nano loads JerryIO paths as they are (field centre origin, cm converted to in) and the file's start heading is used directly. The pose source must use the same frame. For a diff drive the MPC model is `x' = v sinθ`, `y' = v cosθ`, `θ' = r(ω_L − ω_R)/L`.
+
+## Drivetrains
+The MPC runs a diff drive, an X-drive or an H-drive. `RobotDrive` in shared/include/config/robotDrive.hpp picks which one this robot is. It sets the MPC the Nano builds (`MPC` in mpc.hpp), the drive groups in the brain link config, and how the path follower reads and commands the drive. The brain and the Nano must be rebuilt together after changing it.
+
+Each drivetrain is described in shared/include/mpc/drivetrain.hpp (namespace `kinematics`) by its motor groups and two matrices: G gives each group's wheel speed from the robot's motion (forward, left, counterclockwise turn), and K gives the robot's motion from the group speeds. The controller and reference builder are generic over them.
+
+| Drive | Groups (link slot order) | Constants in constants.h |
+|---|---|---|
+| `kinematics::DiffDrive` | L, R | `[ROBOT DIMS]`, `MPC_MOTOR_A/B` |
+| `kinematics::XDrive` | FL, FR, BL, BR | `[MPC X DRIVE]` |
+| `kinematics::HDrive` | L, R, strafe | `[MPC H DRIVE]` |
+
+A motor group is the set of motors that always gets the same voltage, so a 3-motor side is one group. Motor ports are in shared/include/config/linkConstants.hpp. The X and H drive ports, geometry and motor constants are placeholders until those robots are built. X and H drives can use `Params::heading = HeadingMode::HOLD` to keep their starting heading instead of facing along the path. Positive group voltage must drive each group its positive way: forward on every X wheel and H side, left on the H strafe wheel.
 
 ## Steps
 All MPC constants are in shared/include/config/constants.h: the `[MPC]` section (horizons, sample period, motor model, reference limits, cost weights, voltage/field/speed limits) and `[ROBOT DIMS]` (DRIVE_WHEEL_DIAMETER_INCHES, TRACK_WIDTH, DRIVE_GEAR_RATIO). `MPCController::Params()` builds the controller from them.

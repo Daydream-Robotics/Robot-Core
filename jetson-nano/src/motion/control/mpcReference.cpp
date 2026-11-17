@@ -2,37 +2,92 @@
 #include "utils/mathHelpers.hpp"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
-template<std::size_t F>
-MPCReference<F>::MPCReference(const Params& params)
-    : m_params(params) {}
+template<class Drive, std::size_t F>
+MPCReference<Drive, F>::MPCReference(const Params& params)
+    : m_params(params),
+      m_G(Drive::G(params.geom)),
+      m_K(Drive::K(params.geom)) {
+    //a diff drive can only face along its path
+    if constexpr (!Drive::HOLONOMIC) {
+        m_params.heading = HeadingMode::TANGENT;
+    }
+}
 
 //build reference trajectory
-template<std::size_t F>
-typename MPCReference<F>::ZRef MPCReference<F>::build(const Pose& currentPose, const ALS_Path& path, std::size_t idx, bool reverse, double omega_L, double omega_R) {
+template<class Drive, std::size_t F>
+typename MPCReference<Drive, F>::ZRef MPCReference<Drive, F>::build(const Pose& currentPose, const ALS_Path& path, std::size_t idx, bool reverse, const VecM& omega) {
     const std::vector<Sample>& samples = path.getSamples();
     const double s_end = samples.back().s;
+    constexpr double INF = std::numeric_limits<double>::infinity();
 
     //physical consts and refrence-gen limits
     const double h = m_params.h;
-    const double r = m_params.r;
-    const double TRACK_WIDTH = m_params.track_width; // in
     const double A_MAX = m_params.a_max; // in/s^2, reference accel/decel
     const double V_REF_MIN = m_params.v_ref_min; // in/s, floor so reference can pull away from rest
-    const double V_STRAIGHT_MAX = 0.9 * (m_params.b / m_params.a) * 12.0 * r;
-    // max feasible heading rate derate to 90%
-    const double W_REF_MAX = 0.9 * (2.0 * r * (0.9 * (m_params.b / m_params.a) * 12.0)) / TRACK_WIDTH;
+    //top speed each group plans for: 90% of its 12 V steady state (rad/s)
+    std::array<double, N> wheel_max{};
+    for (std::size_t j = 0; j < N; j++) {
+        wheel_max[j] = 0.9 * 12.0 * m_params.b[j] / m_params.a[j];
+    }
+    // max feasible heading rate derate to 90%: the slowest group that spins to rotate the robot sets it
+    double W_REF_MAX = INF;
+    for (std::size_t j = 0; j < N; j++) {
+        if (std::abs(m_G[j][2]) > 1e-9) {
+            W_REF_MAX = std::min(W_REF_MAX, wheel_max[j] / std::abs(m_G[j][2]));
+        }
+    }
+    W_REF_MAX *= 0.9;
 
-    //curvature based speed cap at arc length sq(sQuery): est local kappa from heading change then limit speed so the outer wheel never exceeds V_STRAIGHT_MAX
+    //latch the heading HOLD keeps on the first build after reset()
+    if (!m_have_hold) {
+        m_hold_theta = currentPose.theta;
+        m_have_hold = true;
+    }
+    //target heading at a path point before rate limiting
+    const HeadingMode mode = m_params.heading;
+    const double hold_theta = m_hold_theta;
+    auto headingAt = [mode, reverse, hold_theta](const InterpSample& smp) -> double {
+        if (mode == HeadingMode::HOLD) {
+            return hold_theta;
+        }
+        //TANGENT: if driving backwards, face opposite to path tangent
+        return reverse ? utils::wrapAngle(smp.theta + M_PI) : smp.theta;
+    };
+
+    //speed cap at arc length sq(sQuery): every group's speed along the path plus the turn the heading needs stays under its top speed
     auto capAt = [&](double sq) -> double {
         InterpSample a = path.sampleAtArcLength(sq);
         //the pt ~3in ahead (clamped)
         InterpSample b = path.sampleAtArcLength(std::min(sq + 3.0, s_end));
         double ds = std::max(1e-3, b.s - a.s);
-        //curvature
-        double kappa = std::abs(utils::wrapAngle(b.theta - a.theta)) / ds;
-        //return outer wheel limit
-        return V_STRAIGHT_MAX / (1.0 + kappa * TRACK_WIDTH / 2.0);
+        //heading change per inch the robot has to make (path curvature when following the tangent)
+        double head_a = headingAt(a);
+        double kappa_h = std::abs(utils::wrapAngle(headingAt(b) - head_a)) / ds;
+        //path direction in the body frame (forward, left), Pose convention headings
+        double rel = a.theta - head_a;
+        double dx = std::cos(rel);
+        double dy = -std::sin(rel);
+        double cap = INF;
+        for (std::size_t j = 0; j < N; j++) {
+            //group speed per in/s of travel
+            double per_v = std::abs(m_G[j][0] * dx + m_G[j][1] * dy) + std::abs(m_G[j][2]) * kappa_h;
+            if (per_v > 1e-9) {
+                cap = std::min(cap, wheel_max[j] / per_v);
+            }
+        }
+        //X and H drives not facing along the path: they don't turn, so the group speeds above don't slow them in corners.
+        //cap the cornering accel v^2 * kappa. TANGENT turns like a diff drive, so the group speed cap above already covers it
+        if constexpr (Drive::HOLONOMIC) {
+            if (mode != HeadingMode::TANGENT) {
+                double kappa_p = std::abs(utils::wrapAngle(b.theta - a.theta)) / ds;
+                if (kappa_p > 1e-6) {
+                    cap = std::min(cap, std::sqrt(m_params.a_lat_max / kappa_p));
+                }
+            }
+        }
+        return cap;
     };
 
     //braking speed aware cap: look ahead over the current stopping distance and make sure we could deaccelerate
@@ -59,8 +114,14 @@ typename MPCReference<F>::ZRef MPCReference<F>::build(const Pose& currentPose, c
         return cap;
     };
 
-    //meausred fwd speed for average wheel omega
-    double v_meas = std::abs(0.5 * (omega_L + omega_R) * r);
+    //measured speed from the body twist of the measured group speeds
+    double vx_meas = 0.0;
+    double vy_meas = 0.0;
+    for (std::size_t j = 0; j < N; j++) {
+        vx_meas += m_K[0][j] * omega(j);
+        vy_meas += m_K[1][j] * omega(j);
+    }
+    double v_meas = std::hypot(vx_meas, vy_meas);
     double v;
     if (m_v_ref < 0.0) {
         //first run, get val from measurements (floored)
@@ -83,11 +144,7 @@ typename MPCReference<F>::ZRef MPCReference<F>::build(const Pose& currentPose, c
     for (std::size_t i = 0; i <= F; i++) {
         //pose at current rollout arc length
         InterpSample ref = path.sampleAtArcLength(s);
-        double ref_theta = ref.theta;
-        if (reverse) {
-            //if driving backwards, face opposite to path tangent
-            ref_theta = utils::wrapAngle(ref_theta + M_PI);
-        }
+        double ref_theta = headingAt(ref);
         if (!have_prev) {
             //first stage: unrwap rel to robot's actual heading so MPC sees small heading error
             ref_theta = currentPose.theta + utils::wrapAngle(ref_theta - currentPose.theta);
@@ -131,5 +188,7 @@ typename MPCReference<F>::ZRef MPCReference<F>::build(const Pose& currentPose, c
     return z;
 }
 
-//explicit instantiation
-template class MPCReference<MPC_PREDICTION_HORIZON>;
+//explicit instantiation for every drive (must match MPCController)
+template class MPCReference<kinematics::DiffDrive, MPC_PREDICTION_HORIZON>;
+template class MPCReference<kinematics::XDrive, MPC_PREDICTION_HORIZON>;
+template class MPCReference<kinematics::HDrive, MPC_PREDICTION_HORIZON>;

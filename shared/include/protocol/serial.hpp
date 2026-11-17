@@ -19,7 +19,10 @@
 #include <optional>
 #include <vector>
 
+#include <initializer_list>
+
 #include "config/linkConstants.hpp"
+#include "config/robotDrive.hpp"
 #include "protocol/packets.hpp"
 #include "protocol/serialProtocol.hpp"
 
@@ -52,8 +55,11 @@
  * automatically generated,
  */
 namespace packets {
-    constexpr uint8_t LEFT_DRIVE_SLOT = 0; ///< group packet slot of the left drive
-    constexpr uint8_t RIGHT_DRIVE_SLOT = 1; ///< group packet slot of the right drive
+    /// @brief group packet slot of one of RobotDrive's motor groups
+    /// the drive groups come first in the config, in RobotDrive's group order (see mpc/drivetrain.hpp):
+    /// diff L, R / X FL, FR, BL, BR / H L, R, strafe
+    constexpr uint8_t driveSlot(std::size_t group) { return static_cast<uint8_t>(group); }
+    constexpr uint8_t DRIVE_GROUPS = static_cast<uint8_t>(RobotDrive::N_GROUPS); ///< number of drive groups in the config
     constexpr uint8_t PARALLEL_WHEEL_SLOT = 0; ///< rotation packet slot of the parallel tracking wheel
     constexpr uint8_t PERPENDICULAR_WHEEL_SLOT = 1; ///< rotation packet slot of the perpendicular tracking wheel
 
@@ -68,6 +74,45 @@ namespace packets {
     }
 
     /**
+     * @brief one blue-cartridge, coasting drive group
+     *
+     * @param ports smart ports, negative = reversed. 1–MAX_MOTORS of them
+     * @return GroupCfg the group, with nMotors set from the port count
+     */
+    inline GroupCfg driveGroup(std::initializer_list<int8_t> ports) {
+        GroupCfg group{};
+        group.nMotors = static_cast<uint8_t>(ports.size());
+        group.gearset = static_cast<uint8_t>(Gearset::BLUE);
+        group.brakeMode = static_cast<uint8_t>(BrakeMode::COAST);
+        std::size_t i = 0;
+        for (int8_t port : ports) {
+            if (i < MAX_MOTORS) {
+                group.ports[i++] = port;
+            }
+        }
+        return group;
+    }
+
+    /**
+     * @brief a drive's motor groups, in its group order (slot order)
+     *
+     * @tparam Drive drivetrain, normally RobotDrive
+     * @return std::array<GroupCfg, Drive::N_GROUPS> one group per drive group
+     */
+    template<class Drive>
+    inline std::array<GroupCfg, Drive::N_GROUPS> driveGroupConfigs() {
+        if constexpr (Drive::MODE == kinematics::DriveMode::DIFF) {
+            return {driveGroup(LEFT_DRIVE_WHEEL_PORTS), driveGroup(RIGHT_DRIVE_WHEEL_PORTS)};
+        }
+        else if constexpr (Drive::MODE == kinematics::DriveMode::X) {
+            return {driveGroup(XDRIVE_FL_PORTS), driveGroup(XDRIVE_FR_PORTS), driveGroup(XDRIVE_BL_PORTS), driveGroup(XDRIVE_BR_PORTS)};
+        }
+        else {
+            return {driveGroup(HDRIVE_LEFT_PORTS), driveGroup(HDRIVE_RIGHT_PORTS), driveGroup(HDRIVE_STRAFE_PORTS)};
+        }
+    }
+
+    /**
      * @brief builds the robot's built-in config payload
      *
      * the configId comes from the rest of the payload, so it changes
@@ -76,7 +121,7 @@ namespace packets {
      * @return std::vector<uint8_t> config payload: fixed part, groups, then rotations
      */
     inline std::vector<uint8_t> buildLinkConfig() {
-        constexpr uint8_t GROUPS = 2;
+        constexpr uint8_t GROUPS = DRIVE_GROUPS;
         constexpr uint8_t ROTATIONS = 2;
         std::vector<uint8_t> config(configSize(GROUPS, ROTATIONS));
         PayloadWriter writer{config.data()};
@@ -93,11 +138,10 @@ namespace packets {
                              adiBit(MATCHLOADER_PORT) | adiBit(DESCORE_PORT);
         writer.put(fixed);
 
-        // groups, in slot order
-        const uint8_t blue = static_cast<uint8_t>(Gearset::BLUE);
-        const uint8_t coast = static_cast<uint8_t>(BrakeMode::COAST);
-        writer.put(GroupCfg{3, blue, coast, LEFT_DRIVE_WHEEL_PORTS});
-        writer.put(GroupCfg{3, blue, coast, RIGHT_DRIVE_WHEEL_PORTS});
+        // drive groups, in slot order
+        for (const GroupCfg& group : driveGroupConfigs<RobotDrive>()) {
+            writer.put(group);
+        }
 
         // tracking wheels, in slot order
         writer.put(RotationCfg{PARALLEL_TRACKING_WHEEL_PORT, 0});
