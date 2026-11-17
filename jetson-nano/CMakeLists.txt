@@ -32,7 +32,10 @@ set(OSQP_BUILD_DEMO_EXE   OFF CACHE BOOL "" FORCE)
 set(OSQP_BUILD_UNITTESTS  OFF CACHE BOOL "" FORCE)
 set(OSQP_USE_FLOAT        OFF CACHE BOOL "" FORCE)
 set(OSQP_USE_LONG         ON  CACHE BOOL "" FORCE)
+# OSQP's C sources stay out of compile_commands.json, so clangd infers flags for our headers from our C++ files only
+set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
 add_subdirectory(${EXTERNAL}/osqp ${CMAKE_CURRENT_BINARY_DIR}/osqp EXCLUDE_FROM_ALL)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # - - - - - - - - - - - - - - [MPC CORE] - - - - - - - - - - - - - -
 # portable: Eigen + OSQP + std only. This is what DreamSim links.
@@ -62,6 +65,18 @@ target_include_directories(robotcore_lidar PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen/include
 )
 
+# - - - - - - - - - - - - - - [EKF CORE] - - - - - - - - - - - - - -
+# portable: Eigen + std only, so the simulator and tests can link it too
+add_library(robotcore_ekf STATIC
+    src/localization/ekf/se2.cpp
+    src/localization/ekf/odomEkf.cpp
+)
+target_include_directories(robotcore_ekf PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen/include
+)
+
 # - - - - - - - - - - - - - - [NANO EXECUTABLE] - - - - - - - - - - - - - -
 # only built when jetson-nano/ is the top-level project (DreamSim's add_subdirectory skips it)
 # CMAKE_SOURCE_DIR check instead of PROJECT_IS_TOP_LEVEL, which needs cmake 3.21
@@ -79,7 +94,7 @@ if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/main.cpp
         src/link/serial.cpp
         src/link/serialProtocol.cpp
-        src/localization/imu/bno055.cpp
+        src/localization/imu/bno085.cpp
         ../shared/src/protocol/serialProtocol.cpp
     )
     target_compile_definitions(MPCController PRIVATE __jetson_nano__)
