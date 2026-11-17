@@ -182,3 +182,71 @@ void StaticLayer::buildGrid() {
         m_grid[cell].push_back(point); 
     }
 }
+
+/** 
+ * @brief Finds the closest static map point within maxDist. 
+ */
+std::optional<Point> StaticLayer::nearest(
+    const Point& q, 
+    double maxDist
+) const {
+
+    // Validate the query and search distance 
+    if (!std::isfinite(q.x) || !std::isfinite(q.y) ||
+        !std::isfinite(maxDist) || maxDist < 0.0 ||
+        !std::isfinite(m_voxelSizeIn) || m_voxelSizeIn <= 0.0) {
+            return std::nullopt; 
+    }
+
+    // Nothing to search if the grid is empty
+    if (m_grid.empty()) {
+        return std::nullopt; 
+    }
+
+    // Determine the cells intersecting the search area
+    const CellKey minCell = cellForPoint({
+        q.x - maxDist, 
+        q.y - maxDist
+    }); 
+
+    const CellKey maxCell = cellForPoint({
+        q.x + maxDist, 
+        q.y + maxDist
+    }); 
+
+    // Store the closest match found so far
+    std::optional<Point> nearestPoint = std::nullopt; 
+    double bestDistSquared = maxDist * maxDist; 
+
+    // Search grid cells within the bounding area 
+    for (int64_t x = minCell.x; x <= maxCell.x; ++x) {
+        for (int64_t y = minCell.y; y <= maxCell.y; ++y) {
+            
+            const CellKey cell {x, y}; 
+
+            // Skip cells that contain no points 
+            auto it = m_grid.find(cell); 
+
+            if (it == m_grid.end()) {
+                continue; 
+            }
+
+            // Check every point in this cell 
+            for (const Point& point : it->second) {
+
+                const double dx = point.x - q.x; 
+                const double dy = point.y - q.y; 
+
+                const double distSquared = 
+                    dx * dx + dy * dy; 
+
+                if (distSquared <= bestDistSquared) {
+                    bestDistSquared = distSquared; 
+                    nearestPoint = point; 
+                }
+            }
+        }
+    }
+
+    return nearestPoint; 
+}
