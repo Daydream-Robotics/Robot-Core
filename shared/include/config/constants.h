@@ -118,8 +118,8 @@ constexpr double MPC_P_FINAL_MULT = 20.0; // multiplier for the last output weig
 constexpr double MPC_V_MAX = 12.0; // max drive voltage (V)
 constexpr double MPC_DELTA_U_MAX = 8.0; // max voltage increase per step (V)
 constexpr double MPC_DELTA_U_MIN = -8.0; // max voltage decrease per step (V)
-constexpr double MPC_X_FIELD_MAX = 140.0; // max |x| on the field (in)
-constexpr double MPC_Y_FIELD_MAX = 140.0; // max |y| on the field (in)
+constexpr double MPC_X_FIELD_MAX = 72.0; // max |x| on the field (in), field center origin
+constexpr double MPC_Y_FIELD_MAX = 72.0; // max |y| on the field (in), field center origin
 constexpr double MPC_OMEGA_WHEEL_MAX = 100.0; // max wheel speed (rad/s)
 
 enum class DriveType {
