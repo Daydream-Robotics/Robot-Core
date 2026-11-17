@@ -191,13 +191,13 @@ void Bno085::stop() {
 }
 
 std::optional<double> Bno085::headingIncrement(int64_t t0Us, int64_t t1Us) const {
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        if (!m_health.valid){
-            return std::nullopt;
-        }
+    // one lock for the validity check and both lookups
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (!m_health.valid) {
+        return std::nullopt;
     }
-    // integrated heading at both times. nothing if either is outside the history
+
+    // heading at both times, nothing if either is outside the history
     std::optional<double> theta0 = thetaAt(t0Us);
     std::optional<double> theta1 = thetaAt(t1Us);
     if (!theta0 || !theta1) {
@@ -520,8 +520,6 @@ void Bno085::invalidate() {
 
 
 std::optional<double> Bno085::thetaAt(int64_t tUs) const {
-    std::lock_guard<std::mutex> lock(m_mutex);
-
     // no samples yet
     if (m_historyCount == 0) {
         return std::nullopt;
@@ -532,9 +530,21 @@ std::optional<double> Bno085::thetaAt(int64_t tUs) const {
     const size_t newestIdx = (m_historyHead + size - 1) % size;
     const size_t oldestIdx = (m_historyHead + size - m_historyCount) % size;
 
-    // outside the stored time range
-    if (tUs < m_history[oldestIdx].tUs || tUs > m_history[newestIdx].tUs) {
+    // older than the history, or too far past the newest sample
+    if (tUs < m_history[oldestIdx].tUs || tUs > m_history[newestIdx].tUs + NANO_IMU_MAX_EXTRAPOLATE_US) {
         return std::nullopt;
+    }
+
+    // a little past the newest sample so extend the last two samples' rate
+    if (tUs > m_history[newestIdx].tUs) {
+        if (m_historyCount < 2) {
+            return std::nullopt;
+        }
+        const size_t prevIdx = (newestIdx + size - 1) % size;
+        const ThetaSample& a = m_history[prevIdx];
+        const ThetaSample& b = m_history[newestIdx];
+        const double rate = (b.theta - a.theta) / static_cast<double>(b.tUs - a.tUs);
+        return b.theta + rate * static_cast<double>(tUs - b.tUs);
     }
 
     // walk back from the newest sample to the first one at or before tUs

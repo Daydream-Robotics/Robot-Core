@@ -73,12 +73,13 @@ constexpr double END_TOLERANCE = 0.5;
 /* - - - - - - - - - - - - - - [NANO IMU] - - - - - - - - - - - - - - */
 // BNO085 on the Nano's I2C bus (jetson-nano/src/localization/imu/bno085.cpp)
 
-constexpr int NANO_IMU_RATE_HZ = 100; // gyro read rate, matches the chip's 100 Hz output in IMU mode
+constexpr int NANO_IMU_RATE_HZ = 100; // game rotation vector report rate requested from the chip (Hz)
 constexpr double NANO_IMU_HISTORY_SEC = 1.0; // how far back headingIncrement() can look (s)
 constexpr int NANO_IMU_MAX_READ_ERRORS = 10; // consecutive read errors before recover()
 constexpr int NANO_IMU_RESET_ATTEMPTS = 3; // chip resets tried in a row by recover() before giving up until the next error streak
 constexpr int NANO_IMU_POLL_HZ = 400; // how often the read thread checks for a packet, sample times are good to about half of 1 / this
 constexpr int NANO_IMU_REPORT_TIMEOUT_MS = 200; // no heading report for this long means the chip is stuck, so recover()
+constexpr int NANO_IMU_MAX_EXTRAPOLATE_US = 10000; // how far past the newest sample thetaAt() extrapolates (us), one report period
 constexpr unsigned NANO_IMU_ACCURACY_TRUSTED = 2; // report accuracy needed for valid data (0 unreliable, 1 low, 2 medium, 3 high)
 constexpr double NANO_IMU_YAW_SIGN = 1.0; // 1 with the chip's Z up, -1 if the board is mounted upside down
 constexpr bool NANO_IMU_SAVE_CALIBRATION = true; // save the chip's calibration to its own flash once it's trusted
@@ -103,8 +104,10 @@ constexpr double ODOM_EKF_TRACKING_SIGMA_FLOOR = 0.002; // tracking wheel error 
 constexpr double ODOM_EKF_IME_SIGMA_PER_IN = 0.05; // drive IME error per inch of travel, drive wheels slip
 constexpr double ODOM_EKF_IME_SIGMA_PER_OMEGA = 0.01; // extra IME error per rad/s of turn rate (in), wheel scrub in turns
 constexpr double ODOM_EKF_IME_SIGMA_FLOOR = 0.005; // drive IME error when still (in)
-constexpr double ODOM_EKF_IMU_NOISE_DENSITY = 2.4e-4; // BNO055 gyro noise (rad/s/sqrt(Hz)), heading sigma = this * sqrt(dt)
-constexpr double ODOM_EKF_IMU_BIAS_SIGMA = 0.005; // gyro bias left after calibration (rad/s), heading sigma += this * dt
+// TODO (#193): retune on the robot, these are the BNO055's integrated-gyro values. The BNO085 game
+// rotation vector's increment error is mostly heading jitter plus drift (about 0.5 deg/min, 1.5e-4 rad/s)
+constexpr double ODOM_EKF_IMU_NOISE_DENSITY = 2.4e-4; // IMU increment noise (rad/sqrt(s)), heading sigma = this * sqrt(dt)
+constexpr double ODOM_EKF_IMU_BIAS_SIGMA = 0.005; // IMU heading drift (rad/s), heading sigma += this * dt
 
 // per-row outlier gate on nu^2 / S, chi-squared 1 DOF at 99%
 constexpr double ODOM_EKF_ROW_GATE = 6.63;

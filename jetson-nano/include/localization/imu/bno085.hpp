@@ -94,9 +94,12 @@ public:
     /**
      * @brief Heading change between two times from the game rotation vector (CCW+, rad).
      *
+     * t1Us may be up to NANO_IMU_MAX_EXTRAPOLATE_US past the newest sample, extrapolated at the last rate.
+     *
      * @param t0Us Start time on the Nano's steady_clock.
      * @param t1Us End time on the Nano's steady_clock.
-     * @return std::optional<double> Nothing if either time is outside the history or the IMU is invalid.
+     * @return std::optional<double> Nothing if either time is outside the history (plus the extrapolation
+     * window) or the IMU is invalid.
      */
     std::optional<double> headingIncrement(int64_t t0Us, int64_t t1Us) const;
 
@@ -204,6 +207,8 @@ private:
 
     /**
      * @brief Heading at time t, interpolated from the history.
+     *
+     * Caller holds m_mutex.
      *
      * @param tUs Time on the Nano's steady_clock.
      * @return std::optional<double> Nothing if t is outside the history.
