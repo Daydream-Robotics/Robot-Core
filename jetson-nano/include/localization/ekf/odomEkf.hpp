@@ -100,8 +100,7 @@ public:
      * @brief Motion between two times, composed from the per-cycle increments (for KISS-ICP).
      *
      * Treats cycles as independent when combining covariance, which is an approximation.
-     * Uses whole cycles, so the returned t0Us, t1Us are the span actually covered. A t1Us newer
-     * than the latest step is clamped to it, check the returned t1Us for how much is missing.
+     * Uses whole cycles, so the returned t0Us, t1Us are the span covered
      *
      * @param t0Us Start time, Nano steady_clock (us).
      * @param t1Us End time, Nano steady_clock (us).
