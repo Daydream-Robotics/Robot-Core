@@ -71,4 +71,44 @@ class StaticLayer {
 
         // Spatial grid configuration 
         double m_voxelSizeIn = 1.0; 
+
+        /**
+         * @brief Samples evenly spaced points along a lined segment. 
+         * @param start Starting coordinate of the segment. 
+         * @param end Ending coordinate of the segment.
+         * @param spacing Maximum distance between sample points. 
+         * @param sourceName Name of the wall or field element. 
+         */
+        void sampleSegment(
+            const Point& start, 
+            const Point& end, 
+            double spacing, 
+            const std::string& sourceName
+        );
+
+        /**
+         * @brief Samples points around a circular field element. 
+         * @param center Center position of the circle
+         * @param radius Radius of the circle in inches
+         * @param spacing Maximum spacing between samples in inches. 
+         * @param sourceName Name of the field element.
+         */
+        void sampleCircle(
+            const Point& center, 
+            double radius, 
+            double spacing, 
+            const std::string& sourceName
+        ); 
+
+        /**
+         * @brief Samples the perimeter of a closed polygon. 
+         * @param vertices Polygon vertices in boundary order. 
+         * @param spacing Maximum spacing between samples. 
+         * @param sourceName Name of the field element. 
+         */
+        void samplePolygon(
+            const std::vector<Point>& vertices, 
+            double spacing, 
+            const std::string& sourceName
+        );
 };
