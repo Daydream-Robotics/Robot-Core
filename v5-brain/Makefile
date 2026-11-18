@@ -44,6 +44,7 @@ TEMPLATE_FILES=$(INCDIR)/$(LIBNAME)/*.h $(INCDIR)/$(LIBNAME)/*.hpp
 
 # Shared protocol framing is compiled once for the Brain alongside its transport.
 ELF_DEPS += $(BINDIR)/shared/serialProtocol.cpp.o
+ELF_DEPS += $(BINDIR)/shared/odometry.cpp.o
 
 ################################################################################
 ################################################################################
@@ -55,3 +56,9 @@ $(BINDIR)/shared/serialProtocol.cpp.o: ../shared/src/protocol/serialProtocol.cpp
 	$(CXX) -c $(INCLUDE) $(CXXFLAGS) $(EXTRA_CXXFLAGS) -MMD -MP -MF $(DEPDIR)/shared/serialProtocol.d -o $@ $<
 
 -include $(DEPDIR)/shared/serialProtocol.d
+
+$(BINDIR)/shared/odometry.cpp.o: ../shared/src/odometry.cpp
+	@mkdir -p $(dir $@) $(DEPDIR)/shared
+	$(CXX) -c $(INCLUDE) $(CXXFLAGS) $(EXTRA_CXXFLAGS) -MMD -MP -MF $(DEPDIR)/shared/odometry.d -o $@ $<
+
+-include $(DEPDIR)/shared/odometry.d
