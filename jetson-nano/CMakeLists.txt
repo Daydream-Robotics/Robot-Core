@@ -91,31 +91,13 @@ option(ROBOTCORE_BUILD_LIDAR_DRIVER
         "Build the Slamtec SDK LiDAR driver" ${_robotcore_top_level})
 option(ROBOTCORE_BUILD_LIDAR_TEST
         "Build the LiDAR SDK integration test" OFF)
-option(ROBOTCORE_BUILD_LIDAR_EXTRINSICS_TEST
-        "Build the hardware-free LiDAR extrinsics test" OFF)
-
-# Keep sensor-specific values in a tracked source config, not hard-coded C++.
-# Stage a copy under each CMake binary directory (build/, cmake-build-debug/, etc.).
-# Remember: loadLidarMounts() still needs a path explicitly passed at runtime.
-set(ROBOTCORE_LIDAR_MOUNTS_SOURCE
-        "${CMAKE_CURRENT_SOURCE_DIR}/config/lidar_mounts.ini")
-if(EXISTS "${ROBOTCORE_LIDAR_MOUNTS_SOURCE}")
-    configure_file("${ROBOTCORE_LIDAR_MOUNTS_SOURCE}"
-                   "${CMAKE_CURRENT_BINARY_DIR}/config/lidar_mounts.ini"
-                   COPYONLY)
-elseif(ROBOTCORE_BUILD_LIDAR_DRIVER OR ROBOTCORE_BUILD_LIDAR_TEST OR
-       ROBOTCORE_BUILD_LIDAR_EXTRINSICS_TEST)
-    message(FATAL_ERROR
-            "LiDAR config missing: ${ROBOTCORE_LIDAR_MOUNTS_SOURCE}")
-endif()
 
 # The SDK is needed only on supported host platforms when requested.
 # The original platform-independent lidar target remains unchanged.
 
 # A test requires the driver even if the driver option is OFF.
 if((WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        AND (ROBOTCORE_BUILD_LIDAR_DRIVER OR ROBOTCORE_BUILD_LIDAR_TEST OR
-             ROBOTCORE_BUILD_LIDAR_EXTRINSICS_TEST))
+        AND (ROBOTCORE_BUILD_LIDAR_DRIVER OR ROBOTCORE_BUILD_LIDAR_TEST))
 
     find_package(Threads REQUIRED)
 
@@ -256,7 +238,7 @@ if((WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
             Threads::Threads
     )
 
-    # The Nano executable may call loadLidarMounts() / LidarTransform.
+    # The Nano executable may call lidarMounts() / LidarTransform.
     # Linking is harmless until those functions are called from main.cpp.
     if(TARGET MPCController)
         target_link_libraries(MPCController PRIVATE robotcore_lidar_driver)
@@ -285,18 +267,4 @@ elseif(ROBOTCORE_BUILD_LIDAR_TEST)
     message(STATUS
             "LiDAR SDK test unavailable on ${CMAKE_SYSTEM_NAME}"
     )
-endif()
-
-
-# - - - - - - - - - - - - - - [LIDAR EXTRINSICS UNIT TEST] - - - - - -
-# Uses synthetic Scan data. No LiDAR hardware is needed.
-if(ROBOTCORE_BUILD_LIDAR_EXTRINSICS_TEST AND TARGET robotcore_lidar_driver)
-    enable_testing()
-    add_executable(lidar_extrinsics_test
-            src/perception/lidar/lidarExtrinsics_test.cpp)
-    target_link_libraries(lidar_extrinsics_test PRIVATE robotcore_lidar_driver)
-    add_test(NAME lidar_extrinsics_test
-            COMMAND lidar_extrinsics_test "${ROBOTCORE_LIDAR_MOUNTS_SOURCE}")
-elseif(ROBOTCORE_BUILD_LIDAR_EXTRINSICS_TEST)
-    message(STATUS "LiDAR extrinsics test unavailable on ${CMAKE_SYSTEM_NAME}")
 endif()
