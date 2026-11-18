@@ -22,15 +22,17 @@ static_assert(NANO_IMU_REPORT_TIMEOUT_MS > 1000 / NANO_IMU_RATE_HZ, "report time
 static_assert(NANO_IMU_RESET_ATTEMPTS >= 1, "recover() needs at least one reset attempt");
 static_assert(NANO_IMU_YAW_SIGN == 1.0 || NANO_IMU_YAW_SIGN == -1.0, "NANO_IMU_YAW_SIGN must be 1 or -1");
 
-
+// TODO: Add SPI support for faster imu data
 /**
  * @brief Adafruit BNO085 driver on the Nano's I2C bus. Tracks heading from the chip's game rotation vector.
  *
  * The chip fuses gyro and accelerometer on board (no magnetometer), calibrates its own gyro bias, and
  * stamps every report with when it was sampled. Runs its own read thread so an I2C stall doesn't block
  * the EKF loop. Heading is CCW+ in radians, stamped on the Nano's steady_clock.
+ * 
+ * 
  */
-class Bno085 {
+class BNO085 {
 public:
     /**
      * @brief Bus and timing settings.
