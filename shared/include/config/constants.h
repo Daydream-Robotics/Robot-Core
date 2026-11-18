@@ -82,5 +82,27 @@ constexpr double LIDAR_TAU_0 = 6.0;       // starting ICP max match distance bef
 constexpr double LIDAR_DELTA_MIN = 0.5;   // ICP corrections smaller than this are ignored by the adaptive threshold (in)
 constexpr double LIDAR_R_MAX = 204.0;     // max range considered, ~ diagonal of a 12 ft field (in)
 
+// robot footprint for the self-filter, from the EKF origin (in), TODO (#139/#154): measure on the robot
+constexpr double LIDAR_FOOTPRINT_FRONT_IN = 12.0;
+constexpr double LIDAR_FOOTPRINT_REAR_IN = 12.0;
+constexpr double LIDAR_FOOTPRINT_LEFT_IN = 9.0;
+constexpr double LIDAR_FOOTPRINT_RIGHT_IN = 9.0;
+constexpr double LIDAR_FOOTPRINT_MARGIN_IN = 1.0; // extra clearance around the footprint (in)
+
+// C1 usable range (in), TODO: measure on hardware
+constexpr double LIDAR_R_MIN_IN = 2.0;
+
+// sensor 0 mount, robot frame (+X forward, +Y left, CCW+), TODO: measure, placeholder values
+constexpr double LIDAR_0_X_IN = 6.0;
+constexpr double LIDAR_0_Y_IN = 4.0;
+constexpr double LIDAR_0_PSI_RAD = 0.0; // mount yaw plus the C1's 0 deg offset, check with a target on the left
+constexpr double LIDAR_0_HEIGHT_IN = 8.0; // scan plane height, below the field wall top (#144)
+
+// sensor 1 mount, robot frame (+X forward, +Y left, CCW+), TODO: measure, placeholder values
+constexpr double LIDAR_1_X_IN = 6.0;
+constexpr double LIDAR_1_Y_IN = -4.0;
+constexpr double LIDAR_1_PSI_RAD = 0.0; // mount yaw plus the C1's 0 deg offset, check with a target on the left
+constexpr double LIDAR_1_HEIGHT_IN = 8.0; // scan plane height, below the field wall top (#144)
+
 
 #endif

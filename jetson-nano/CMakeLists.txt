@@ -222,8 +222,11 @@ if((WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_compile_definitions(slamtec_lidar_sdk PRIVATE WIN32)
     endif()
 
+    # Robot-frame transformation belongs to our driver/perception library,
+    # not to the third-party Slamtec SDK or a test executable.
     add_library(robotcore_lidar_driver STATIC
             src/perception/lidar/lidarDriver.cpp
+            src/perception/lidar/lidarExtrinsics.cpp
     )
 
     target_include_directories(robotcore_lidar_driver PUBLIC
@@ -234,6 +237,12 @@ if((WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
             slamtec_lidar_sdk
             Threads::Threads
     )
+
+    # The Nano executable may call lidarMounts() / LidarTransform.
+    # Linking is harmless until those functions are called from main.cpp.
+    if(TARGET MPCController)
+        target_link_libraries(MPCController PRIVATE robotcore_lidar_driver)
+    endif()
 
     # Nano-only code (UART counters, SCHED_FIFO) is guarded by __jetson_nano__
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -259,4 +268,3 @@ elseif(ROBOTCORE_BUILD_LIDAR_TEST)
             "LiDAR SDK test unavailable on ${CMAKE_SYSTEM_NAME}"
     )
 endif()
-
