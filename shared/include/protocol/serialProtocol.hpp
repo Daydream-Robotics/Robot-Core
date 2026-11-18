@@ -201,7 +201,7 @@ private:
     size_t m_rxBufferPos; ///< bytes currently in m_rxBuffer
 
     std::atomic<bool> m_inFrame{false}; ///< see midFrame()
-    uint8_t m_commandGroups = 0; ///< see setCommandGroups()
+    std::atomic<uint8_t> m_commandGroups{0}; ///< see setCommandGroups()
 
     /**
      * @brief whether this side accepts a packet type
