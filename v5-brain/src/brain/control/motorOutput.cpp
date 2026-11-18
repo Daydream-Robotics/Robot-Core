@@ -4,45 +4,51 @@
 
 #include "brain/control/motorOutput.hpp"
 
-#include <cmath>   
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 namespace brain {
 
 MotorOutput::MotorOutput(pros::MotorGroup* const* groups, std::size_t groupCount)
-    : groups_(groups), groupCount_(groupCount) {}
+    : m_groups(groups), m_groupCount(groupCount) {}
 
 void MotorOutput::apply(const MotorCommand& command) {
-    
-    for(std::size_t i = 0; i < groupCount_; ++i) {
-        pros::MotorGroup* group = groups_[i];
+    if (m_groups == nullptr) return;
+    for (std::size_t i = 0; i < m_groupCount; ++i) {
+        pros::MotorGroup* group = m_groups[i];
 
         if (group == nullptr) {
             continue; // skip null pointers
         }
 
-        if (i >= command.groupCount) {
+        if (i >= command.groupCount || i >= command.groups.size()) {
             group->brake(); // stop if no command for this group
             continue;
         }
             
-        const MotorGroupCommand& groupCommand = command.groups[i];
+        const packets::GroupCmd& GROUP_COMMAND = command.groups[i];
         // never send a NaN or infinite set point to a motor
-        if (!std::isfinite(groupCommand.value)) {
+        if (!std::isfinite(GROUP_COMMAND.value)) {
             group->brake();
             continue;
         }
 
-        switch (groupCommand.mode) {
-            case MotorCommandMode::Voltage:
-                group->move_voltage(static_cast<std::int32_t>(std::lround(groupCommand.value)));
+        switch (static_cast<packets::GroupMode>(GROUP_COMMAND.mode)) {
+            case packets::GroupMode::VOLTAGE:
+                group->move_voltage(static_cast<std::int32_t>(
+                    std::lround(std::clamp(GROUP_COMMAND.value, -12000.0f, 12000.0f))));
                 break;
-            case MotorCommandMode::Velocity:
-                group->move_velocity(static_cast<std::int32_t>(std::lround(groupCommand.value))); 
+            case packets::GroupMode::VELOCITY:
+                group->move_velocity(static_cast<std::int32_t>(std::lround(std::clamp(
+                    static_cast<double>(GROUP_COMMAND.value),
+                    static_cast<double>(std::numeric_limits<std::int32_t>::min()),
+                    static_cast<double>(std::numeric_limits<std::int32_t>::max())))));
                 break;
-            case MotorCommandMode::Position:
-                group->move_absolute(groupCommand.value, groupCommand.auxiliary);
+            case packets::GroupMode::POSITION:
+                group->move_absolute(GROUP_COMMAND.value, GROUP_COMMAND.aux);
                 break;
-            case MotorCommandMode::Stop:
+            case packets::GroupMode::STOP:
             default:
                 group->brake();
                 break;
@@ -51,8 +57,9 @@ void MotorOutput::apply(const MotorCommand& command) {
 }
 
 void MotorOutput::stop() {
-    for(std::size_t i = 0; i < groupCount_; ++i) {
-        pros::MotorGroup* group = groups_[i];
+    if (m_groups == nullptr) return;
+    for (std::size_t i = 0; i < m_groupCount; ++i) {
+        pros::MotorGroup* group = m_groups[i];
         if (group == nullptr) {
             continue; // skip null pointers
         }
