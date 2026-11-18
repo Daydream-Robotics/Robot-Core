@@ -14,6 +14,11 @@ void FullEkf::reset(const Pose& pose, const Eigen::Matrix3d& cov) {
     if (!(std::isfinite(pose.x) && std::isfinite(pose.y) && std::isfinite(pose.theta) && cov.allFinite())) {
         return;
     }
+    
+    // Skip invalid covariance matrices (not positive definite)
+    if (cov.llt().info() != Eigen::Success) {
+        return;
+    }
 
     // drop measurements queued before the reset
     {
