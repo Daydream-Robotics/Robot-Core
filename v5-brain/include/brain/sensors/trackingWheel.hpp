@@ -32,15 +32,15 @@ public:
 
     /**
      * @brief Destroy the TrackingWheel instance.
-     * @note Does not destroy or reset the underlying non-owning @ref encoder_.
+     * @note Does not destroy or reset the underlying non-owning @ref m_encoder.
      */
     ~TrackingWheel() = default;
 
     /**
      * @brief Refresh the wheel's cached distance and distance delta.
-     * @details Reads the latest position and delta from @ref encoder_ and converts
-     *          angular sensor ticks into linear distance using @ref geometry_.diameter.
-     * @note Assumes @ref Encoder::update() has already been called for the current tick.
+     * @details Reads the latest position and delta from @ref m_encoder and converts
+     *          angular sensor ticks into linear distance using @ref m_geometry.diameter.
+     * @note Refreshes the underlying encoder exactly once.
      */
     void update();
 
@@ -55,6 +55,15 @@ public:
      * @return Linear distance delta in the geometry's length units.
      */
     double deltaDistance() const;
+
+    /** @brief Return the latest encoder delta.
+     *  @return Rotation change in centidegrees.
+     */
+    double deltaRotation() const;
+    /** @brief Check the latest encoder delta.
+     *  @return True when the latest update produced a usable delta.
+     */
+    bool deltaValid() const;
 
     /**
      * @brief Get the wheel's signed perpendicular offset from the robot's tracking center.
@@ -74,20 +83,17 @@ private:
     /// Number of PROS rotation sensor ticks (centidegrees) per full wheel revolution.
     static constexpr double TICKS_PER_REVOLUTION = 36000.0;
 
-    /// Mathematical constant pi used for wheel circumference calculations.
-    static constexpr double PI = 3.14159265358979323846;
-
     /// Non-owning encoder whose rotation is converted to distance.
-    Encoder& encoder_;
+    Encoder& m_encoder;
 
     /// Diameter and signed offset used for the distance conversion.
-    shared::TrackingWheelGeometry geometry_;
+    shared::TrackingWheelGeometry m_geometry;
 
     /// Cached total linear travel distance updated on each @ref update() call.
-    double distance_ = 0.0;
+    double m_distance = 0.0;
 
     /// Cached linear travel distance change since the previous @ref update() call.
-    double deltaDistance_ = 0.0;
+    double m_deltaDistance = 0.0;
 };
 
 } // namespace brain

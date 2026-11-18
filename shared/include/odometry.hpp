@@ -14,7 +14,7 @@ struct Pose {
     double x;
     /// Position along the frame's y-axis, in RobotConfig length units.
     double y;
-    /// Robot heading in radians, using the shared coordinate convention.
+    /// Compass heading in radians: 0 faces +Y, pi/2 faces +X, clockwise positive.
     double heading;
 };
 
@@ -52,9 +52,9 @@ public:
 
 private:
     /// Robot geometry used to interpret wheel offsets and diameters.
-    RobotConfig config_;
+    RobotConfig m_config;
     /// Last integrated pose.
-    Pose pose_{};
+    Pose m_pose{};
 };
 
 } // namespace shared

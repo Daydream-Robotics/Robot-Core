@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "pros/rotation.hpp"
-
 #include <cstdint>
+
+#include "pros/rotation.hpp"
 
 namespace brain {
 
@@ -41,6 +41,11 @@ public:
      */
     bool connected() const;
 
+    /** @brief Check whether the latest delta has consecutive readings.
+     *  @return True when the latest delta is usable.
+     */
+    bool deltaValid() const;
+
 
     /** @brief Reset the encoder's position reference to zero. */
     void tare();
@@ -52,6 +57,10 @@ private:
     double m_position = 0.0;
     /// Change in position since the previous update.
     double m_delta = 0.0;
+    /// Whether a prior valid reading is available for a delta.
+    bool m_hasBaseline = false;
+    /// Whether the latest delta uses consecutive valid readings.
+    bool m_deltaValid = false;
 };
 
 } // namespace brain

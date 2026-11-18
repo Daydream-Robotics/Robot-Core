@@ -31,9 +31,9 @@ public:
 
 private:
     /// Non-owning array of motor groups controlled by this adapter.
-    pros::MotorGroup* const* groups_;
-    /// Number of valid pointers in @ref groups_.
-    std::size_t groupCount_;
+    pros::MotorGroup* const* m_groups;
+    /// Number of valid pointers in @ref m_groups.
+    std::size_t m_groupCount;
 };
 
 } // namespace brain

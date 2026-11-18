@@ -25,9 +25,9 @@ struct RobotConfig {
     double driveGearRatio;
     /// Distance between the left and right drivetrain tracking paths.
     double trackWidth;
-    /// Geometry of the wheel measuring travel parallel to the robot centerline.
+    /// Parallel wheel: rotation-induced travel is offset * CCW heading change.
     TrackingWheelGeometry parallelTrackingWheel;
-    /// Geometry of the wheel measuring travel perpendicular to the centerline.
+    /// Perpendicular wheel: rotation-induced travel is -offset * CCW heading change.
     TrackingWheelGeometry perpendicularTrackingWheel;
 };
 
