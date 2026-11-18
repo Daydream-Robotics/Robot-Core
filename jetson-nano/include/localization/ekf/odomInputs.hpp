@@ -45,8 +45,5 @@ public:
     void reset();
 
 private:
-    // TODO: dt from tNanoUs, and reject dt <= 0 or > ~0.2 s (link stalled -> reset instead)
-    // TODO: rad -> in for wheels and IMEs, imeStepRad is already one value per group
-    // TODO: validity from fault bits, NaN, and a max-increment sanity check
     std::optional<int64_t> m_lastTUs; ///< tNanoUs of the previous sample, empty until the first one
 };
