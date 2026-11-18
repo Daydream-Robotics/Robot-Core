@@ -338,7 +338,7 @@ OdomEkf::Measurement OdomEkf::buildMeasurement(const OdomInputs& in) const {
         addRow(in.dsRight, dt, 0.0, hOmega, sigmaRight);
     }
 
-    // IMU: dt * omega, gyro noise grows with sqrt(dt) and leftover bias with dt
+    // IMU: dt * omega, heading jitter plus drift times dt
     if (in.imuValid) {
         const double sigma = ODOM_EKF_IMU_NOISE_DENSITY * std::sqrt(dt) + ODOM_EKF_IMU_BIAS_SIGMA * dt;
         addRow(in.dTheta, 0.0, 0.0, dt, sigma);
