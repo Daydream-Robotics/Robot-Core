@@ -14,17 +14,15 @@
 #include <algorithm>
 #include <cerrno>
 #include <cmath>
+#include <numbers>
 #include <vector>
 
 namespace brain {
 
 namespace {
 
-/// Mathematical constant pi for RPM-to-rad/s conversions.
-constexpr double PI = 3.14159265358979323846;
-
 /// Conversion factor from revolutions per minute (RPM) to radians per second (rad/s).
-constexpr double RPM_TO_RAD_PER_SEC = (2.0 * PI) / 60.0;
+constexpr double RPM_TO_RAD_PER_SEC = (2.0 * std::numbers::pi) / 60.0;
 
 /// Conversion factor from degrees to protocol centidegrees (1 deg = 100 centidegrees).
 constexpr double DEG_TO_CENTIDEGREES = 100.0;
@@ -85,11 +83,11 @@ SensorService::SensorService(pros::IMU& headingSensor,
                              std::size_t motorGroupCount,
                              TrackingWheel* const* trackingWheels,
                              std::size_t trackingWheelCount)
-    : headingSensor_(headingSensor),
-      motorGroups_(motorGroups),
-      motorGroupCount_(motorGroupCount),
-      trackingWheels_(trackingWheels),
-      trackingWheelCount_(trackingWheelCount) {}
+    : m_headingSensor(headingSensor),
+      m_motorGroups(motorGroups),
+      m_motorGroupCount(motorGroupCount),
+      m_trackingWheels(trackingWheels),
+      m_trackingWheelCount(trackingWheelCount) {}
 
 /**
  * @brief Sample all configured sensors and return a coherent @ref SensorSnapshot.
@@ -105,29 +103,29 @@ SensorSnapshot SensorService::sample() {
 
     // 1. Sample IMU continuous rotation (PROS clockwise-positive -> protocol CCW-positive).
     errno = 0;
-    const double currentHeadingDeg = headingSensor_.get_rotation();
-    if (errno == 0 && !headingSensor_.is_calibrating() && std::isfinite(currentHeadingDeg)) {
-        if (hasHeadingBaseline_) {
-            const double deltaHeadingDeg = -(currentHeadingDeg - lastHeadingDeg_);
+    const double currentHeadingDeg = m_headingSensor.get_rotation();
+    if (errno == 0 && !m_headingSensor.is_calibrating() && std::isfinite(currentHeadingDeg)) {
+        if (m_hasHeadingBaseline) {
+            const double deltaHeadingDeg = -(currentHeadingDeg - m_lastHeadingDeg);
             snapshot.headingDelta = toCentidegrees(deltaHeadingDeg);
         } else {
             snapshot.headingDelta = 0;
-            hasHeadingBaseline_ = true;
+            m_hasHeadingBaseline = true;
         }
-        lastHeadingDeg_ = currentHeadingDeg;
+        m_lastHeadingDeg = currentHeadingDeg;
     } else {
         snapshot.headingDelta = 0;
     }
 
     // 2. Sample configured motor groups up to protocol maximum.
     const std::size_t validMotorGroups =
-        (motorGroups_ != nullptr)
-            ? std::min<std::size_t>(motorGroupCount_, packets::MAX_GROUPS)
+        (m_motorGroups != nullptr)
+            ? std::min<std::size_t>(m_motorGroupCount, packets::MAX_GROUPS)
             : 0U;
     snapshot.motorGroupCount = static_cast<std::uint8_t>(validMotorGroups);
 
     for (std::size_t i = 0; i < validMotorGroups; ++i) {
-        pros::MotorGroup* group = motorGroups_[i];
+        pros::MotorGroup* group = m_motorGroups[i];
         MotorGroupTelemetry& telemetry = snapshot.motorGroups[i];
 
         if (group == nullptr) {
@@ -142,7 +140,7 @@ SensorSnapshot SensorService::sample() {
         if ((telemetry.faultFlags & packets::fault::MISSING) != 0) {
             telemetry.positionDelta = 0;
             telemetry.velocity = 0.0f;
-            hasMotorBaseline_[i] = false;
+            m_hasMotorBaseline[i] = false;
             continue;
         }
 
@@ -156,13 +154,13 @@ SensorSnapshot SensorService::sample() {
             avgPosDeg /= static_cast<double>(positions.size());
         }
 
-        if (hasMotorBaseline_[i]) {
-            telemetry.positionDelta = toCentidegrees(avgPosDeg - lastMotorPosDeg_[i]);
+        if (m_hasMotorBaseline[i]) {
+            telemetry.positionDelta = toCentidegrees(avgPosDeg - m_lastMotorPosDeg[i]);
         } else {
             telemetry.positionDelta = 0;
-            hasMotorBaseline_[i] = true;
+            m_hasMotorBaseline[i] = true;
         }
-        lastMotorPosDeg_[i] = avgPosDeg;
+        m_lastMotorPosDeg[i] = avgPosDeg;
 
         // Average output-shaft velocity across motors in the group (RPM -> rad/s).
         const std::vector<double> velocities = group->get_actual_velocity_all();
@@ -178,13 +176,13 @@ SensorSnapshot SensorService::sample() {
 
     // 3. Sample configured tracking wheels up to protocol maximum.
     const std::size_t validTrackingWheels =
-        (trackingWheels_ != nullptr)
-            ? std::min<std::size_t>(trackingWheelCount_, packets::MAX_ROTATIONS)
+        (m_trackingWheels != nullptr)
+            ? std::min<std::size_t>(m_trackingWheelCount, packets::MAX_ROTATIONS)
             : 0U;
     snapshot.trackingWheelCount = static_cast<std::uint8_t>(validTrackingWheels);
 
     for (std::size_t i = 0; i < validTrackingWheels; ++i) {
-        TrackingWheel* wheel = trackingWheels_[i];
+        TrackingWheel* wheel = m_trackingWheels[i];
         TrackingWheelTelemetry& telemetry = snapshot.trackingWheels[i];
 
         if (wheel == nullptr) {

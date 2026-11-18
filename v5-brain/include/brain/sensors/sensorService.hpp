@@ -66,31 +66,31 @@ public:
 
 private:
     /// IMU used to acquire heading information; owned by the robot configuration.
-    pros::IMU& headingSensor_;
+    pros::IMU& m_headingSensor;
 
     /// Non-owning array of motor groups whose telemetry is sampled.
-    pros::MotorGroup* const* motorGroups_;
+    pros::MotorGroup* const* m_motorGroups;
 
-    /// Number of motor groups available through @ref motorGroups_.
-    std::size_t motorGroupCount_;
+    /// Number of motor groups available through @ref m_motorGroups.
+    std::size_t m_motorGroupCount;
 
     /// Non-owning array of tracking wheels whose telemetry is sampled.
-    TrackingWheel* const* trackingWheels_;
+    TrackingWheel* const* m_trackingWheels;
 
-    /// Number of tracking wheels available through @ref trackingWheels_.
-    std::size_t trackingWheelCount_;
+    /// Number of tracking wheels available through @ref m_trackingWheels.
+    std::size_t m_trackingWheelCount;
 
-    /// Whether @ref lastHeadingDeg_ has been initialized with a valid IMU sample.
-    bool hasHeadingBaseline_ = false;
+    /// Whether @ref m_lastHeadingDeg has been initialized with a valid IMU sample.
+    bool m_hasHeadingBaseline = false;
 
     /// Previous IMU continuous rotation reading (in degrees) for delta calculation.
-    double lastHeadingDeg_ = 0.0;
+    double m_lastHeadingDeg = 0.0;
 
     /// Tracks whether each motor-group slot has a valid baseline position for deltas.
-    std::array<bool, packets::MAX_GROUPS> hasMotorBaseline_{};
+    std::array<bool, packets::MAX_GROUPS> m_hasMotorBaseline{};
 
     /// Previous average encoder position (in degrees) per configured motor-group slot.
-    std::array<double, packets::MAX_GROUPS> lastMotorPosDeg_{};
+    std::array<double, packets::MAX_GROUPS> m_lastMotorPosDeg{};
 };
 
 } // namespace brain
