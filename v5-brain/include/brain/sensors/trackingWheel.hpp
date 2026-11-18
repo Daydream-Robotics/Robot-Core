@@ -74,20 +74,17 @@ private:
     /// Number of PROS rotation sensor ticks (centidegrees) per full wheel revolution.
     static constexpr double TICKS_PER_REVOLUTION = 36000.0;
 
-    /// Mathematical constant pi used for wheel circumference calculations.
-    static constexpr double PI = 3.14159265358979323846;
-
     /// Non-owning encoder whose rotation is converted to distance.
-    Encoder& encoder_;
+    Encoder& m_encoder;
 
     /// Diameter and signed offset used for the distance conversion.
-    shared::TrackingWheelGeometry geometry_;
+    shared::TrackingWheelGeometry m_geometry;
 
     /// Cached total linear travel distance updated on each @ref update() call.
-    double distance_ = 0.0;
+    double m_distance = 0.0;
 
     /// Cached linear travel distance change since the previous @ref update() call.
-    double deltaDistance_ = 0.0;
+    double m_deltaDistance = 0.0;
 };
 
 } // namespace brain

@@ -6,8 +6,9 @@
  */
 
 #include "brain/sensors/trackingWheel.hpp"
-
 #include "brain/sensors/encoder.hpp"
+
+#include <numbers>
 
 namespace brain {
 
@@ -17,23 +18,23 @@ namespace brain {
  * @param geometry Physical wheel diameter and tracking-center offset.
  */
 TrackingWheel::TrackingWheel(Encoder& encoder, shared::TrackingWheelGeometry geometry)
-    : encoder_(encoder),
-      geometry_(geometry) {
+    : m_encoder(encoder),
+      m_geometry(geometry) {
     // Synchronize cached distance values with the encoder's initial state on construction.
     update();
 }
 
 /**
  * @brief Recompute cached linear distance and delta from the underlying encoder.
- * @todo Planned feature: Handle disconnected sensors (@c !encoder_.connected()) by zeroing
- *       @ref deltaDistance_ and flagging a sensor fault.
+ * @todo Planned feature: Handle disconnected sensors (@c !m_encoder.connected()) by zeroing
+ *       @ref m_deltaDistance and flagging a sensor fault.
  * @todo Planned feature: Apply external gear ratio scaling if non-1:1 gearing is added to
  *       @ref shared::TrackingWheelGeometry.
  */
 void TrackingWheel::update() {
     // Convert total accumulated ticks and per-tick delta ticks into linear distance.
-    distance_ = ticksToDistance(encoder_.getPosition(), geometry_.diameter);
-    deltaDistance_ = ticksToDistance(encoder_.getDelta(), geometry_.diameter);
+    m_distance = ticksToDistance(m_encoder.getPosition(), m_geometry.diameter);
+    m_deltaDistance = ticksToDistance(m_encoder.getDelta(), m_geometry.diameter);
 }
 
 /**
@@ -41,7 +42,7 @@ void TrackingWheel::update() {
  * @return Total distance traveled in the geometry's length units.
  */
 double TrackingWheel::distance() const {
-    return distance_;
+    return m_distance;
 }
 
 /**
@@ -49,7 +50,7 @@ double TrackingWheel::distance() const {
  * @return Distance delta in the geometry's length units.
  */
 double TrackingWheel::deltaDistance() const {
-    return deltaDistance_;
+    return m_deltaDistance;
 }
 
 /**
@@ -57,11 +58,11 @@ double TrackingWheel::deltaDistance() const {
  * @return Offset from the tracking center in the geometry's length units.
  */
 double TrackingWheel::offset() const {
-    return geometry_.offset;
+    return m_geometry.offset;
 }
 
 /**
- * @brief Convert angular encoder ticks into linear travel distance using @ref PI.
+ * @brief Convert angular encoder ticks into linear travel distance using @ref std::numbers::pi.
  * @param ticks Angular displacement in PROS rotation ticks (centidegrees).
  * @param wheelDiameter Diameter of the tracking wheel in target length units.
  * @return Linear travel distance in the same units as @p wheelDiameter.
@@ -72,9 +73,9 @@ double TrackingWheel::ticksToDistance(double ticks, double wheelDiameter) {
         return 0.0;
     }
 
-    // Convert raw ticks to full wheel revolutions, then multiply by circumference (PI * d).
+    // Convert raw ticks to full wheel revolutions, then multiply by circumference (std::numbers::pi * d).
     const double revolutions = ticks / TICKS_PER_REVOLUTION;
-    const double circumference = PI * wheelDiameter;
+    const double circumference = std::numbers::pi * wheelDiameter;
     return revolutions * circumference;
 }
 
