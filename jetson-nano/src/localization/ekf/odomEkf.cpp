@@ -1,7 +1,9 @@
 #include "localization/ekf/odomEkf.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <mutex>
 
 #include "config/constants.h"
 // TODO (#178): uncomment once odomInputs.hpp is merged in
@@ -31,30 +33,58 @@ void OdomEkf::step(const OdomInputs& in) {
         return;
     }
 
-    // link stall: the velocity may have changed arbitrarily, reopen its uncertainty
-    if (in.dt > ODOM_EKF_MAX_DT) {
-        m_P.bottomRightCorner<3, 3>() = initialP.bottomRightCorner<3, 3>();
-        m_P.topRightCorner<3, 3>().setZero();
-        m_P.bottomLeftCorner<3, 3>().setZero();
+    StampedPose pose;
+    PoseIncrement inc;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+
+        // state at the start of this cycle, the increment is measured from here
+        const State before = m_s;
+
+        // start of this cycle, Nano steady_clock (us)
+        const int64_t t0Us = in.tUs - std::llround(in.dt * 1e6);
+
+        // link stall: the velocity may have changed arbitrarily, reopen its uncertainty
+        if (in.dt > ODOM_EKF_MAX_DT) {
+            m_P.bottomRightCorner<3, 3>() = initialP.bottomRightCorner<3, 3>();
+            m_P.topRightCorner<3, 3>().setZero();
+            m_P.bottomLeftCorner<3, 3>().setZero();
+        }
+
+        // this cycle's covariance starts with the pose known exactly, only the velocity uncertainty carries in
+        m_Pstep = m_P;
+        m_Pstep.topRows<3>().setZero();
+        m_Pstep.leftCols<3>().setZero();
+
+        // move the state forward and grow P
+        predict(in.dt);
+
+        Measurement measurement = buildMeasurement(in);
+        // no valid source this cycle: coast on the prediction
+        if (measurement.z.size() != 0) {
+            update(measurement);
+        }
+
+        // this cycle ends now
+        m_tUs = in.tUs;
+
+        inc = stepIncrement(before, t0Us);
+        storeIncrement(inc);
+
+        // latest odometry-frame pose with its absolute covariance
+        pose = StampedPose{m_tUs, Pose{m_s[0], m_s[1], m_s[2]}, m_P.topLeftCorner<3, 3>()};
     }
 
-    // move the state forward and grow P
-    predict(in.dt);
-
-    Measurement measurement = buildMeasurement(in);
-    // no valid source this cycle: coast on the prediction
-    if (measurement.z.size() == 0) {
-        return;
-    }
-
-    update(measurement);
+    publish(pose, inc);
 }
 
-const OdomEkf::State& OdomEkf::state() const {
+OdomEkf::State OdomEkf::state() const {
+    std::lock_guard<std::mutex> lock(m_mutex);
     return m_s;
 }
 
-const OdomEkf::Cov& OdomEkf::covariance() const {
+OdomEkf::Cov OdomEkf::covariance() const {
+    std::lock_guard<std::mutex> lock(m_mutex);
     return m_P;
 }
 
@@ -62,6 +92,8 @@ void OdomEkf::reset(const Pose& pose) {
     if (!std::isfinite(pose.x) || !std::isfinite(pose.y) || !std::isfinite(pose.theta)) {
         return;
     }
+
+    std::lock_guard<std::mutex> lock(m_mutex);
 
     // zero everything, so v_x, v_y, omega start at rest
     m_s.setZero();
@@ -73,6 +105,121 @@ void OdomEkf::reset(const Pose& pose) {
 
     // drop the old covariance and correlations, start from the initial P
     m_P = initialP;
+
+    // the odometry frame jumped, so no increment can be composed across this point
+    m_incrementHead = 0;
+    m_incrementCount = 0;
+    m_Pstep.setZero();
+}
+
+void OdomEkf::onPose(PoseCallback cb) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_poseCallbacks.push_back(std::move(cb));
+}
+
+void OdomEkf::onIncrement(IncrementCallback cb) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_incrementCallbacks.push_back(std::move(cb));
+}
+
+std::optional<PoseIncrement> OdomEkf::increment(int64_t t0Us, int64_t t1Us) const {
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    if (t0Us >= t1Us || m_incrementCount == 0) {
+        return std::nullopt;
+    }
+
+    // oldest stored increment, the slot just past the newest once the buffer wraps
+    const int oldest = (m_incrementHead - m_incrementCount + INCREMENT_HISTORY) % INCREMENT_HISTORY;
+    // newest stored increment, the slot just before the head
+    const int newest = (m_incrementHead - 1 + INCREMENT_HISTORY) % INCREMENT_HISTORY;
+
+    // the span starts before the buffer (too old, or before a reset), or after the latest step
+    if (t0Us < m_increments[oldest].t0Us || t0Us >= m_increments[newest].t1Us) {
+        return std::nullopt;
+    }
+
+    // a span ending after the latest step stops at it
+    t1Us = std::min(t1Us, m_increments[newest].t1Us);
+
+    // start with no motion and no uncertainty
+    Pose delta{0.0, 0.0, 0.0};
+    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
+    // span actually covered
+    int64_t firstUs = 0;
+    int64_t lastUs = 0;
+    bool any = false;
+
+    for (int k = 0; k < m_incrementCount; ++k) {
+        const PoseIncrement& inc = m_increments[(oldest + k) % INCREMENT_HISTORY];
+
+        // skip cycles fully outside [t0Us, t1Us]
+        if (inc.t1Us <= t0Us || inc.t0Us >= t1Us) {
+            continue;
+        }
+
+        // both Jacobians at the old delta, before it's overwritten
+        const Eigen::Matrix3d Ja = se2::composeJacA(delta, inc.delta);
+        const Eigen::Matrix3d Jb = se2::composeJacB(delta);
+
+        // cycles treated as independent, an approximation
+        cov = Ja * cov * Ja.transpose() + Jb * inc.cov * Jb.transpose();
+        delta = se2::compose(delta, inc.delta);
+
+        if (!any) {
+            firstUs = inc.t0Us;
+            any = true;
+        }
+        lastUs = inc.t1Us;
+    }
+
+    if (!any) {
+        return std::nullopt;
+    }
+
+    return PoseIncrement{firstUs, lastUs, delta, cov};
+}
+
+Twist OdomEkf::twist() const {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    const double v = m_s[3];
+    const double omega = m_s[5];
+    Eigen::Matrix2d cov;
+    cov << m_P(3, 3), m_P(3, 5),
+           m_P(5, 3), m_P(5, 5);
+    return Twist{m_tUs, v, omega, cov};
+}
+
+PoseIncrement OdomEkf::stepIncrement(const State& before, int64_t t0Us) const {
+    // pose at the start and end of this cycle, odometry frame
+    const Pose p0{before[0], before[1], before[2]};
+    const Pose p1{m_s[0], m_s[1], m_s[2]};
+
+    // motion from p0 to p1 in p0's frame, theta wrapped
+    const Pose delta = se2::between(p0, p1);
+
+    // rotate x, y into p0's frame
+    Eigen::Matrix3d J = Eigen::Matrix3d::Identity();
+    J.topLeftCorner<2, 2>() = Eigen::Rotation2Dd(-before[2]).toRotationMatrix();
+    const Eigen::Matrix3d cov = J * m_Pstep.topLeftCorner<3, 3>() * J.transpose();
+
+    return PoseIncrement{t0Us, m_tUs, delta, cov};
+}
+
+void OdomEkf::storeIncrement(const PoseIncrement& inc) {
+    m_increments[m_incrementHead] = inc;
+    m_incrementHead = (m_incrementHead + 1) % INCREMENT_HISTORY;
+    m_incrementCount = std::min(m_incrementCount + 1, INCREMENT_HISTORY);
+}
+
+void OdomEkf::publish(const StampedPose& pose, const PoseIncrement& inc) {
+    for (const PoseCallback& cb : m_poseCallbacks) {
+        cb(pose);
+    }
+
+    for (const IncrementCallback& cb : m_incrementCallbacks) {
+        cb(inc);
+    }
 }
 
 void OdomEkf::predict(double dt) {
@@ -130,9 +277,12 @@ void OdomEkf::predict(double dt) {
 
     // propagate the uncertainty and add this cycle's process noise, in both velocity and pose
     m_P = F * m_P * F.transpose() + G * Qv * G.transpose();
+    // same propagation for this cycle's covariance
+    m_Pstep = F * m_Pstep * F.transpose() + G * Qv * G.transpose();
 
     // remove rounding asymmetry
     m_P = ((m_P + m_P.transpose()) / 2.0).eval();
+    m_Pstep = ((m_Pstep + m_Pstep.transpose()) / 2.0).eval();
 }
 
 OdomEkf::Measurement OdomEkf::buildMeasurement(const OdomInputs& in) const {
@@ -266,7 +416,10 @@ void OdomEkf::update(const Measurement& m) {
     // Joseph form, a sum of two symmetric products
     const Cov ikh = Cov::Identity() - K * hKept;
     m_P = ikh * m_P * ikh.transpose() + K * rKept * K.transpose();
+    // same correction for this cycle's covariance, with the gain from the full P
+    m_Pstep = ikh * m_Pstep * ikh.transpose() + K * rKept * K.transpose();
 
     // remove rounding asymmetry
     m_P = ((m_P + m_P.transpose()) / 2.0).eval();
+    m_Pstep = ((m_Pstep + m_Pstep.transpose()) / 2.0).eval();
 }
