@@ -85,7 +85,7 @@ public:
      * @brief Self-filters the scan and converts it to the robot frame, keeping timestamps for deskew (#142).
      *
      * @param scan Scan from this transform's sensor.
-     * @return RobotScan Kept points in the robot frame. Throws std::invalid_argument if scan.sensor_id doesn't match.
+     * @return RobotScan Kept points in the robot frame. Empty, with an error logged, if scan.sensor_id doesn't match.
      */
     RobotScan toRobotFrame(const Scan& scan) const;
 

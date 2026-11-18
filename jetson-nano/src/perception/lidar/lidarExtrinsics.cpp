@@ -1,6 +1,7 @@
 #include "perception/lidar/lidarExtrinsics.hpp"
 
 #include <cmath>
+#include <cstdio>
 #include <stdexcept>
 #include <utility>
 
@@ -65,7 +66,9 @@ LidarTransform::LidarTransform(LidarMount mount) : m_mount(std::move(mount)) {
 
 RobotScan LidarTransform::toRobotFrame(const Scan& scan) const {
     if (scan.sensor_id != m_mount.sensor_id) {
-        throw std::invalid_argument("scan sensor_id does not match LidarTransform mount");
+        std::fprintf(stderr, "[LiDAR %u] scan sent to the transform for sensor %u, dropped\n",
+                     unsigned(scan.sensor_id), unsigned(m_mount.sensor_id));
+        return RobotScan{};
     }
 
     RobotScan result;
@@ -81,8 +84,9 @@ RobotScan LidarTransform::toRobotFrame(const Scan& scan) const {
         // bearing_rad is already CCW-positive
         const double r = point.range_in;
         const double beta = point.bearing_rad;
-        if (!std::isfinite(r) || !std::isfinite(beta) || r <= 0.0 ||
+        if (!std::isfinite(r) || !std::isfinite(beta) ||
             r < m_mount.r_min_in || r > m_mount.r_max_in) {
+
             continue;
         }
         // masks are in the sensor frame
