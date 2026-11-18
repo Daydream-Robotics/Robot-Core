@@ -74,7 +74,7 @@ double TrackingWheel::ticksToDistance(double ticks, double wheelDiameter) {
 
     // Convert raw ticks to full wheel REVOLUTIONS, then multiply by CIRCUMFERENCE (PI * d).
     const double REVOLUTIONS = ticks / TICKS_PER_REVOLUTION;
-    const double CIRCUMFERENCE = PI * wheelDiameter;
+    const double CIRCUMFERENCE = std::numbers::pi * wheelDiameter;
     return REVOLUTIONS * CIRCUMFERENCE;
 }
 

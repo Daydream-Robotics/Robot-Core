@@ -83,9 +83,6 @@ private:
     /// Number of PROS rotation sensor ticks (centidegrees) per full wheel revolution.
     static constexpr double TICKS_PER_REVOLUTION = 36000.0;
 
-    /// Mathematical constant pi used for wheel circumference calculations.
-    static constexpr double PI = 3.14159265358979323846;
-
     /// Non-owning encoder whose rotation is converted to distance.
     Encoder& m_encoder;
 
