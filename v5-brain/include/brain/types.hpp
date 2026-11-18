@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 
+#include "odometry.hpp"
 #include "protocol/packets.hpp"
 
 namespace brain {
@@ -47,6 +48,10 @@ struct MotorGroupTelemetry {
 struct TrackingWheelTelemetry {
     /// Rotation change in centidegrees over the reported interval.
     std::int32_t delta = 0;
+    /// Linear wheel travel in configured length units during this acquisition cycle.
+    double distanceDelta = 0.0;
+    /// True when the latest travel delta has consecutive valid sensor readings.
+    bool deltaValid = false;
     /// Continuous sensor position in radians since the current configuration was applied.
     double positionRad = 0.0;
     /// Fault bits defined by the shared serial protocol.
@@ -59,6 +64,8 @@ struct SensorSnapshot {
     std::uint32_t sampledAt = 0;
     /// Heading change in centidegrees, counter-clockwise positive.
     std::int32_t headingDelta = 0;
+    /// True when headingDelta was measured between consecutive valid IMU readings.
+    bool headingDeltaValid = false;
     /// Number of valid entries in @ref motorGroups.
     std::uint8_t motorGroupCount = 0;
     /// Number of valid entries in @ref trackingWheels.
@@ -73,6 +80,10 @@ struct SensorSnapshot {
 struct BrainState {
     /// Most recent physical sensor readings.
     SensorSnapshot sensors{};
+    /// Latest local backup pose.
+    shared::Pose backupPose{};
+    /// Whether the backup pose is continuous since reset.
+    bool backupPoseValid = false;
     /// Most recent master-controller input.
     DriverInput driver{};
     /// V5 battery voltage in millivolts.

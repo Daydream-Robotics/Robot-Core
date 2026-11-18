@@ -9,7 +9,10 @@
 
 namespace brain {
 
-/** @brief Provides a selectable local odometry estimate from tracking data. */
+/** @brief Provides a selectable local odometry estimate from tracking data.
+ *  @note Call methods from one task, or synchronize access externally. When used
+ *  by AcquisitionTask, read the published pose from the BrainState mailbox.
+ */
 class BackupOdometry {
 public:
     /** @brief Bind the Brain adapter to the shared odometry calculation.
@@ -26,12 +29,16 @@ public:
      *  @return True when this adapter accepts updates.
      */
     bool enabled() const;
+    /** @brief Check whether the estimate has remained continuous.
+     *  @return True after a sample is integrated without a subsequent gap.
+     */
+    bool valid() const;
     /** @brief Apply sensor deltas to shared odometry when enabled.
      *  @param sensors Snapshot containing the latest wheel and heading deltas.
      *  @details Expects SensorService snapshots with the parallel wheel in slot 0
-     *  and perpendicular wheel in slot 1. Each wheel delta is in hundredths of
-     *  a configured length unit. Missing wheels cause the sample to be skipped.
-     *  Call once per acquisition cycle; deltas from skipped cycles are not recovered.
+     *  and perpendicular wheel in slot 1. Wheel travel is in configured length
+     *  units. Call once per acquisition cycle. Motion lost during a sensor outage
+     *  cannot be recovered; reset the pose to restore validity.
      */
     void update(const SensorSnapshot& sensors);
     /** @brief Get the current shared odometry pose.
@@ -48,6 +55,10 @@ private:
     shared::Odometry& m_odometry;
     /// Whether @ref update applies incoming sensor snapshots.
     bool m_enabled = false;
+    /// Whether the pose has remained continuous since the last reset.
+    bool m_valid = false;
+    /// Whether a usable sample has been integrated since the last reset.
+    bool m_hasReadySample = false;
 };
 
 } // namespace brain

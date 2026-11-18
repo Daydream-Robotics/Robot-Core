@@ -8,14 +8,16 @@
 
 #include "brain/sensors/sensorService.hpp"
 
-#include "brain/sensors/trackingWheel.hpp"
-#include "pros/rtos.hpp"
-
 #include <algorithm>
 #include <cerrno>
 #include <cmath>
 #include <numbers>
 #include <vector>
+
+#include "pros/error.h"
+#include "pros/rtos.hpp"
+
+#include "brain/sensors/trackingWheel.hpp"
 
 namespace brain {
 
@@ -47,19 +49,19 @@ std::uint8_t readMotorGroupFaults(pros::MotorGroup& group) {
     std::uint8_t flags = 0;
 
     errno = 0;
-    const std::vector<std::int32_t> overTemp = group.is_over_temp_all();
-    if (errno == ENODEV || overTemp.empty()) {
+    const std::vector<std::int32_t> OVER_TEMP = group.is_over_temp_all();
+    if (errno == ENODEV || OVER_TEMP.empty()) {
         return packets::fault::MISSING;
     }
 
-    for (std::int32_t tempFlag : overTemp) {
+    for (std::int32_t tempFlag : OVER_TEMP) {
         if (tempFlag != 0) {
             flags |= packets::fault::OVER_TEMP;
         }
     }
 
-    const std::vector<std::int32_t> overCurrent = group.is_over_current_all();
-    for (std::int32_t currentFlag : overCurrent) {
+    const std::vector<std::int32_t> OVER_CURRENT = group.is_over_current_all();
+    for (std::int32_t currentFlag : OVER_CURRENT) {
         if (currentFlag != 0) {
             flags |= packets::fault::OVER_CURRENT;
         }
@@ -92,39 +94,36 @@ SensorService::SensorService(pros::IMU& headingSensor,
 /**
  * @brief Sample all configured sensors and return a coherent @ref SensorSnapshot.
  * @return Populated @ref SensorSnapshot for the current acquisition tick.
- * @todo Planned feature: Verify whether @c TrackingWheelTelemetry::delta should carry raw
- *       wheel rotation centidegrees directly from @c Encoder::getDelta() or linear distance
- *       scaled into centidegrees; currently converts @c TrackingWheel::deltaDistance().
- * @todo Planned feature: Populate @c TrackingWheelTelemetry::faultFlags once @c TrackingWheel
- *       exposes underlying @c Encoder::connected() status.
  */
 SensorSnapshot SensorService::sample() {
     SensorSnapshot snapshot{};
 
     // 1. Sample IMU continuous rotation (PROS clockwise-positive -> protocol CCW-positive).
     errno = 0;
-    const double currentHeadingDeg = m_headingSensor.get_rotation();
-    if (errno == 0 && !m_headingSensor.is_calibrating() && std::isfinite(currentHeadingDeg)) {
+    const double CURRENT_HEADING_DEG = m_headingSensor.get_rotation();
+    if (errno == 0 && CURRENT_HEADING_DEG != PROS_ERR_F && !m_headingSensor.is_calibrating() && std::isfinite(CURRENT_HEADING_DEG)) {
         if (m_hasHeadingBaseline) {
-            const double deltaHeadingDeg = -(currentHeadingDeg - m_lastHeadingDeg);
-            snapshot.headingDelta = toCentidegrees(deltaHeadingDeg);
+            const double DELTA_HEADING_DEG = -(CURRENT_HEADING_DEG - m_lastHeadingDeg);
+            snapshot.headingDelta = toCentidegrees(DELTA_HEADING_DEG);
+            snapshot.headingDeltaValid = true;
         } else {
             snapshot.headingDelta = 0;
             m_hasHeadingBaseline = true;
         }
-        m_lastHeadingDeg = currentHeadingDeg;
+        m_lastHeadingDeg = CURRENT_HEADING_DEG;
     } else {
         snapshot.headingDelta = 0;
+        m_hasHeadingBaseline = false;
     }
 
     // 2. Sample configured motor groups up to protocol maximum.
-    const std::size_t validMotorGroups =
+    const std::size_t VALID_MOTOR_GROUPS =
         (m_motorGroups != nullptr)
             ? std::min<std::size_t>(m_motorGroupCount, packets::MAX_GROUPS)
             : 0U;
-    snapshot.motorGroupCount = static_cast<std::uint8_t>(validMotorGroups);
+    snapshot.motorGroupCount = static_cast<std::uint8_t>(VALID_MOTOR_GROUPS);
 
-    for (std::size_t i = 0; i < validMotorGroups; ++i) {
+    for (std::size_t i = 0; i < VALID_MOTOR_GROUPS; ++i) {
         pros::MotorGroup* group = m_motorGroups[i];
         MotorGroupTelemetry& telemetry = snapshot.motorGroups[i];
 
@@ -133,7 +132,7 @@ SensorSnapshot SensorService::sample() {
             continue;
         }
 
-        // Ensure motor group reports positions in degrees so centidegree conversion is exact.
+        // Ensure motor group reports POSITIONS in degrees so centidegree conversion is exact.
         group->set_encoder_units_all(pros::E_MOTOR_ENCODER_DEGREES);
 
         telemetry.faultFlags = readMotorGroupFaults(*group);
@@ -145,13 +144,13 @@ SensorSnapshot SensorService::sample() {
         }
 
         // Average position across motors in the group (in degrees).
-        const std::vector<double> positions = group->get_position_all();
+        const std::vector<double> POSITIONS = group->get_position_all();
         double avgPosDeg = 0.0;
-        if (!positions.empty()) {
-            for (double pos : positions) {
+        if (!POSITIONS.empty()) {
+            for (double pos : POSITIONS) {
                 avgPosDeg += pos;
             }
-            avgPosDeg /= static_cast<double>(positions.size());
+            avgPosDeg /= static_cast<double>(POSITIONS.size());
         }
 
         if (m_hasMotorBaseline[i]) {
@@ -163,25 +162,25 @@ SensorSnapshot SensorService::sample() {
         m_lastMotorPosDeg[i] = avgPosDeg;
 
         // Average output-shaft velocity across motors in the group (RPM -> rad/s).
-        const std::vector<double> velocities = group->get_actual_velocity_all();
+        const std::vector<double> VELOCITIES = group->get_actual_velocity_all();
         double avgRpm = 0.0;
-        if (!velocities.empty()) {
-            for (double rpm : velocities) {
+        if (!VELOCITIES.empty()) {
+            for (double rpm : VELOCITIES) {
                 avgRpm += rpm;
             }
-            avgRpm /= static_cast<double>(velocities.size());
+            avgRpm /= static_cast<double>(VELOCITIES.size());
         }
         telemetry.velocity = static_cast<float>(avgRpm * RPM_TO_RAD_PER_SEC);
     }
 
     // 3. Sample configured tracking wheels up to protocol maximum.
-    const std::size_t validTrackingWheels =
+    const std::size_t VALID_TRACKING_WHEELS =
         (m_trackingWheels != nullptr)
             ? std::min<std::size_t>(m_trackingWheelCount, packets::MAX_ROTATIONS)
             : 0U;
-    snapshot.trackingWheelCount = static_cast<std::uint8_t>(validTrackingWheels);
+    snapshot.trackingWheelCount = static_cast<std::uint8_t>(VALID_TRACKING_WHEELS);
 
-    for (std::size_t i = 0; i < validTrackingWheels; ++i) {
+    for (std::size_t i = 0; i < VALID_TRACKING_WHEELS; ++i) {
         TrackingWheel* wheel = m_trackingWheels[i];
         TrackingWheelTelemetry& telemetry = snapshot.trackingWheels[i];
 
@@ -192,10 +191,10 @@ SensorSnapshot SensorService::sample() {
         }
 
         wheel->update();
-        // TODO: Confirm unit convention between TrackingWheel::deltaDistance() and protocol
-        //       TrackingWheelTelemetry::delta (centidegrees of wheel rotation vs. scaled length).
-        telemetry.delta = toCentidegrees(wheel->deltaDistance());
-        telemetry.faultFlags = 0;
+        telemetry.delta = static_cast<std::int32_t>(wheel->deltaRotation());
+        telemetry.distanceDelta = wheel->deltaDistance();
+        telemetry.deltaValid = wheel->deltaValid();
+        if (!telemetry.deltaValid) telemetry.faultFlags = packets::fault::MISSING;
     }
 
     // 4. Capture microsecond timestamp after all device reads complete (per StateFixed::tUs spec).
