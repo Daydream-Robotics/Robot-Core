@@ -6,26 +6,8 @@
 #include <mutex>
 
 #include "config/constants.h"
-// TODO (#178): uncomment once odomInputs.hpp is merged in
-// #include "localization/ekf/odomInputs.hpp"
+#include "localization/ekf/odomInputs.hpp"
 #include "utils/mathHelpers.hpp"
-
-// TODO (#178): delete this temporary copy of OdomInputs once odomInputs.hpp is merged in
-struct OdomInputs {
-    int64_t tUs = 0; // end of this cycle, Nano steady_clock (us)
-    double dt = 0.0; // seconds since the previous OdomInputs
-
-    double dsPar = 0.0; // parallel tracking wheel travel (in)
-    double dsPerp = 0.0; // perpendicular tracking wheel travel (in)
-    double dsLeft = 0.0; // left drive travel from IMEs (in)
-    double dsRight = 0.0; // right drive travel from IMEs (in)
-    double dTheta = 0.0; // IMU heading change, CCW+ (rad)
-
-    bool parValid = false;
-    bool perpValid = false;
-    bool imeValid = false;
-    bool imuValid = false;
-};
 
 void OdomEkf::step(const OdomInputs& in) {
     // skip a duplicate, out-of-order, or infinite dt
