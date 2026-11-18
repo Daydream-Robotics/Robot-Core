@@ -28,6 +28,10 @@ public:
     bool enabled() const;
     /** @brief Apply sensor deltas to shared odometry when enabled.
      *  @param sensors Snapshot containing the latest wheel and heading deltas.
+     *  @details Expects SensorService snapshots with the parallel wheel in slot 0
+     *  and perpendicular wheel in slot 1. Each wheel delta is in hundredths of
+     *  a configured length unit. Missing wheels cause the sample to be skipped.
+     *  Call once per acquisition cycle; deltas from skipped cycles are not recovered.
      */
     void update(const SensorSnapshot& sensors);
     /** @brief Get the current shared odometry pose.
@@ -41,9 +45,9 @@ public:
 
 private:
     /// Non-owning shared odometry instance used for pose estimation.
-    shared::Odometry& odometry_;
+    shared::Odometry& m_odometry;
     /// Whether @ref update applies incoming sensor snapshots.
-    bool enabled_ = false;
+    bool m_enabled = false;
 };
 
 } // namespace brain
