@@ -112,6 +112,21 @@ constexpr double ODOM_EKF_IMU_BIAS_SIGMA = 0.005; // IMU heading drift (rad/s), 
 // per-row outlier gate on nu^2 / S, chi-squared 1 DOF at 99%
 constexpr double ODOM_EKF_ROW_GATE = 6.63;
 
+/* - - - - - - - - - - - - - - [ODOM INPUTS] - - - - - - - - - - - - - - */
+// link sample -> OdomInputs (jetson-nano/src/localization/ekf/odomInputs.cpp)
+
+// slots in the link config, TODO: confirm against the config the Nano sends the brain
+constexpr int ODOM_LEFT_GROUP = 0; // left drive motor group
+constexpr int ODOM_RIGHT_GROUP = 1; // right drive motor group
+constexpr int ODOM_PAR_WHEEL = 0; // parallel tracking wheel rotation sensor
+constexpr int ODOM_PERP_WHEEL = 1; // perpendicular tracking wheel rotation sensor
+
+// sanity limits, faster than this can't be real motion
+constexpr double ODOM_INPUT_MAX_SPEED = 200.0; // in/s, 2 in per 10 ms
+constexpr double ODOM_INPUT_MAX_OMEGA = 20.0; // rad/s
+constexpr double ODOM_INPUT_STALL_DT = 0.2; // s, longer gap means the link stalled
+
+
 /* - - - - - - - - - - - - - - [FULL EKF] - - - - - - - - - - - - - - */
 // starting guesses, tune with robot logs (jetson-nano/src/localization/ekf/fullEkf.cpp)
 

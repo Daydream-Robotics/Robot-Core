@@ -76,6 +76,8 @@ add_library(robotcore_ekf STATIC
     src/localization/ekf/odomEkf.cpp
     src/localization/ekf/fullEkf.cpp
 )
+# the EKF only runs on the Nano, and OdomInputs pulls in SerialLink::Sample
+target_compile_definitions(robotcore_ekf PRIVATE __jetson_nano__)
 target_include_directories(robotcore_ekf PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
@@ -100,6 +102,7 @@ if(ROBOTCORE_BUILD_NANO_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/link/serial.cpp
         src/link/serialProtocol.cpp
         src/localization/imu/bno085.cpp
+        src/localization/ekf/odomInputs.cpp
         ../shared/src/protocol/serialProtocol.cpp
     )
     target_compile_definitions(MPCController PRIVATE __jetson_nano__)

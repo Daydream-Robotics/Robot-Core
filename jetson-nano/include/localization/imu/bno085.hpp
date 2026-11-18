@@ -70,16 +70,16 @@ public:
      *
      * @param cfg Bus, address, and rates.
      */
-    explicit Bno085(Config cfg);
+    explicit BNO085(Config cfg);
 
     /**
      * @brief Stops the read thread and closes the bus.
      */
-    ~Bno085();
+    ~BNO085();
 
     // owns a thread and a file descriptor, so it can't be copied or moved
-    Bno085(const Bno085&) = delete;
-    Bno085& operator=(const Bno085&) = delete;
+    BNO085(const BNO085&) = delete;
+    BNO085& operator=(const BNO085&) = delete;
 
     /**
      * @brief Opens the bus, resets the chip, checks it answers, enables its reports, and starts the read thread.

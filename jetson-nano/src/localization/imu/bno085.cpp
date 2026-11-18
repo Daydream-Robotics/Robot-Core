@@ -104,9 +104,9 @@ size_t reportLength(uint8_t id) {
 
 } 
 
-Bno085::Bno085(Config cfg) : m_cfg(std::move(cfg)) {}
+BNO085::BNO085(Config cfg) : m_cfg(std::move(cfg)) {}
 
-Bno085::~Bno085() {
+BNO085::~BNO085() {
     // join the read thread first so it can't touch the bus after it's closed
     stop();
     // -1 means the bus was never opened (or is closed)
@@ -116,7 +116,7 @@ Bno085::~Bno085() {
     }
 }
 
-bool Bno085::start() {
+bool BNO085::start() {
     // already running
     if (m_running) {
         return true;
@@ -172,11 +172,11 @@ bool Bno085::start() {
     }
 
     // run() on this object in its own thread
-    m_thread = std::thread(&Bno085::run, this);
+    m_thread = std::thread(&BNO085::run, this);
     return true;
 }
 
-void Bno085::stop() {
+void BNO085::stop() {
     // tell run() to exit its loop
     m_running = false;
     // wait for the thread to finish. joinable() is false if it was never started or is already joined
@@ -190,7 +190,7 @@ void Bno085::stop() {
     }
 }
 
-std::optional<double> Bno085::headingIncrement(int64_t t0Us, int64_t t1Us) const {
+std::optional<double> BNO085::headingIncrement(int64_t t0Us, int64_t t1Us) const {
     // one lock for the validity check and both lookups
     std::lock_guard<std::mutex> lock(m_mutex);
     if (!m_health.valid) {
@@ -208,12 +208,12 @@ std::optional<double> Bno085::headingIncrement(int64_t t0Us, int64_t t1Us) const
     return *theta1 - *theta0;
 }
 
-Bno085::Health Bno085::health() const {
+BNO085::Health BNO085::health() const {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_health;
 }
 
-bool Bno085::resetAndConfigure() {
+bool BNO085::resetAndConfigure() {
     using namespace std::chrono_literals;
 
     // soft reset, retried for about 1s in case the chip is still booting and NAKs the write
@@ -262,7 +262,7 @@ bool Bno085::resetAndConfigure() {
     return configure();
 }
 
-bool Bno085::configure() {
+bool BNO085::configure() {
     // calibrate accel and gyro while running.
     // params: P0 accel, P1 gyro, P2 mag, P3 subcommand (0 = configure), P4 planar accel
     if (!sendCommand(CMD_ME_CALIBRATION, {1, 1, 0, 0, 1})) {
@@ -288,7 +288,7 @@ bool Bno085::configure() {
 }
 
 
-void Bno085::run() {
+void BNO085::run() {
     // monotonic clock for scheduling
     using clock = std::chrono::steady_clock;
 
@@ -372,7 +372,7 @@ void Bno085::run() {
 }
 
 
-void Bno085::recover() {
+void BNO085::recover() {
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_health.resets++;
@@ -391,7 +391,7 @@ void Bno085::recover() {
 }
 
 
-void Bno085::handlePacket(const Packet& p) {
+void BNO085::handlePacket(const Packet& p) {
     switch (p.channel) {
         case CH_EXECUTABLE:
             // a reset complete we didn't ask for: brownout, watchdog, or the reset pin. Every report is off now
@@ -423,7 +423,7 @@ void Bno085::handlePacket(const Packet& p) {
     }
 }
 
-void Bno085::handleReports(const Packet& p) {
+void BNO085::handleReports(const Packet& p) {
     // without the INT pin the chip raised its interrupt sometime in the last poll period, so take the middle
     const int64_t hostIntUs = p.readUs - 500'000 / m_cfg.pollHz;
     // offset from hostIntUs to the batch's base time, in 100 us ticks. Same math as CEVA's sh2.c:
@@ -479,7 +479,7 @@ void Bno085::handleReports(const Packet& p) {
     }
 }
 
-void Bno085::addHeading(int64_t tUs, double yaw, uint8_t accuracy) {
+void BNO085::addHeading(int64_t tUs, double yaw, uint8_t accuracy) {
     yaw *= m_cfg.yawSign;
     // unwrap and add the short way around from the last yaw, so theta keeps counting past +-pi
     if (m_haveYaw) {
@@ -508,7 +508,7 @@ void Bno085::addHeading(int64_t tUs, double yaw, uint8_t accuracy) {
     m_health.valid = accuracy >= NANO_IMU_ACCURACY_TRUSTED;
 }
 
-void Bno085::invalidate() {
+void BNO085::invalidate() {
     // the next report starts a new unwrap, theta carries on from where it was
     m_haveYaw = false;
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -519,7 +519,7 @@ void Bno085::invalidate() {
 }
 
 
-std::optional<double> Bno085::thetaAt(int64_t tUs) const {
+std::optional<double> BNO085::thetaAt(int64_t tUs) const {
     // no samples yet
     if (m_historyCount == 0) {
         return std::nullopt;
@@ -569,7 +569,7 @@ std::optional<double> Bno085::thetaAt(int64_t tUs) const {
     return std::nullopt;
 }
 
-bool Bno085::enableReport(uint8_t reportId, uint32_t intervalUs) {
+bool BNO085::enableReport(uint8_t reportId, uint32_t intervalUs) {
     // Set Feature: ID, report, flags, change sensitivity (2), report interval (4), batch interval (4), sensor config (4)
     std::vector<uint8_t> cmd(17, 0);
     cmd[0] = SET_FEATURE;
@@ -598,7 +598,7 @@ bool Bno085::enableReport(uint8_t reportId, uint32_t intervalUs) {
     return true;
 }
 
-bool Bno085::sendCommand(uint8_t command, const std::vector<uint8_t>& params) {
+bool BNO085::sendCommand(uint8_t command, const std::vector<uint8_t>& params) {
     // Command Request: ID, sequence, command, P0-P8
     std::vector<uint8_t> cmd(12, 0);
     cmd[0] = COMMAND_REQUEST;
@@ -610,7 +610,7 @@ bool Bno085::sendCommand(uint8_t command, const std::vector<uint8_t>& params) {
     return writePacket(CH_CONTROL, cmd);
 }
 
-bool Bno085::waitFor(int timeoutMs, const std::function<bool(const Packet&)>& match, Packet& out) {
+bool BNO085::waitFor(int timeoutMs, const std::function<bool(const Packet&)>& match, Packet& out) {
     using namespace std::chrono_literals;
     const int64_t deadline = nowUs() + static_cast<int64_t>(timeoutMs) * 1000;
 
@@ -628,7 +628,7 @@ bool Bno085::waitFor(int timeoutMs, const std::function<bool(const Packet&)>& ma
 }
 
 
-bool Bno085::writePacket(uint8_t channel, const std::vector<uint8_t>& payload) {
+bool BNO085::writePacket(uint8_t channel, const std::vector<uint8_t>& payload) {
     // bus not open
     if (m_fd < 0) {
         return false;
@@ -648,7 +648,7 @@ bool Bno085::writePacket(uint8_t channel, const std::vector<uint8_t>& payload) {
     return write(m_fd, buf.data(), buf.size()) == static_cast<ssize_t>(buf.size());
 }
 
-bool Bno085::readPacket(Packet& out) {
+bool BNO085::readPacket(Packet& out) {
     out.payload.clear();
     out.readUs = nowUs();
 
