@@ -20,6 +20,10 @@ void OdomEkf::step(const OdomInputs& in) {
     {
         std::lock_guard<std::mutex> lock(m_mutex);
 
+        // clear this cycle's flags
+        m_health.slipThisCycle = false;
+        m_health.predictOnly = false;
+
         // state at the start of this cycle, the increment is measured from here
         const State before = m_s;
 
@@ -46,6 +50,14 @@ void OdomEkf::step(const OdomInputs& in) {
         if (measurement.z.size() != 0) {
             update(measurement);
         }
+        else {
+            // nothing applied this cycle
+            m_health.predictOnly = true;
+        }
+
+        // forward acceleration over this cycle, for next cycle's IME noise
+        m_accelX = std::abs(m_s[3] - m_prevVx) / in.dt;
+        m_prevVx = m_s[3];
 
         // this cycle ends now
         m_tUs = in.tUs;
@@ -92,6 +104,10 @@ void OdomEkf::reset(const Pose& pose) {
     m_incrementHead = 0;
     m_incrementCount = 0;
     m_Pstep.setZero();
+
+    // velocity restarts at zero
+    m_prevVx = 0.0;
+    m_accelX = 0.0;
 }
 
 void OdomEkf::onPose(PoseCallback cb) {
@@ -170,6 +186,11 @@ Twist OdomEkf::twist() const {
     cov << m_P(3, 3), m_P(3, 5),
            m_P(5, 3), m_P(5, 5);
     return Twist{m_tUs, v, omega, cov};
+}
+
+OdomHealth OdomEkf::health() const {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_health;
 }
 
 PoseIncrement OdomEkf::stepIncrement(const State& before, int64_t t0Us) const {
@@ -286,9 +307,10 @@ OdomEkf::Measurement OdomEkf::buildMeasurement(const OdomInputs& in) const {
 
     int row = 0;
 
-    // writes one row (measured value, H in the vX, vY, omega columns, sigma squared into R) and moves to the next
-    const auto addRow = [&](double zVal, double hVx, double hVy, double hOmega, double sigma) {
+    // writes one row (measured value, its source, H in the vX, vY, omega columns, sigma squared into R) and moves to the next
+    const auto addRow = [&](double zVal, Measurement::Source s, double hVx, double hVy, double hOmega, double sigma) {
         m.z(row) = zVal;
+        m.src[row] = s;
         m.H(row, 3) = hVx;
         m.H(row, 4) = hVy;
         m.H(row, 5) = hOmega;
@@ -300,30 +322,33 @@ OdomEkf::Measurement OdomEkf::buildMeasurement(const OdomInputs& in) const {
     if (in.parValid) {
         const double hOmega = dt * PARALLEL_TRACKING_WHEEL_OFFSET;
         const double sigma = ODOM_EKF_TRACKING_SIGMA_PER_IN * std::abs(in.dsPar) + ODOM_EKF_TRACKING_SIGMA_FLOOR;
-        addRow(in.dsPar, dt, 0.0, hOmega, sigma);
+        addRow(in.dsPar, Measurement::PAR, dt, 0.0, hOmega, sigma);
     }
 
     // perpendicular wheel: dt * (vY - offset * omega), offset positive behind
     if (in.perpValid) {
         const double hOmega = -dt * PERPENDICULAR_TRACKING_WHEEL_OFFSET;
         const double sigma = ODOM_EKF_TRACKING_SIGMA_PER_IN * std::abs(in.dsPerp) + ODOM_EKF_TRACKING_SIGMA_FLOOR;
-        addRow(in.dsPerp, 0.0, dt, hOmega, sigma);
+        addRow(in.dsPerp, Measurement::PERP, 0.0, dt, hOmega, sigma);
     }
 
     // drive IMEs: dt * (vX -/+ omega * track / 2), noisier and worse in turns
     if (in.imeValid) {
         const double hOmega = dt * TRACK_WIDTH / 2.0;
-        const double turnSigma = ODOM_EKF_IME_SIGMA_PER_OMEGA * absOmega + ODOM_EKF_IME_SIGMA_FLOOR;
+        // error shared by both sides: turn scrub, acceleration, and the floor
+        const double turnSigma = ODOM_EKF_IME_SIGMA_PER_OMEGA * absOmega
+                               + ODOM_EKF_IME_SIGMA_PER_ACCEL * m_accelX
+                               + ODOM_EKF_IME_SIGMA_FLOOR;
         const double sigmaLeft = ODOM_EKF_IME_SIGMA_PER_IN * std::abs(in.dsLeft) + turnSigma;
         const double sigmaRight = ODOM_EKF_IME_SIGMA_PER_IN * std::abs(in.dsRight) + turnSigma;
-        addRow(in.dsLeft, dt, 0.0, -hOmega, sigmaLeft);
-        addRow(in.dsRight, dt, 0.0, hOmega, sigmaRight);
+        addRow(in.dsLeft, Measurement::IME_L, dt, 0.0, -hOmega, sigmaLeft);
+        addRow(in.dsRight, Measurement::IME_R, dt, 0.0, hOmega, sigmaRight);
     }
 
     // IMU: dt * omega, heading jitter plus drift times dt
     if (in.imuValid) {
         const double sigma = ODOM_EKF_IMU_NOISE_DENSITY * std::sqrt(dt) + ODOM_EKF_IMU_BIAS_SIGMA * dt;
-        addRow(in.dTheta, 0.0, 0.0, dt, sigma);
+        addRow(in.dTheta, Measurement::IMU, 0.0, 0.0, dt, sigma);
     }
 
     // a source counted but not added (or the reverse) would leave bad rows, skip the update instead
@@ -349,6 +374,11 @@ void OdomEkf::update(const Measurement& m) {
     // column i is P * H_i^T
     const Gain PHt = m_P * m.H.transpose();
 
+    // gate results for the slip check
+    bool imeLRejected = false;
+    bool imeRRejected = false;
+    bool parAccepted = false;
+
     // drop any row whose disagreement with the prediction is too big to be noise
     for (int i = 0; i < rows; ++i) {
         // this row of H, 1 x 6, picks the states the source measures
@@ -361,11 +391,42 @@ void OdomEkf::update(const Measurement& m) {
         const double d2 = nuI * nuI / sII;
         if (d2 <= ODOM_EKF_ROW_GATE) {
             keptRows[keptCount++] = i;
+            // parallel wheel passed the gate
+            if (m.src[i] == Measurement::PAR) {
+                parAccepted = true;
+            }
+        }
+        else {
+            // count the rejection against its source
+            switch (m.src[i]) {
+                case Measurement::PAR:
+                    ++m_health.rejectedPar;
+                    break;
+                case Measurement::PERP:
+                    ++m_health.rejectedPerp;
+                    break;
+                case Measurement::IME_L:
+                    ++m_health.rejectedIme;
+                    imeLRejected = true;
+                    break;
+                case Measurement::IME_R:
+                    ++m_health.rejectedIme;
+                    imeRRejected = true;
+                    break;
+                case Measurement::IMU:
+                    ++m_health.rejectedImu;
+                    break;
+            }
         }
     }
 
+    // drive wheels slipped: both IMEs rejected, parallel wheel kept
+    m_health.slipThisCycle = imeLRejected && imeRRejected && parAccepted;
+
     // every source disagreed, so coast on the prediction
     if (keptCount == 0) {
+        // nothing applied this cycle
+        m_health.predictOnly = true;
         return;
     }
 

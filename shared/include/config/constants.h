@@ -104,6 +104,7 @@ constexpr double ODOM_EKF_TRACKING_SIGMA_FLOOR = 0.002; // tracking wheel error 
 constexpr double ODOM_EKF_IME_SIGMA_PER_IN = 0.05; // drive IME error per inch of travel, drive wheels slip
 constexpr double ODOM_EKF_IME_SIGMA_PER_OMEGA = 0.01; // extra IME error per rad/s of turn rate (in), wheel scrub in turns
 constexpr double ODOM_EKF_IME_SIGMA_FLOOR = 0.005; // drive IME error when still (in)
+constexpr double ODOM_EKF_IME_SIGMA_PER_ACCEL = 1e-4; // extra IME error per in/s^2 of forward acceleration (in), placeholder, 0.02 in at 200 in/s^2
 // TODO (#193): retune on the robot, these are the BNO055's integrated-gyro values. The BNO085 game
 // rotation vector's increment error is mostly heading jitter plus drift (about 0.5 deg/min, 1.5e-4 rad/s)
 constexpr double ODOM_EKF_IMU_NOISE_DENSITY = 2.4e-4; // IMU increment noise (rad/sqrt(s)), heading sigma = this * sqrt(dt)
