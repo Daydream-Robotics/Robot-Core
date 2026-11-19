@@ -26,6 +26,22 @@ struct Twist {
 };
 
 /**
+ * @brief Gate rejections and health flags for logging and the MPC.
+ */
+struct OdomHealth {
+    uint32_t rejectedPar = 0; ///< parallel wheel rows rejected, since startup
+    uint32_t rejectedPerp = 0; ///< perpendicular wheel rows rejected, since startup
+    uint32_t rejectedIme = 0; ///< IME rows rejected, both sides, since startup
+    uint32_t rejectedImu = 0; ///< IMU rows rejected, since startup
+    uint32_t offeredPar = 0;  ///< parallel wheel rows that reached the gate, since startup
+    uint32_t offeredPerp = 0; ///< perpendicular wheel rows that reached the gate, since startup
+    uint32_t offeredIme = 0; ///< IME rows that reached the gate, both sides, since startup
+    uint32_t offeredImu = 0; ///< IMU rows that reached the gate, since startup
+    bool slipThisCycle = false; ///< both IMEs rejected while the parallel wheel was kept
+    bool predictOnly = false; ///< no row was applied this cycle
+};
+
+/**
  * @brief Odometry EKF: fuses tracking wheels, IMEs, and IMU. Takes relative movements.
  *
  * State is (x, y, theta, v_x, v_y, omega). Pose is in the odometry frame, and v_x, v_y are
@@ -116,6 +132,13 @@ public:
      */
     Twist twist() const;
 
+    /**
+     * @brief Rejection counts and this cycle's health flags.
+     *
+     * @return OdomHealth A copy.
+     */
+    OdomHealth health() const;
+
 private:
     static constexpr int MAX_ROWS = 5; ///< parallel, perpendicular, two IMEs, IMU
 
@@ -131,6 +154,8 @@ private:
         MeasVec z; ///< measured increments, one row per valid source
         MeasMat H; ///< maps the state to each row
         MeasCov R; ///< measurement noise, diagonal
+        enum Source : uint8_t { PAR, PERP, IME_L, IME_R, IMU }; ///< sensor a row came from
+        std::array<Source, MAX_ROWS> src{}; ///< which sensor each row came from
     };
 
     /**
@@ -154,6 +179,14 @@ private:
      * @param m Measurement from buildMeasurement().
      */
     void update(const Measurement& m);
+
+    /**
+     * @brief Counts one gated row against its source: always offered, rejected if it failed the gate.
+     *
+     * @param src Sensor the row came from.
+     * @param kept True if the row passed the gate.
+     */
+    void countRow(Measurement::Source src, bool kept);
 
     /**
      * @brief This cycle's increment, from the pose before predict() to the pose after update().
@@ -204,4 +237,8 @@ private:
     std::array<PoseIncrement, INCREMENT_HISTORY> m_increments{}; ///< ring buffer, oldest overwritten first
     int m_incrementHead = 0; ///< index the next increment is written to
     int m_incrementCount = 0; ///< how many of m_increments are filled
+
+    OdomHealth m_health; ///< returned by health()
+    double m_prevVx = 0.0; ///< v_x at the end of the previous step (in/s)
+    double m_accelX = 0.0; ///< |forward acceleration| over the previous step (in/s^2), used in the IME noise
 };
