@@ -37,7 +37,7 @@ int applyDeadband(int value) {
 
 } // namespace
 
-MotorCommand ManualControl::command(const DriverInput& input) const {
+MotorCommand ManualControl::command(const DriverInput& input) {
     MotorCommand command{};   // starts with groupCount 0, every group Stop
 
     // no controller, so stop everything
@@ -70,7 +70,7 @@ MotorCommand ControlModeCoordinator::select(RobotMode mode,
     switch (mode) {
         case RobotMode::Manual:
             // the driver is in charge
-            return ManualControl{}.command(input);
+            return ManualControl::command(input);
 
         case RobotMode::Autonomous:
             // only trust the Nano when there is a command, it passed validation, and the link is up
