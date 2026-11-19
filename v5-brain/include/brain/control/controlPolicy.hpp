@@ -15,7 +15,7 @@ public:
      *  @param input Controller snapshot to interpret.
      *  @return Motor-group command for manual operation.
      */
-    MotorCommand command(const DriverInput& input) const;
+    static MotorCommand command(const DriverInput& input);
 };
 
 /** @brief Selects the command source appropriate for the robot's current mode. */
