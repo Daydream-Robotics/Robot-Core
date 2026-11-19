@@ -193,6 +193,39 @@ OdomHealth OdomEkf::health() const {
     return m_health;
 }
 
+void OdomEkf::countRow(Measurement::Source src, bool kept) {
+    // this source's counters
+    uint32_t* offered = nullptr;
+    uint32_t* rejected = nullptr;
+    switch (src) {
+        case Measurement::PAR:
+            offered = &m_health.offeredPar;
+            rejected = &m_health.rejectedPar;
+            break;
+        case Measurement::PERP:
+            offered = &m_health.offeredPerp;
+            rejected = &m_health.rejectedPerp;
+            break;
+        case Measurement::IME_L:
+        case Measurement::IME_R:
+            offered = &m_health.offeredIme;
+            rejected = &m_health.rejectedIme;
+            break;
+        case Measurement::IMU:
+            offered = &m_health.offeredImu;
+            rejected = &m_health.rejectedImu;
+            break;
+    }
+    if (offered == nullptr) {
+        return;
+    }
+
+    ++*offered;
+    if (!kept) {
+        ++*rejected;
+    }
+}
+
 PoseIncrement OdomEkf::stepIncrement(const State& before, int64_t t0Us) const {
     // pose at the start and end of this cycle, odometry frame
     const Pose p0{before[0], before[1], before[2]};
@@ -389,7 +422,12 @@ void OdomEkf::update(const Measurement& m) {
         const double sII = hRow.dot(PHt.col(i)) + m.R(i, i);
         // innovation in its own standard deviations (squared)
         const double d2 = nuI * nuI / sII;
-        if (d2 <= ODOM_EKF_ROW_GATE) {
+        const bool kept = d2 <= ODOM_EKF_ROW_GATE;
+
+        // offered and rejected counts for this row's source
+        countRow(m.src[i], kept);
+
+        if (kept) {
             keptRows[keptCount++] = i;
             // parallel wheel passed the gate
             if (m.src[i] == Measurement::PAR) {
@@ -397,25 +435,12 @@ void OdomEkf::update(const Measurement& m) {
             }
         }
         else {
-            // count the rejection against its source
-            switch (m.src[i]) {
-                case Measurement::PAR:
-                    ++m_health.rejectedPar;
-                    break;
-                case Measurement::PERP:
-                    ++m_health.rejectedPerp;
-                    break;
-                case Measurement::IME_L:
-                    ++m_health.rejectedIme;
-                    imeLRejected = true;
-                    break;
-                case Measurement::IME_R:
-                    ++m_health.rejectedIme;
-                    imeRRejected = true;
-                    break;
-                case Measurement::IMU:
-                    ++m_health.rejectedImu;
-                    break;
+            // which IME side was rejected, for the slip check
+            if (m.src[i] == Measurement::IME_L) {
+                imeLRejected = true;
+            }
+            if (m.src[i] == Measurement::IME_R) {
+                imeRRejected = true;
             }
         }
     }

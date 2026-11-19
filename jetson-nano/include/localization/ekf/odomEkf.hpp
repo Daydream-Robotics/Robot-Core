@@ -33,6 +33,10 @@ struct OdomHealth {
     uint32_t rejectedPerp = 0; ///< perpendicular wheel rows rejected, since startup
     uint32_t rejectedIme = 0; ///< IME rows rejected, both sides, since startup
     uint32_t rejectedImu = 0; ///< IMU rows rejected, since startup
+    uint32_t offeredPar = 0;  ///< parallel wheel rows that reached the gate, since startup
+    uint32_t offeredPerp = 0; ///< perpendicular wheel rows that reached the gate, since startup
+    uint32_t offeredIme = 0; ///< IME rows that reached the gate, both sides, since startup
+    uint32_t offeredImu = 0; ///< IMU rows that reached the gate, since startup
     bool slipThisCycle = false; ///< both IMEs rejected while the parallel wheel was kept
     bool predictOnly = false; ///< no row was applied this cycle
 };
@@ -175,6 +179,14 @@ private:
      * @param m Measurement from buildMeasurement().
      */
     void update(const Measurement& m);
+
+    /**
+     * @brief Counts one gated row against its source: always offered, rejected if it failed the gate.
+     *
+     * @param src Sensor the row came from.
+     * @param kept True if the row passed the gate.
+     */
+    void countRow(Measurement::Source src, bool kept);
 
     /**
      * @brief This cycle's increment, from the pose before predict() to the pose after update().
