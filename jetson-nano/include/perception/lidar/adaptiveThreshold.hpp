@@ -12,15 +12,13 @@
 class AdaptiveThreshold {
 public:
     /**
-     * @brief Constructs the threshold, starting at tau0. Defaults come from config/constants.h.
+     * @brief Constructs the threshold, starting at tau0.
      *
      * @param tau0In Starting max match distance before any data (in).
      * @param deltaMinIn Corrections smaller than this are ignored (in).
      * @param rMaxIn Max range, used to turn a heading error into a distance (in).
      */
-    explicit AdaptiveThreshold(double tau0In = LIDAR_TAU_0,
-                               double deltaMinIn = LIDAR_DELTA_MIN,
-                               double rMaxIn = LIDAR_R_MAX);
+    explicit AdaptiveThreshold(double tau0In = LIDAR_TAU_0, double deltaMinIn = LIDAR_DELTA_MIN, double rMaxIn = LIDAR_R_MAX);
 
     /**
      * @brief Records how far ICP moved from its initial guess. Call after each successful ICP.
