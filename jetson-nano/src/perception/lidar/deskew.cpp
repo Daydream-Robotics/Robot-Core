@@ -48,9 +48,22 @@ uint64_t deskewScan(const RobotScan& scan, const PoseBuffer& poses, const Pose& 
 }
 
 void ScanMerger::addScan(const RobotScan& scan) {
-    // TODO: ignore an empty scan or an out-of-range sensor_id
-    // TODO: lock and store as m_latest[scan.sensor_id]
-    (void)scan;
+    // drop an empty scan or unknown sensor
+    if (scan.points.empty() || scan.sensor_id >= LIDAR_NUM_SENSORS) {
+        return;
+    }
+
+    // driver threads write, build() reads
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    // drop sweep that isn't newer than the stored one
+    const std::optional<RobotScan>& stored = m_latest[scan.sensor_id];
+    if (stored.has_value() && scan.t_end_us <= stored->t_end_us) {
+        return;
+    }
+
+    // keep this sensor's newest sweep
+    m_latest[scan.sensor_id] = scan;
 }
 
 std::optional<DeskewedCloud> ScanMerger::build(const PoseBuffer& poses) {
