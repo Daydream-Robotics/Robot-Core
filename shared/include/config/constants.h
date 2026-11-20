@@ -40,8 +40,8 @@ constexpr double PERPENDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behin
 /* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
 
 constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 3.25;
-constexpr double DRIVE_GEAR_RATIO = 450.0/600.0; //450 rpm wheel / 600 rpm cartridge
-constexpr double TRACK_WIDTH = 10.5; // integration value, inches; odomUpdates used a 2-inch placeholder. Verify on robot.
+constexpr double DRIVE_GEAR_RATIO = 600.0/600.0; //450 rpm wheel / 600 rpm cartridge
+constexpr double TRACK_WIDTH = 10.5; // drive wheel track width (in), also used by the Nano's MPC
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
 
@@ -98,16 +98,17 @@ constexpr double MPC_SAMPLE_PERIOD = 0.02; // control step (s)
 constexpr double MPC_COMMAND_DELAY = 0.01; // s from solving to the brain applying the command (it goes out with the next state)
 
 // motor model at the wheel: omega_dot = -a*omega + b*V
-constexpr double MPC_MOTOR_A = 16.7211; // motor time-constant (1/s)
-constexpr double MPC_MOTOR_B = 71.3105; // motor gain constant (rad/s^2 per V)
+constexpr double MPC_MOTOR_A = 5.22; // motor time-constant (1/s)
+constexpr double MPC_MOTOR_B = 19.02; // motor gain constant (rad/s^2 per V)
 
 // reference generation
-constexpr double MPC_A_MAX = 60.0; // max accel/decel of the reference (in/s^2)
+constexpr double MPC_A_MAX = 85.0; // max accel/decel of the reference (in/s^2)
 constexpr double MPC_V_REF_MIN = 3.0; // reference speed floor (in/s)
+constexpr double MPC_A_LAT_MAX = 80.0; // max sideways accel in corners (in/s^2): caps corner speed at sqrt(a_lat / curvature)
 
 // cost weights
-constexpr double MPC_P_X = 200.0; // output weight for x
-constexpr double MPC_P_Y = 200.0; // output weight for y
+constexpr double MPC_P_X = 300.0; // output weight for x
+constexpr double MPC_P_Y = 300.0; // output weight for y
 constexpr double MPC_P_THETA = 60.0; // output weight for theta
 constexpr double MPC_Q_U = 0.1; // input change penalty
 constexpr double MPC_Q_ZERO_MULT = 2.0; // multiplier for the first input change penalty
@@ -118,8 +119,8 @@ constexpr double MPC_P_FINAL_MULT = 20.0; // multiplier for the last output weig
 constexpr double MPC_V_MAX = 12.0; // max drive voltage (V)
 constexpr double MPC_DELTA_U_MAX = 8.0; // max voltage increase per step (V)
 constexpr double MPC_DELTA_U_MIN = -8.0; // max voltage decrease per step (V)
-constexpr double MPC_X_FIELD_MAX = 72.0; // max |x| on the field (in), field center origin
-constexpr double MPC_Y_FIELD_MAX = 72.0; // max |y| on the field (in), field center origin
+constexpr double MPC_X_FIELD_MAX = 200.0; // max |x| on the field (in)
+constexpr double MPC_Y_FIELD_MAX = 200.0; // max |y| on the field (in)
 constexpr double MPC_OMEGA_WHEEL_MAX = 100.0; // max wheel speed (rad/s)
 
 enum class DriveType {
