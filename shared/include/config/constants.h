@@ -98,11 +98,11 @@ constexpr double MPC_MOTOR_B = 19.02; // motor gain constant (rad/s^2 per V)
 // reference generation
 constexpr double MPC_A_MAX = 85.0; // max accel/decel of the reference (in/s^2)
 constexpr double MPC_V_REF_MIN = 3.0; // reference speed floor (in/s)
-constexpr double MPC_A_LAT_MAX = 90.0; // max sideways accel in corners (in/s^2): caps corner speed at sqrt(a_lat / curvature)
+constexpr double MPC_A_LAT_MAX = 80.0; // max sideways accel in corners (in/s^2): caps corner speed at sqrt(a_lat / curvature)
 
 // cost weights
-constexpr double MPC_P_X = 200.0; // output weight for x
-constexpr double MPC_P_Y = 200.0; // output weight for y
+constexpr double MPC_P_X = 300.0; // output weight for x
+constexpr double MPC_P_Y = 300.0; // output weight for y
 constexpr double MPC_P_THETA = 60.0; // output weight for theta
 constexpr double MPC_Q_U = 0.1; // input change penalty
 constexpr double MPC_Q_ZERO_MULT = 2.0; // multiplier for the first input change penalty
