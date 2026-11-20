@@ -20,6 +20,12 @@ constexpr int LEVER_TWO_PORT = 22;
 
 constexpr int IMU_PORT = 1; 
 
+// MCL distance sensors (from dev/odomUpdates).
+constexpr int FRONT_DISTANCE_PORT = 3;
+constexpr int LEFT_DISTANCE_PORT = 2;
+constexpr int BACK_DISTANCE_PORT = 8;
+constexpr int RIGHT_DISTANCE_PORT = 9;
+
 
 /* - - - - - - - - - - - - - - [ODOMETRY] - - - - - - - - - - - - - - */
 

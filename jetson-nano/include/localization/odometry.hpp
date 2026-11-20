@@ -1,36 +1,104 @@
 #pragma once
 
+#include "main.h"
+#include <vector>
+#include <optional>
+#include <atomic>
+#include <numbers>
+
 struct OdomConfig {
     double parallelWheelDiameter;
     double perpendicularWheelDiameter;
     double parallelTrackingWheelOffset;
     double perpendicularTrackingWheelOffset;
+    bool useMotorEncoders = false;
+    double driveWheelDiameter = 0.0;
+    double driveTrackWidth = TRACK_WIDTH;
+    double driveEncoderOffset = 0.0;
+};
+
+/**
+ * @enum OdomError
+ * @brief Represents errors that may be encountered by odometry system.
+ */
+enum class OdomError {
+    NONE,
+    IMU_DISCONNECTED,
+    IMU_CALIBRATING,
+    IMU_COMMUNICATION_ERROR,
+    TRACKING_WHEEL_ERROR, // both tracking wheels are down
+    PERPENDICULAR_WHEEL_ERROR, // perpendicular wheel is down, sideways travel is taken as 0
+    PARALLEL_WHEEL_ERROR, // parallel wheel is down, forward travel is coming from the drive encoders
+    MOTOR_ENCODER_ERROR,
+    IMU_FALLBACK // IMU is unavailable, heading is coming from the drive encoders
+};
+
+/**
+ * @struct YawResult
+ * @brief Stores yaw measurement and associated odometry error
+ */
+struct YawResult {
+    double yaw{0.0}; /**< The yaw measurement from the IMU in radians */
+    OdomError error{OdomError::NONE}; /**< The IMU error status */
 };
 
 struct WheelLengths {
-    double parallel;
-    double perpendicular;
+    double parallel; /**< The distance traveled by the parallel tracking wheel in inches */
+    double perpendicular; /**< The distance traveled by the perpendicular tracking wheel in inches */
 };
 
+/**
+ * @struct WheelTravelResult
+ * @brief Stores tracking wheel travel mesurements and associated odometry error
+ */
+struct WheelTravelResult {
+    WheelLengths travel{0.0, 0.0}; /**< The distances traveled by the parallel and perpendicular tracking wheels in inches */
+    OdomError error{OdomError::NONE}; /**< The tracking wheel error status */
+    double currentParallelPosition{0.0}; /**< raw reading this frame, PROS_ERR if the read failed */
+    double currentPerpendicularPosition{0.0}; /**< raw reading this frame, PROS_ERR if the read failed */
+};
+
+/**
+ * @struct DriveTravelResult
+ * @brief Stores individual drive wheel travel and encoder error result
+ */
+struct DriveTravelResult {
+    double leftInches{0.0};
+    double rightInches{0.0};
+    OdomError error{OdomError::NONE};
+    double currentLeftPosition{0.0};
+    double currentRightPosition{0.0};
+    std::vector<std::optional<double>> currentLeftMotorPositions;
+    std::vector<std::optional<double>> currentRightMotorPositions;
+};
+
+/**
+ * @struct VelocityResult
+ * @brief Stores velocity measurement and associated odometry error
+ */
+struct VelocityResult {
+    double velocity{0.0}; /**< The velocity measurement in inches per second */
+    OdomError error{OdomError::NONE}; /**< The velocity error status */
+};
+
+/**
+ * @struct Position
+ * @brief Stores the global position of the robot
+ */
 struct Position {
-    double x;
-    double y;
+    double x; /**< The x-position of the robot in inches */
+    double y; /**< The y-position of the robot in inches */
 };
 
 /**
  * @brief stores a pose of the robot
- * @note frame: +X forward, +Y left. heading 0 points along +Y and pi/2 (90 deg) along +X,
- *       so it increases turning from +Y toward +X. this matches JerryIO's field coordinates and headings
+ * @note Frame: +X forward, +Y left. Heading is compass style: 0 = facing +Y,
+ *       pi/2 (90 deg) = facing +X, clockwise positive. Heading h points along (sin h, cos h)
  */
 struct Pose {
-    // x-position of bot (inches)
-    double x;
-
-    // y-position of bot (inches)
-    double y;
-
-    // Heading of bot (rads): 0 along +Y, pi/2 along +X
-    double theta;
+    double x; /**< The x-position of the robot in inches */
+    double y; /**< The y-position of the robot in inches */
+    double theta; /**< The heading of the robot in radians (0 = +Y, pi/2 = +X, CW positive) */
 };
 
 /**
@@ -46,14 +114,7 @@ public:
      * @param config The physical odometry dimensions of the robot
      */
     Odometry(OdomConfig config);
-
-    /**
-     * @brief Calculates and updates the robot's global pose
-     * @note This function is safe to be called continuously in a background task
-     * @warning In the case of an IMU failure this function stops updating the latest position
-     */
-    void updatePose(void);
-
+    
     /**
      * @brief Gets the robot's latest pose
      * @returns The latest Pose of the robot
@@ -86,31 +147,47 @@ public:
      */
     double getPosY();
 
-    /** 
-     * @brief gets the yaw of the robot
-     * @note Counter clockwise is positive
-     * @returns returns yaw/heading in degrees bounded by [-180, 180]
-     * @retval	-180.1	IMU disconnected
-     * @retval	-180.2	IMU calibrating
-     * @retval	-180.3	Pros communication failure
+    /**
+     * @brief Gets the most recent odometry error
+     * @note task safe
+     * @returns The latest OdomError, OdomError::IMU_FALLBACK if the heading is coming from
+     *          the drive encoders, PARALLEL_WHEEL_ERROR / PERPENDICULAR_WHEEL_ERROR / TRACKING_WHEEL_ERROR
+     *          if the pose is updating without that tracking wheel, or OdomError::NONE if the last update succeeded
      */
-    double getYaw(void);
+    OdomError getOdomError();
+
+    /**
+     * @brief Gets the most recent tracking wheel status, independent of the IMU status
+     * @note task safe. getOdomError() reports IMU_FALLBACK over a wheel error, this doesn't hide it
+     * @returns PARALLEL_WHEEL_ERROR / PERPENDICULAR_WHEEL_ERROR / TRACKING_WHEEL_ERROR if a wheel is down
+     *          (including the frame it reconnects on), or OdomError::NONE if both are working
+     *          or the tracking wheels aren't the movement source
+     */
+    OdomError getTrackingWheelError();
+
+    /**
+     * @brief Gets yaw, falling back to the drive encoder heading tracked by odometry if the IMU is unavailable
+     * @note Field heading, same frame as Pose::theta (0 = +Y, pi/2 = +X, CW positive), includes setPose()
+     * @returns yaw/heading in radians and error status
+     */
+    YawResult getYaw(void);
     
     /**
-     * @brief Returns struct of distances travelled by Odometry Wheels
+     * @brief gets the current velocity of the parallel tracking wheel or drive motors
+     * @returns velocity in inches per second
      */
-    WheelLengths getOdomWheelTravel(void);
-    
+    VelocityResult getParallelVel();
+
     /**
-     * @brief gets the current velocity of the parallel tracking wheel
-     * @returns velocity of parallel tracking wheel in inches per second
+     * @brief Starts the background odom task, if it isn't already running
+     * @note Safe to call more than once, there is only ever one odom task
      */
-    double getParallelVel();
-    
+    void startTask();
+
     /**
-     * @brief Background task entry point
+     * @brief Calculates tracking wheel offsets by rotating the robot 
      */
-    static void odomTask();
+    void calculateTrackingWheelOffsets();
 
 private:
     // the config for the robot
@@ -120,13 +197,75 @@ private:
     Pose m_currentPosition = {0, 0, 0};
 
     // ROTS mutex to keep data task safe
-    // pros::Mutex m_mutex;
+    pros::Mutex m_mutex;
+
+    /**
+     * @brief Calculates and updates the robot's global pose
+     * @note This function is safe to be called continuously in a background task
+     * @warning In the case of an IMU failure this function stops updating the latest position
+     */
+    void updatePose(void);
+
+    /**
+     * @brief Returns struct of distances travelled by Odometry Wheels
+     * @note doesn't save the readings as previous. updatePose() does that after the pose update
+     * @returns PARALLEL_WHEEL_ERROR / PERPENDICULAR_WHEEL_ERROR with the remaining wheel's travel,
+     *          or TRACKING_WHEEL_ERROR with no travel when both are down. A wheel with no valid
+     *          previous reading (just reconnected) counts as down for that frame
+     */
+    WheelTravelResult getOdomWheelTravel(void);
+
+    /**
+     * @brief Returns struct of distances travelled by drive encoders since the saved previous readings
+     * @note sets up the per-motor baselines when they aren't ready, so only updatePose() should call it
+     */
+    DriveTravelResult getDriveEncoderTravel(void);
+
+    /**
+     * @brief Yaw straight from the IMU
+     * @returns yaw in radians (CCW positive) and IMU error status
+     */
+    YawResult getIMUYaw(void);
+
+    /**
+     * @brief Averages the actual velocities of all motors in a motor group
+     * @param group The motor group to average
+     * @returns The average velocity in RPM of the motors with valid readings, or PROS_ERR_F if none are valid
+     */
+    static double averageMotorGroupVelocities(const pros::MotorGroup& group);
+
+    /**
+     * @brief Background task entry point, started by startTask()
+     */
+    static void odomTask();
+
+    // handle of the one background odom task, guarded by m_taskMutex
+    pros::task_t m_taskHandle = nullptr;
+    pros::Mutex m_taskMutex;
   
     // previous state tracking
     double m_prevTheta = 0;
     double m_prevParallel = 0;
     double m_prevPerpendicular = 0;
+    double m_prevLeft = 0;
+    double m_prevRight = 0;
+    std::vector<std::optional<double>> m_prevLeftMotorPositions;
+    std::vector<std::optional<double>> m_prevRightMotorPositions;
+    bool m_driveEncodersReady = false;
+    // math angle (0 = +X, CCW positive) = raw IMU heading + offset. Starts at pi/2 so the
+    // robot starts at field heading 0 (facing +Y)
+    double m_headingOffset = std::numbers::pi / 2.0;
+    double m_lastRawTheta = 0.0; //latest raw IMU heading, used by setPose()
     bool m_initialized = false;
+    std::atomic<bool> m_usingEncoderHeading{false}; // read by getYaw() from other tasks
+    bool m_imuNeedsRebase = false;
+
+    // latest odom error, readable from any task
+    std::atomic<OdomError> m_lastOdomError{OdomError::NONE};
+
+    // latest tracking wheel status, readable from any task
+    std::atomic<OdomError> m_lastWheelError{OdomError::NONE};
+    
 };
 
 extern Odometry odom;
