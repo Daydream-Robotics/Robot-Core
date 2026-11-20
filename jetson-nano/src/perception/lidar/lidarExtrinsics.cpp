@@ -10,8 +10,6 @@
 
 namespace {
 
-constexpr double ANGLE_EPSILON = 1e-12; // tolerance on mask edges (rad)
-
 void validate(const LidarMount& mount) {
     const auto& f = mount.footprint;
     if (!std::isfinite(mount.x_in) || !std::isfinite(mount.y_in) ||
@@ -106,9 +104,9 @@ bool LidarTransform::masked(double bearing_rad) const {
         const double begin = utils::normalizeAngle(mask.start_rad);
         const double end = utils::normalizeAngle(mask.end_rad);
         if (begin <= end) {
-            if (angle >= begin - ANGLE_EPSILON && angle <= end + ANGLE_EPSILON) return true;
+            if (angle >= begin - LIDAR_MASK_EPSILON_RAD && angle <= end + LIDAR_MASK_EPSILON_RAD) return true;
         } else { // wraps across +/-pi
-            if (angle >= begin - ANGLE_EPSILON || angle <= end + ANGLE_EPSILON) return true;
+            if (angle >= begin - LIDAR_MASK_EPSILON_RAD || angle <= end + LIDAR_MASK_EPSILON_RAD) return true;
         }
     }
     return false;

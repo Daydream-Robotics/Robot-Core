@@ -7,6 +7,8 @@
 #include <ctime>
 #include <utility>
 
+#include "config/constants.h"
+
 #ifdef __jetson_nano__
 #include <fcntl.h>
 #include <linux/serial.h>
@@ -20,13 +22,6 @@ namespace {
 constexpr double PI = 3.14159265358979323846;
 constexpr double TWO_PI = 2.0 * PI;
 constexpr double INCHES_PER_MM = 1.0 / 25.4;
-constexpr size_t MAX_SAMPLES = 4096;
-// Sync times are fitted over this many recent sweeps (~1.6 s at 10 Hz).
-constexpr size_t SYNC_FIT_WINDOW = 16;
-// The fitted sample period must stay this close to the scan mode's us_per_sample.
-constexpr double MAX_SLOPE_ERROR = 0.02;
-// A sync this much later than the fit is a read delay once, or dropped samples twice in a row.
-constexpr double SYNC_RESYNC_US = 3000.0;
 
 uint64_t nowUs() {
 #ifdef _WIN32
@@ -340,7 +335,7 @@ void LidarDriver::onSamples(const sl_lidar_response_measurement_node_hq_t* nodes
         }
         if (!m_tStartUs) continue; // discard partial first revolution
         if (n.dist_mm_q2 == 0 || n.quality == 0) continue;
-        if (m_building.size() >= MAX_SAMPLES) {
+        if (m_building.size() >= LIDAR_MAX_SCAN_SAMPLES) {
             m_buildingOverflow = true;
             continue;
         }
@@ -355,7 +350,7 @@ void LidarDriver::onSamples(const sl_lidar_response_measurement_node_hq_t* nodes
 // jitter. The configured latency is then subtracted.
 uint64_t LidarDriver::fitSyncTime(uint64_t index, uint64_t rawUs) {
     m_syncObs.push_back({index, rawUs});
-    if (m_syncObs.size() > SYNC_FIT_WINDOW) m_syncObs.pop_front();
+    if (m_syncObs.size() > LIDAR_SYNC_FIT_WINDOW) m_syncObs.pop_front();
 
     const SyncObservation& first = m_syncObs.front();
     auto dIndex = [&](const SyncObservation& o) { return static_cast<double>(o.index - first.index); };
@@ -376,7 +371,7 @@ uint64_t LidarDriver::fitSyncTime(uint64_t index, uint64_t rawUs) {
             sxy += (dIndex(o) - meanX) * (dTime(o) - meanY);
         }
         const double fitted = sxx > 0.0 ? sxy / sxx : slope;
-        if (std::abs(fitted - m_usPerSample) <= MAX_SLOPE_ERROR * m_usPerSample) slope = fitted;
+        if (std::abs(fitted - m_usPerSample) <= LIDAR_SYNC_MAX_SLOPE_ERROR * m_usPerSample) slope = fitted;
     }
 
     // Lower envelope: the earliest-looking sync had the least read delay.
@@ -386,7 +381,7 @@ uint64_t LidarDriver::fitSyncTime(uint64_t index, uint64_t rawUs) {
     const double newestResidual = dTime(m_syncObs.back()) - slope * dIndex(m_syncObs.back());
 
     double fittedUs = static_cast<double>(first.rawUs) + minResidual + slope * dIndex(m_syncObs.back());
-    if (newestResidual - minResidual <= SYNC_RESYNC_US) {
+    if (newestResidual - minResidual <= LIDAR_SYNC_RESYNC_US) {
         m_lateSyncs = 0;
     } else if (++m_lateSyncs < 2 && m_syncObs.size() > 1) {
         // One late sync is a long read delay, keep the fit and drop this observation.

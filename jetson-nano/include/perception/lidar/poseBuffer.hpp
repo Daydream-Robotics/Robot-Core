@@ -5,6 +5,7 @@
 #include <mutex>
 #include <optional>
 
+#include "config/constants.h"
 #include "localization/odometry.hpp"
 
 /**
@@ -37,8 +38,6 @@ public:
     void clear();
 
 private:
-    static constexpr int CAPACITY = 200; ///< 1 s at 200 Hz
-
     /**
      * @brief One stored pose.
      */
@@ -58,7 +57,7 @@ private:
     static Pose interpolate(const Sample& a, const Sample& b, double alpha);
 
     mutable std::mutex m_mutex; ///< guards the ring buffer
-    std::array<Sample, CAPACITY> m_samples{}; ///< ring buffer, oldest overwritten first
+    std::array<Sample, LIDAR_POSE_BUFFER_CAPACITY> m_samples{}; ///< ring buffer, oldest overwritten first
     int m_head = 0; ///< index the next sample is written to
     int m_count = 0; ///< how many of m_samples are filled
     bool m_lowRateLogged = false; ///< low rate already logged
