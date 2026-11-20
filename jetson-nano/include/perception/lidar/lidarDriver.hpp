@@ -16,16 +16,16 @@
 #include <vector>
 
 struct LidarPoint {
-    double range_in = 0.0;    // inches
-    double bearing_rad = 0.0; // sensor frame, counterclockwise positive, [-pi, pi]
-    uint64_t stamp_us = 0;    // monotonic microseconds (CLOCK_MONOTONIC on Linux)
+    double rangeIn = 0.0;    // inches
+    double bearingRad = 0.0; // sensor frame, counterclockwise positive, [-pi, pi]
+    uint64_t stampUs = 0;    // monotonic microseconds (CLOCK_MONOTONIC on Linux)
     uint8_t quality = 0;      // optional, keeps diagnostic strength from SDK
 };
 
 struct Scan {
-    uint8_t sensor_id = 0;
-    uint64_t t_start_us = 0;
-    uint64_t t_end_us = 0;
+    uint8_t sensorId = 0;
+    uint64_t tStartUs = 0;
+    uint64_t tEndUs = 0;
     std::vector<LidarPoint> points;
 };
 

@@ -423,17 +423,17 @@ void LidarDriver::finishSweep(uint64_t tEndUs) {
     }
 
     Scan scan;
-    scan.sensor_id = m_cfg.sensorId;
-    scan.t_start_us = m_tStartUs;
-    scan.t_end_us = tEndUs;
+    scan.sensorId = m_cfg.sensorId;
+    scan.tStartUs = m_tStartUs;
+    scan.tEndUs = tEndUs;
     scan.points.reserve(m_building.size());
-    uint64_t lastStamp = scan.t_start_us;
+    uint64_t lastStamp = scan.tStartUs;
     for (const auto& n : m_building) {
         const double fraction = sweepAngle(n.angleCwRad, m_startAngleCwRad) / TWO_PI;
-        uint64_t stamp = scan.t_start_us + static_cast<uint64_t>(fraction * periodUs);
+        uint64_t stamp = scan.tStartUs + static_cast<uint64_t>(fraction * periodUs);
         // Guarantee non-decreasing timestamps even if angles jitter in SDK data.
         stamp = std::max(stamp, lastStamp);
-        stamp = std::min(stamp, scan.t_end_us - 1);
+        stamp = std::min(stamp, scan.tEndUs - 1);
         lastStamp = stamp;
         scan.points.push_back({n.rangeIn, signedBearing(n.angleCwRad), stamp, n.quality});
     }
