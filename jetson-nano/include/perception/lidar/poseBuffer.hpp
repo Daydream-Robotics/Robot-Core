@@ -37,7 +37,7 @@ public:
     void clear();
 
 private:
-    static constexpr int CAPACITY = 100; ///< 1 s at 100 Hz
+    static constexpr int CAPACITY = 200; ///< 1 s at 200 Hz
 
     /**
      * @brief One stored pose.
@@ -61,4 +61,5 @@ private:
     std::array<Sample, CAPACITY> m_samples{}; ///< ring buffer, oldest overwritten first
     int m_head = 0; ///< index the next sample is written to
     int m_count = 0; ///< how many of m_samples are filled
+    bool m_lowRateLogged = false; ///< low rate already logged
 };

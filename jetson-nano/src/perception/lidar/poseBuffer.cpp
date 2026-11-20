@@ -40,6 +40,22 @@ void PoseBuffer::push(uint64_t tUs, const Pose& pose) {
     m_head = (m_head + 1) % CAPACITY;
     // one more sample, up to CAPACITY
     m_count = std::min(m_count + 1, CAPACITY);
+
+    // average odom rate over the full buffer
+    if (m_count == CAPACITY) {
+        const int oldest = m_head;
+        const uint64_t spanUs = tUs - m_samples[oldest].tUs;
+        const double hz = (CAPACITY - 1) * 1e6 / static_cast<double>(spanUs);
+
+        // log once when the rate drops, again only after it recovers
+        if (hz < LIDAR_POSE_MIN_HZ && !m_lowRateLogged) {
+            std::fprintf(stderr, "[PoseBuffer] odom rate %.1f Hz below %.1f Hz\n", hz, LIDAR_POSE_MIN_HZ);
+            m_lowRateLogged = true;
+        } 
+        else if (hz >= LIDAR_POSE_MIN_HZ) {
+            m_lowRateLogged = false;
+        }
+    }
 }
 
 std::optional<Pose> PoseBuffer::poseAt(uint64_t tUs) const {
@@ -78,7 +94,8 @@ std::optional<Pose> PoseBuffer::poseAt(uint64_t tUs) const {
         const Sample& midSample = m_samples[(oldestIdx + mid) % CAPACITY];
         if (midSample.tUs <= tUs) {
             lo = mid;
-        } else {
+        } 
+        else {
             hi = mid;
         }
     }
@@ -106,6 +123,7 @@ void PoseBuffer::clear() {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_head = 0;
     m_count = 0;
+    m_lowRateLogged = false;
 }
 
 Pose PoseBuffer::interpolate(const Sample& a, const Sample& b, double alpha) {
