@@ -132,8 +132,8 @@ Pose PoseBuffer::interpolate(const Sample& a, const Sample& b, double alpha) {
     const double y = a.pose.y + alpha * (b.pose.y - a.pose.y);
 
     // heading takes the short way around
-    const double dTheta = utils::wrapAngle(b.pose.theta - a.pose.theta);
-    const double theta = utils::wrapAngle(a.pose.theta + alpha * dTheta);
+    const double dTheta = utils::normalizeAngle(b.pose.theta - a.pose.theta);
+    const double theta = utils::normalizeAngle(a.pose.theta + alpha * dTheta);
 
     return Pose{x, y, theta};
 }

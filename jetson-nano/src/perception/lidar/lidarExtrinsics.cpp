@@ -12,12 +12,6 @@ namespace {
 
 constexpr double ANGLE_EPSILON = 1e-12; // tolerance on mask edges (rad)
 
-// wraps to (-pi, pi], -pi becomes pi so both ends of a mask compare the same
-double normalizeAngle(double angle) {
-    const double wrapped = utils::wrapAngle(angle);
-    return wrapped <= -M_PI ? M_PI : wrapped;
-}
-
 void validate(const LidarMount& mount) {
     const auto& f = mount.footprint;
     if (!std::isfinite(mount.x_in) || !std::isfinite(mount.y_in) ||
@@ -104,13 +98,13 @@ RobotScan LidarTransform::toRobotFrame(const Scan& scan) const {
 }
 
 bool LidarTransform::masked(double bearing_rad) const {
-    const double angle = normalizeAngle(bearing_rad);
+    const double angle = utils::normalizeAngle(bearing_rad);
     for (const auto& mask : m_mount.blocked_bearings) {
         // a -180 to 180 mask blocks the whole circle
         if ((mask.start_rad == -M_PI && mask.end_rad == M_PI) ||
             (mask.start_rad == M_PI && mask.end_rad == -M_PI)) return true;
-        const double begin = normalizeAngle(mask.start_rad);
-        const double end = normalizeAngle(mask.end_rad);
+        const double begin = utils::normalizeAngle(mask.start_rad);
+        const double end = utils::normalizeAngle(mask.end_rad);
         if (begin <= end) {
             if (angle >= begin - ANGLE_EPSILON && angle <= end + ANGLE_EPSILON) return true;
         } else { // wraps across +/-pi
