@@ -7,6 +7,8 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#include <cstdint>
+
 #include "config/linkConstants.hpp"
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
@@ -103,6 +105,10 @@ constexpr double LIDAR_1_X_IN = 6.0;
 constexpr double LIDAR_1_Y_IN = -4.0;
 constexpr double LIDAR_1_PSI_RAD = 0.0; // mount yaw plus the C1's 0 deg offset, check with a target on the left
 constexpr double LIDAR_1_HEIGHT_IN = 8.0; // scan plane height, below the field wall top (#144)
+
+// odom_ekf_ pose buffer
+constexpr uint64_t LIDAR_POSE_EXTRAPOLATE_US = 5000; // poseAt() returns the newest pose up to this far past it (us)
+constexpr uint64_t LIDAR_POSE_GAP_US = 30000; // gap between odom poses that gets logged (us)
 
 
 #endif
