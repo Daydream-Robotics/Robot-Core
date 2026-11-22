@@ -31,7 +31,10 @@ void FullEkf::reset(const Pose& pose, const Eigen::Matrix3d& cov) {
     m_P = ((cov + cov.transpose()) / 2.0).eval();
     m_rejectStreak = 0;
 
-    // TODO (#187): clear the history
+    // forget cycles from before the reset
+    m_histHead = 0;
+    m_histCount = 0;
+
 }
 
 
@@ -46,22 +49,10 @@ void FullEkf::predict(const PoseIncrement& inc) {
 
     std::lock_guard<std::mutex> lock(m_stateMutex);
 
-    // TODO (#187): move the math below into propagate(), call propagate(inc) then pushHistory(inc)
-
-    // Jacobians at the old pose
-    const Eigen::Matrix3d F = se2::composeJacA(m_x, inc.delta);
-    const Eigen::Matrix3d G = se2::composeJacB(m_x);
-
-    // move the pose by this cycle's increment
-    m_x = se2::compose(m_x, inc.delta);
-
-    // propagate the covariance
-    m_P = F * m_P * F.transpose() + G * inc.cov * G.transpose() + m_noise.qExtra;
-    // remove rounding asymmetry
-    m_P = ((m_P + m_P.transpose()) / 2.0).eval();
-
-    // time of the new pose
-    m_tUs = inc.t1Us;
+    // move the state forward one cycle
+    propagate(inc);
+    // save this cycle for late measurements
+    pushHistory(inc);
 }
 
 void FullEkf::submit(const PoseMeasurement& m) {
@@ -170,8 +161,9 @@ void FullEkf::drainQueue() {
     // apply each one and keep the latest result
     std::lock_guard<std::mutex> lock(m_stateMutex);
     for (const PoseMeasurement& m : batch) {
-        // TODO (#187): m.tUs older than m_tUs goes to applyLate(m) instead
-        m_lastUpdate = update(m);
+        // a measurement from the past is applied at its own time
+        m_lastUpdate = (m.tUs < m_tUs) ? applyLate(m) : update(m);
+
     }
 }
 
@@ -192,9 +184,20 @@ int FullEkf::tooOldCount() const {
 }
 
 void FullEkf::propagate(const PoseIncrement& inc) {
-    // TODO: the Jacobian, compose, and covariance math from predict()
-    // TODO: m_tUs = inc.t1Us
-    (void)inc;
+    // Jacobians at the old pose
+    const Eigen::Matrix3d F = se2::composeJacA(m_x, inc.delta);
+    const Eigen::Matrix3d G = se2::composeJacB(m_x);
+
+    // move the pose by this cycle's increment
+    m_x = se2::compose(m_x, inc.delta);
+
+    // propagate the covariance
+    m_P = F * m_P * F.transpose() + G * inc.cov * G.transpose() + m_noise.qExtra;
+    // remove rounding asymmetry
+    m_P = ((m_P + m_P.transpose()) / 2.0).eval();
+
+    // time of the new pose
+    m_tUs = inc.t1Us;
 }
 
 void FullEkf::pushHistory(const PoseIncrement& inc) {
