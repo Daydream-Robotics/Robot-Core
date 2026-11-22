@@ -1,7 +1,9 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <vector>
 
 #include <Eigen/Dense>
@@ -109,7 +111,62 @@ public:
      */
     UpdateResult lastUpdate() const;
 
+    /**
+     * @brief Pose at a past time, interpolated from history (thread-safe).
+     *
+     * @param tUs Time on the Nano's steady_clock (us).
+     * @return std::optional<StampedPose> Nothing if tUs is outside the history.
+     */
+    std::optional<StampedPose> poseAt(int64_t tUs) const;
+
+    /**
+     * @brief Measurements dropped for being older than the history (thread-safe).
+     *
+     * @return int Count since construction.
+     */
+    int tooOldCount() const;
+
 private:
+    /**
+     * @brief One cycle of filter history.
+     */
+    struct HistoryEntry {
+        int64_t tUs = 0; ///< time of this state, Nano steady_clock (us)
+        Pose x{0.0, 0.0, 0.0}; ///< field pose after this cycle
+        Eigen::Matrix3d P = Eigen::Matrix3d::Identity(); ///< covariance of x
+        PoseIncrement inc; ///< the increment that led to this entry
+    };
+
+    /**
+     * @brief Moves m_x and m_P forward by one increment. Caller holds m_stateMutex.
+     *
+     * @param inc One cycle's motion in the previous pose's frame.
+     */
+    void propagate(const PoseIncrement& inc);
+
+    /**
+     * @brief Stores the current state and the increment that led to it. Caller holds m_stateMutex.
+     *
+     * @param inc The increment just applied.
+     */
+    void pushHistory(const PoseIncrement& inc);
+
+    /**
+     * @brief Finds the history entry nearest to a time. Caller holds m_stateMutex.
+     *
+     * @param tUs Time to look up.
+     * @return int Logical index, 0 is the oldest, or -1 if tUs is older than the history.
+     */
+    int findEntry(int64_t tUs) const;
+
+    /**
+     * @brief Applies a measurement from the past and replays the increments since. Caller holds m_stateMutex.
+     *
+     * @param m Measurement with tUs older than m_tUs.
+     * @return UpdateResult Whether it was accepted, and its NIS.
+     */
+    UpdateResult applyLate(const PoseMeasurement& m);
+
     /**
      * @brief Corrects the state with one absolute measurement, if it passes the gate.
      *
@@ -130,7 +187,11 @@ private:
     FullEkfNoise m_noise; ///< process inflation and gate
     UpdateResult m_lastUpdate; ///< most recent update, for lastUpdate()
     int m_rejectStreak = 0; ///< consecutive gate rejections, reset on an accepted update
-    mutable std::mutex m_stateMutex; ///< guards m_x, m_P, m_tUs, m_lastUpdate, m_rejectStreak
+    std::array<HistoryEntry, FULL_EKF_HISTORY_SIZE> m_history{}; ///< ring buffer of past cycles
+    int m_histHead = 0; ///< slot the next entry is written to
+    int m_histCount = 0; ///< number of stored entries, up to FULL_EKF_HISTORY_SIZE
+    int m_tooOld = 0; ///< measurements dropped for being older than the history
+    mutable std::mutex m_stateMutex; ///< guards m_x, m_P, m_tUs, m_lastUpdate, m_rejectStreak, history
     std::vector<PoseMeasurement> m_pending; ///< measurements waiting for the next predict()
     std::mutex m_pendingMutex; ///< guards m_pending, submit() runs on other threads
 };

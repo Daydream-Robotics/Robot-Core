@@ -30,6 +30,8 @@ void FullEkf::reset(const Pose& pose, const Eigen::Matrix3d& cov) {
     m_x = Pose{pose.x, pose.y, utils::wrapAngle(pose.theta)};
     m_P = ((cov + cov.transpose()) / 2.0).eval();
     m_rejectStreak = 0;
+
+    // TODO (#187): clear the history
 }
 
 
@@ -43,6 +45,8 @@ void FullEkf::predict(const PoseIncrement& inc) {
     }
 
     std::lock_guard<std::mutex> lock(m_stateMutex);
+
+    // TODO (#187): move the math below into propagate(), call propagate(inc) then pushHistory(inc)
 
     // Jacobians at the old pose
     const Eigen::Matrix3d F = se2::composeJacA(m_x, inc.delta);
@@ -89,8 +93,6 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
         return result;
     }
 
-
-    // TODO (#187): m.tUs is older than m_x, apply it at m.tUs from the history and replay the increments since
     // innovation, measured minus predicted, heading wrapped
     Eigen::Vector3d nu;
     nu(0) = m.pose.x - m_x.x;
@@ -168,6 +170,52 @@ void FullEkf::drainQueue() {
     // apply each one and keep the latest result
     std::lock_guard<std::mutex> lock(m_stateMutex);
     for (const PoseMeasurement& m : batch) {
+        // TODO (#187): m.tUs older than m_tUs goes to applyLate(m) instead
         m_lastUpdate = update(m);
     }
+}
+
+std::optional<StampedPose> FullEkf::poseAt(int64_t tUs) const {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    // TODO: empty history -> nullopt
+    // TODO: tUs outside [oldest, newest] -> nullopt
+    // TODO: binary search for the two entries around tUs
+    // TODO: interpolate x and y linearly, theta with the wrapped difference,
+    //       alpha = (t - t_a) / (t_b - t_a), cov from the nearer entry
+    (void)tUs;
+    return std::nullopt;
+}
+
+int FullEkf::tooOldCount() const {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    return m_tooOld;
+}
+
+void FullEkf::propagate(const PoseIncrement& inc) {
+    // TODO: the Jacobian, compose, and covariance math from predict()
+    // TODO: m_tUs = inc.t1Us
+    (void)inc;
+}
+
+void FullEkf::pushHistory(const PoseIncrement& inc) {
+    // TODO: write {m_tUs, m_x, m_P, inc} at m_histHead
+    // TODO: move the head forward with wrap, count up to FULL_EKF_HISTORY_SIZE
+    (void)inc;
+}
+
+int FullEkf::findEntry(int64_t tUs) const {
+    // TODO: empty history or tUs older than the oldest entry -> -1
+    // TODO: binary search over logical index i, slot (oldest + i) % FULL_EKF_HISTORY_SIZE
+    // TODO: return whichever of the two entries around tUs is nearer
+    (void)tUs;
+    return -1;
+}
+
+UpdateResult FullEkf::applyLate(const PoseMeasurement& m) {
+    // TODO: i = findEntry(m.tUs), -1 -> ++m_tooOld and return a rejected result
+    // TODO: restore m_x, m_P, m_tUs from entry i
+    // TODO: result = update(m), write the corrected state back into entry i
+    // TODO: for each entry after i, propagate(entry.inc) and overwrite its x and P
+    // TODO: return result
+    return UpdateResult{m.tUs, m.source};
 }
