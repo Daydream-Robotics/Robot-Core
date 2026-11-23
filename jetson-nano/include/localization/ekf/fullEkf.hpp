@@ -152,7 +152,7 @@ private:
     void pushHistory(const PoseIncrement& inc);
 
     /**
-     * @brief Finds the history entry nearest to a time. Caller holds m_stateMutex.
+     * @brief Finds the first history entry at or after a time. Caller holds m_stateMutex.
      *
      * @param tUs Time to look up.
      * @return int Logical index, 0 is the oldest, or -1 if tUs is older than the history.

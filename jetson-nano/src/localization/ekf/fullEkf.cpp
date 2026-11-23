@@ -169,13 +169,33 @@ void FullEkf::drainQueue() {
 
 std::optional<StampedPose> FullEkf::poseAt(int64_t tUs) const {
     std::lock_guard<std::mutex> lock(m_stateMutex);
-    // TODO: empty history -> nullopt
-    // TODO: tUs outside [oldest, newest] -> nullopt
-    // TODO: binary search for the two entries around tUs
-    // TODO: interpolate x and y linearly, theta with the wrapped difference,
-    //       alpha = (t - t_a) / (t_b - t_a), cov from the nearer entry
-    (void)tUs;
-    return std::nullopt;
+    // first entry at or after tUs
+    const int i = findEntry(tUs);
+    if (i < 0) {
+        return std::nullopt;
+    }
+
+    // oldest slot in the ring, then entry i
+    const int oldest = (m_histHead - m_histCount + FULL_EKF_HISTORY_SIZE) % FULL_EKF_HISTORY_SIZE;
+    const HistoryEntry& b = m_history[(oldest + i) % FULL_EKF_HISTORY_SIZE];
+    // newer than the newest entry
+    if (b.tUs < tUs) {
+        return std::nullopt;
+    }
+
+    // exact hit
+    if (b.tUs == tUs) {
+        return StampedPose{b.tUs, b.x, b.P};
+    }
+
+    // entry just before tUs
+    const HistoryEntry& a = m_history[(oldest + i - 1) % FULL_EKF_HISTORY_SIZE];
+    // fraction of the way from a to b
+    const double alpha = static_cast<double>(tUs - a.tUs) / static_cast<double>(b.tUs - a.tUs);
+    // x and y linear, heading the short way around
+    const Pose p {(a.x.x + alpha * (b.x.x - a.x.x)), (a.x.y + alpha * (b.x.y - a.x.y)), utils::wrapAngle(a.x.theta + alpha * utils::wrapAngle(b.x.theta - a.x.theta))};
+    // covariance from the nearer entry
+    return StampedPose{tUs, p, alpha < 0.5 ? a.P : b.P};
 }
 
 int FullEkf::tooOldCount() const {
@@ -201,21 +221,25 @@ void FullEkf::propagate(const PoseIncrement& inc) {
 }
 
 void FullEkf::pushHistory(const PoseIncrement& inc) {
-    // TODO: write {m_tUs, m_x, m_P, inc} at m_histHead
-    // TODO: move the head forward with wrap, count up to FULL_EKF_HISTORY_SIZE
-    (void)inc;
+    // store the state after this cycle and the increment that led to it
+    m_history[m_histHead] = HistoryEntry{m_tUs, m_x, m_P, inc};
+    // move the head forward
+    m_histHead = (m_histHead + 1) % FULL_EKF_HISTORY_SIZE;
+    // count up until the buffer is full
+    m_histCount = std::min(m_histCount + 1, FULL_EKF_HISTORY_SIZE);
 }
 
 int FullEkf::findEntry(int64_t tUs) const {
     // TODO: empty history or tUs older than the oldest entry -> -1
-    // TODO: binary search over logical index i, slot (oldest + i) % FULL_EKF_HISTORY_SIZE
-    // TODO: return whichever of the two entries around tUs is nearer
+    // TODO: binary search for the first logical index i with time >= tUs, slot (oldest + i) % FULL_EKF_HISTORY_SIZE
+    // TODO: return i, the newest index if tUs is past every entry
     (void)tUs;
     return -1;
 }
 
 UpdateResult FullEkf::applyLate(const PoseMeasurement& m) {
     // TODO: i = findEntry(m.tUs), -1 -> ++m_tooOld and return a rejected result
+    // TODO: use i - 1 if that entry is nearer to m.tUs
     // TODO: restore m_x, m_P, m_tUs from entry i
     // TODO: result = update(m), write the corrected state back into entry i
     // TODO: for each entry after i, propagate(entry.inc) and overwrite its x and P
