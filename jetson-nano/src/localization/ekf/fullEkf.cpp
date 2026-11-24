@@ -162,7 +162,7 @@ void FullEkf::drainQueue() {
     std::lock_guard<std::mutex> lock(m_stateMutex);
     for (const PoseMeasurement& m : batch) {
         // a measurement from the past is applied at its own time
-        m_lastUpdate = (m.tUs < m_tUs) ? applyLate(m) : update(m);
+        m_lastUpdate = (m.tUs <= m_tUs) ? applyLate(m) : update(m);
 
     }
 }
