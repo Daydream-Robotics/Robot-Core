@@ -254,11 +254,41 @@ std::optional<int> FullEkf::findEntry(int64_t tUs) const {
 }
 
 UpdateResult FullEkf::applyLate(const PoseMeasurement& m) {
-    // TODO: i = findEntry(m.tUs), nullopt -> ++m_tooOld and return a rejected result
-    // TODO: use i - 1 if that entry is nearer to m.tUs
-    // TODO: restore m_x, m_P, m_tUs from entry i
-    // TODO: result = update(m), write the corrected state back into entry i
-    // TODO: for each entry after i, propagate(entry.inc) and overwrite its x and P
-    // TODO: return result
-    return UpdateResult{m.tUs, m.source};
+    // first entry at or after m.tUs
+    std::optional<int> found = findEntry(m.tUs);
+    if (found == std::nullopt) {
+        // older than the history, drop and count it
+        ++m_tooOld;
+        return UpdateResult{m.tUs, m.source};
+    }
+
+    // oldest slot in the ring
+    const int oldest = (m_histHead - m_histCount + FULL_EKF_HISTORY_SIZE) % FULL_EKF_HISTORY_SIZE;
+    // apply at the nearer cycle boundary
+    if (*found > 0) {
+        const HistoryEntry& prev = m_history[(oldest + *found - 1) % FULL_EKF_HISTORY_SIZE];
+        const HistoryEntry& curr = m_history[(oldest + *found) % FULL_EKF_HISTORY_SIZE];
+        if (m.tUs - prev.tUs < curr.tUs - m.tUs) {
+            --*found;
+        }
+    }
+
+    // restore the state at that cycle
+    HistoryEntry& e = m_history[(oldest + *found) % FULL_EKF_HISTORY_SIZE];
+    m_x = e.x;
+    m_P = e.P;
+    m_tUs = e.tUs;
+    // correct it and save it back
+    const UpdateResult result = update(m);
+    e.x = m_x;
+    e.P = m_P;
+
+    // replay the later cycles up to now
+    for (int i = *found + 1; i < m_histCount; ++i) {
+        HistoryEntry& f = m_history[(oldest + i) % FULL_EKF_HISTORY_SIZE];
+        propagate(f.inc);
+        f.x = m_x;
+        f.P = m_P;
+    }
+    return result;
 }
