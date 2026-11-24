@@ -28,7 +28,7 @@ static_assert(NANO_IMU_YAW_SIGN == 1.0 || NANO_IMU_YAW_SIGN == -1.0, "NANO_IMU_Y
  *
  * The chip fuses gyro and accelerometer on board (no magnetometer), calibrates its own gyro bias, and
  * stamps every report with when it was sampled. Runs its own read thread so an I2C stall doesn't block
- * the EKF loop. Heading is CCW+ in radians, stamped on the Nano's steady_clock.
+ * the EKF loop. Heading is CW+ (compass, docs/FIELD_FRAME.md) in radians, stamped on the Nano's steady_clock.
  * 
  * 
  */
@@ -94,7 +94,7 @@ public:
     void stop();
 
     /**
-     * @brief Heading change between two times from the game rotation vector (CCW+, rad).
+     * @brief Heading change between two times from the game rotation vector (CW+, rad).
      *
      * t1Us may be up to NANO_IMU_MAX_EXTRAPOLATE_US past the newest sample, extrapolated at the last rate.
      *
@@ -116,7 +116,7 @@ private:
     /// @brief One heading sample.
     struct ThetaSample {
         int64_t tUs = 0;
-        double theta = 0.0; // unwrapped heading since start(), CCW+, rad
+        double theta = 0.0; // unwrapped heading since start(), CW+, rad
     };
 
     /// @brief One SHTP packet, header stripped.

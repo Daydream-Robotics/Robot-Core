@@ -56,8 +56,8 @@ void OdomEkf::step(const OdomInputs& in) {
         }
 
         // forward acceleration over this cycle, for next cycle's IME noise
-        m_accelX = std::abs(m_s[3] - m_prevVx) / in.dt;
-        m_prevVx = m_s[3];
+        m_accelY = std::abs(m_s[4] - m_prevVy) / in.dt;
+        m_prevVy = m_s[4];
 
         // this cycle ends now
         m_tUs = in.tUs;
@@ -106,8 +106,8 @@ void OdomEkf::reset(const Pose& pose) {
     m_Pstep.setZero();
 
     // velocity restarts at zero
-    m_prevVx = 0.0;
-    m_accelX = 0.0;
+    m_prevVy = 0.0;
+    m_accelY = 0.0;
 }
 
 void OdomEkf::onPose(PoseCallback cb) {
@@ -180,11 +180,11 @@ std::optional<PoseIncrement> OdomEkf::increment(int64_t t0Us, int64_t t1Us) cons
 
 Twist OdomEkf::twist() const {
     std::lock_guard<std::mutex> lock(m_mutex);
-    const double v = m_s[3];
+    const double v = m_s[4];
     const double omega = m_s[5];
     Eigen::Matrix2d cov;
-    cov << m_P(3, 3), m_P(3, 5),
-           m_P(5, 3), m_P(5, 5);
+    cov << m_P(4, 4), m_P(4, 5),
+           m_P(5, 4), m_P(5, 5);
     return Twist{m_tUs, v, omega, cov};
 }
 
@@ -236,7 +236,7 @@ PoseIncrement OdomEkf::stepIncrement(const State& before, int64_t t0Us) const {
 
     // rotate x, y into p0's frame
     Eigen::Matrix3d J = Eigen::Matrix3d::Identity();
-    J.topLeftCorner<2, 2>() = Eigen::Rotation2Dd(-before[2]).toRotationMatrix();
+    J.topLeftCorner<2, 2>() = Eigen::Rotation2Dd(before[2]).toRotationMatrix();
     const Eigen::Matrix3d cov = J * m_Pstep.topLeftCorner<3, 3>() * J.transpose();
 
     return PoseIncrement{t0Us, m_tUs, delta, cov};
@@ -271,19 +271,19 @@ void OdomEkf::predict(double dt) {
     const double sinThetaMid = std::sin(thetaMid);
 
     // robot-frame velocity rotated into the odometry frame, times dt
-    const double dx = dt * (vX * cosThetaMid - vY * sinThetaMid);
-    const double dy = dt * (vX * sinThetaMid + vY * cosThetaMid);
+    const double dx = dt * (vX * cosThetaMid + vY * sinThetaMid);
+    const double dy = dt * (-vX * sinThetaMid + vY * cosThetaMid);
 
     // F = d(new state) / d(old state), identity except where the pose depends on theta or the velocities
     Cov F = Cov::Identity();
-    F(0, 2) = -dy; // dx/dtheta, a heading error swings the step sideways
-    F(1, 2) = dx; // dy/dtheta
-    F(0, 3) = dt * cosThetaMid; // dx/dvX, forward speed moves along the heading
-    F(1, 3) = dt * sinThetaMid; // dy/dvX
-    F(0, 4) = -dt * sinThetaMid; // dx/dvY, sideways speed moves perpendicular to the heading
+    F(0, 2) = dy; // dx/dtheta, a heading error swings the step sideways
+    F(1, 2) = -dx; // dy/dtheta
+    F(0, 3) = dt * cosThetaMid; // dx/dvX, sideways speed moves perpendicular to the heading
+    F(1, 3) = -dt * sinThetaMid; // dy/dvX
+    F(0, 4) = dt * sinThetaMid; // dx/dvY, forward speed moves along the heading
     F(1, 4) = dt * cosThetaMid; // dy/dvY
-    F(0, 5) = -dy * dt / 2.0; // dx/domega
-    F(1, 5) = dx * dt / 2.0; // dy/domega
+    F(0, 5) = dy * dt / 2.0; // dx/domega
+    F(1, 5) = -dx * dt / 2.0; // dy/domega
     F(2, 5) = dt; // dtheta/domega
 
     // process noise is a change in velocity this cycle
@@ -298,8 +298,8 @@ void OdomEkf::predict(double dt) {
     // G maps a velocity change (vX, vY, omega) into the state, with the same rotation as the prediction
     Eigen::Matrix<double, 6, 3> G = Eigen::Matrix<double, 6, 3>::Zero();
     G(0, 0) = dt * cosThetaMid;
-    G(0, 1) = -dt * sinThetaMid;
-    G(1, 0) = dt * sinThetaMid;
+    G(0, 1) = dt * sinThetaMid;
+    G(1, 0) = -dt * sinThetaMid;
     G(1, 1) = dt * cosThetaMid;
     G(2, 2) = dt;
     G(3, 0) = 1.0;
@@ -351,31 +351,31 @@ OdomEkf::Measurement OdomEkf::buildMeasurement(const OdomInputs& in) const {
         ++row;
     };
 
-    // parallel wheel: dt * (vX + offset * omega), offset positive to the right
+    // parallel wheel: dt * (vY - offset * omega), offset positive to the right
     if (in.parValid) {
-        const double hOmega = dt * PARALLEL_TRACKING_WHEEL_OFFSET;
+        const double hOmega = -dt * PARALLEL_TRACKING_WHEEL_OFFSET;
         const double sigma = ODOM_EKF_TRACKING_SIGMA_PER_IN * std::abs(in.dsPar) + ODOM_EKF_TRACKING_SIGMA_FLOOR;
-        addRow(in.dsPar, Measurement::PAR, dt, 0.0, hOmega, sigma);
+        addRow(in.dsPar, Measurement::PAR, 0.0, dt, hOmega, sigma);
     }
 
-    // perpendicular wheel: dt * (vY - offset * omega), offset positive behind
+    // perpendicular wheel: dt * (vX - offset * omega), offset positive behind
     if (in.perpValid) {
         const double hOmega = -dt * PERPENDICULAR_TRACKING_WHEEL_OFFSET;
         const double sigma = ODOM_EKF_TRACKING_SIGMA_PER_IN * std::abs(in.dsPerp) + ODOM_EKF_TRACKING_SIGMA_FLOOR;
-        addRow(in.dsPerp, Measurement::PERP, 0.0, dt, hOmega, sigma);
+        addRow(in.dsPerp, Measurement::PERP, dt, 0.0, hOmega, sigma);
     }
 
-    // drive IMEs: dt * (vX -/+ omega * track / 2), noisier and worse in turns
+    // drive IMEs: dt * (vY +/- omega * track / 2), noisier and worse in turns
     if (in.imeValid) {
         const double hOmega = dt * TRACK_WIDTH / 2.0;
         // error shared by both sides: turn scrub, acceleration, and the floor
         const double turnSigma = ODOM_EKF_IME_SIGMA_PER_OMEGA * absOmega
-                               + ODOM_EKF_IME_SIGMA_PER_ACCEL * m_accelX
+                               + ODOM_EKF_IME_SIGMA_PER_ACCEL * m_accelY
                                + ODOM_EKF_IME_SIGMA_FLOOR;
         const double sigmaLeft = ODOM_EKF_IME_SIGMA_PER_IN * std::abs(in.dsLeft) + turnSigma;
         const double sigmaRight = ODOM_EKF_IME_SIGMA_PER_IN * std::abs(in.dsRight) + turnSigma;
-        addRow(in.dsLeft, Measurement::IME_L, dt, 0.0, -hOmega, sigmaLeft);
-        addRow(in.dsRight, Measurement::IME_R, dt, 0.0, hOmega, sigmaRight);
+        addRow(in.dsLeft, Measurement::IME_L, 0.0, dt, hOmega, sigmaLeft);
+        addRow(in.dsRight, Measurement::IME_R, 0.0, dt, -hOmega, sigmaRight);
     }
 
     // IMU: dt * omega, heading jitter plus drift times dt
