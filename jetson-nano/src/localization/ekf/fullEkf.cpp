@@ -30,6 +30,11 @@ void FullEkf::reset(const Pose& pose, const Eigen::Matrix3d& cov) {
     m_x = Pose{pose.x, pose.y, utils::wrapAngle(pose.theta)};
     m_P = ((cov + cov.transpose()) / 2.0).eval();
     m_rejectStreak = 0;
+
+    // forget cycles from before the reset
+    m_histHead = 0;
+    m_histCount = 0;
+
 }
 
 
@@ -44,20 +49,10 @@ void FullEkf::predict(const PoseIncrement& inc) {
 
     std::lock_guard<std::mutex> lock(m_stateMutex);
 
-    // Jacobians at the old pose
-    const Eigen::Matrix3d F = se2::composeJacA(m_x, inc.delta);
-    const Eigen::Matrix3d G = se2::composeJacB(m_x);
-
-    // move the pose by this cycle's increment
-    m_x = se2::compose(m_x, inc.delta);
-
-    // propagate the covariance
-    m_P = F * m_P * F.transpose() + G * inc.cov * G.transpose() + m_noise.qExtra;
-    // remove rounding asymmetry
-    m_P = ((m_P + m_P.transpose()) / 2.0).eval();
-
-    // time of the new pose
-    m_tUs = inc.t1Us;
+    // move the state forward one cycle
+    propagate(inc);
+    // save this cycle for late measurements
+    pushHistory(inc);
 }
 
 void FullEkf::submit(const PoseMeasurement& m) {
@@ -89,8 +84,6 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
         return result;
     }
 
-
-    // TODO (#187): m.tUs is older than m_x, apply it at m.tUs from the history and replay the increments since
     // innovation, measured minus predicted, heading wrapped
     Eigen::Vector3d nu;
     nu(0) = m.pose.x - m_x.x;
@@ -168,6 +161,134 @@ void FullEkf::drainQueue() {
     // apply each one and keep the latest result
     std::lock_guard<std::mutex> lock(m_stateMutex);
     for (const PoseMeasurement& m : batch) {
-        m_lastUpdate = update(m);
+        // a measurement from the past is applied at its own time
+        m_lastUpdate = (m.tUs <= m_tUs) ? applyLate(m) : update(m);
+
     }
+}
+
+std::optional<StampedPose> FullEkf::poseAt(int64_t tUs) const {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    // first entry at or after tUs, nothing if empty or too old
+    const std::optional<int> found = findEntry(tUs);
+    if (found == std::nullopt) {
+        return std::nullopt;
+    }
+
+    // oldest slot in the ring, then entry *found
+    const int oldest = (m_histHead - m_histCount + FULL_EKF_HISTORY_SIZE) % FULL_EKF_HISTORY_SIZE;
+    const HistoryEntry& b = m_history[(oldest + *found) % FULL_EKF_HISTORY_SIZE];
+    // newer than the newest entry
+    if (b.tUs < tUs) {
+        return std::nullopt;
+    }
+
+    // exact hit
+    if (b.tUs == tUs) {
+        return StampedPose{b.tUs, b.x, b.P};
+    }
+
+    // entry just before tUs
+    const HistoryEntry& a = m_history[(oldest + *found - 1) % FULL_EKF_HISTORY_SIZE];
+    // fraction of the way from a to b
+    const double alpha = static_cast<double>(tUs - a.tUs) / static_cast<double>(b.tUs - a.tUs);
+    // x and y linear, heading the short way around
+    const Pose p {(a.x.x + alpha * (b.x.x - a.x.x)), (a.x.y + alpha * (b.x.y - a.x.y)), utils::wrapAngle(a.x.theta + alpha * utils::wrapAngle(b.x.theta - a.x.theta))};
+    // covariance from the nearer entry
+    return StampedPose{tUs, p, alpha < 0.5 ? a.P : b.P};
+}
+
+int FullEkf::tooOldCount() const {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    return m_tooOld;
+}
+
+void FullEkf::propagate(const PoseIncrement& inc) {
+    // Jacobians at the old pose
+    const Eigen::Matrix3d F = se2::composeJacA(m_x, inc.delta);
+    const Eigen::Matrix3d G = se2::composeJacB(m_x);
+
+    // move the pose by this cycle's increment
+    m_x = se2::compose(m_x, inc.delta);
+
+    // propagate the covariance
+    m_P = F * m_P * F.transpose() + G * inc.cov * G.transpose() + m_noise.qExtra;
+    // remove rounding asymmetry
+    m_P = ((m_P + m_P.transpose()) / 2.0).eval();
+
+    // time of the new pose
+    m_tUs = inc.t1Us;
+}
+
+void FullEkf::pushHistory(const PoseIncrement& inc) {
+    // store the state after this cycle and the increment that led to it
+    m_history[m_histHead] = HistoryEntry{m_tUs, m_x, m_P, inc};
+    // move the head forward
+    m_histHead = (m_histHead + 1) % FULL_EKF_HISTORY_SIZE;
+    // count up until the buffer is full
+    m_histCount = std::min(m_histCount + 1, FULL_EKF_HISTORY_SIZE);
+}
+
+std::optional<int> FullEkf::findEntry(int64_t tUs) const {
+    // oldest slot in the ring
+    const int oldest = (m_histHead - m_histCount + FULL_EKF_HISTORY_SIZE) % FULL_EKF_HISTORY_SIZE;
+    // nothing stored, or older than the history
+    if (m_histCount == 0 || tUs < m_history[oldest].tUs) {
+        return std::nullopt;
+    }
+
+    // binary search
+    int lo = 0;
+    int hi = m_histCount - 1;
+    while (lo < hi) {
+        const int mid = (lo + hi) / 2;
+        if (m_history[(oldest + mid) % FULL_EKF_HISTORY_SIZE].tUs < tUs) {
+            lo = mid + 1;
+        } 
+        else {
+            hi = mid;
+        }
+    }
+    // first entry at or after tUs
+    return lo;
+}
+
+UpdateResult FullEkf::applyLate(const PoseMeasurement& m) {
+    // first entry at or after m.tUs
+    std::optional<int> found = findEntry(m.tUs);
+    if (found == std::nullopt) {
+        // older than the history, drop and count it
+        ++m_tooOld;
+        return UpdateResult{m.tUs, m.source};
+    }
+
+    // oldest slot in the ring
+    const int oldest = (m_histHead - m_histCount + FULL_EKF_HISTORY_SIZE) % FULL_EKF_HISTORY_SIZE;
+    // apply at the nearer cycle boundary
+    if (*found > 0) {
+        const HistoryEntry& prev = m_history[(oldest + *found - 1) % FULL_EKF_HISTORY_SIZE];
+        const HistoryEntry& curr = m_history[(oldest + *found) % FULL_EKF_HISTORY_SIZE];
+        if (m.tUs - prev.tUs < curr.tUs - m.tUs) {
+            --*found;
+        }
+    }
+
+    // restore the state at that cycle
+    HistoryEntry& e = m_history[(oldest + *found) % FULL_EKF_HISTORY_SIZE];
+    m_x = e.x;
+    m_P = e.P;
+    m_tUs = e.tUs;
+    // correct it and save it back
+    const UpdateResult result = update(m);
+    e.x = m_x;
+    e.P = m_P;
+
+    // replay the later cycles up to now
+    for (int i = *found + 1; i < m_histCount; ++i) {
+        HistoryEntry& f = m_history[(oldest + i) % FULL_EKF_HISTORY_SIZE];
+        propagate(f.inc);
+        f.x = m_x;
+        f.P = m_P;
+    }
+    return result;
 }

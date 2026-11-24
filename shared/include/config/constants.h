@@ -143,6 +143,9 @@ constexpr int FULL_EKF_RECOVERY_REJECTS = 5; // about 0.5 s of ICP
 constexpr double FULL_EKF_RECOVERY_XY_SIGMA = 12.0; // recovery position std dev (in)
 constexpr double FULL_EKF_RECOVERY_THETA_SIGMA = 0.26; // recovery heading std dev (rad)
 
+// history for late measurements, about 1 s at 10 ms cycles
+constexpr int FULL_EKF_HISTORY_SIZE = 100;
+
 
 /* - - - - - - - - - - - - - - [LIDAR] - - - - - - - - - - - - - - */
 // starting values from the LiDAR plan's parameter table; tune with the simulator and robot logs
