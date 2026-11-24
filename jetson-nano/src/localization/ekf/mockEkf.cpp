@@ -70,8 +70,12 @@ std::optional<StampedPose> MockEkf::mainPoseAt(int64_t tUs) const {
 }
 
 StampedPose MockEkf::mainPoseLatest() const {
-    // TODO: back of m_history, or {0, m_main, poseCov()} if empty
-    return StampedPose{0, m_main, poseCov()};
+    // nothing stepped yet, no real time
+    if (m_history.empty()) {
+        return StampedPose{0, m_main, poseCov()};
+    }
+    // newest main pose
+    return m_history.back();
 }
 
 void MockEkf::submitLidarMeasurement(const LidarMeasurement& m) {
@@ -92,6 +96,13 @@ const std::vector<LidarMeasurement>& MockEkf::submitted() const {
 }
 
 void MockEkf::firePoseReset(const StampedPose& p) {
+    // reset before the first step(), start from p instead of the first truth
+    if (!m_started) {
+        m_lastTruth = p;
+        m_nextPublishUs = p.tUs;
+        m_started = true;
+    }
+
     // both filters start over at the new pose
     m_odom = p.pose;
     m_main = p.pose;
@@ -101,7 +112,7 @@ void MockEkf::firePoseReset(const StampedPose& p) {
     m_history.push_back(p);
 
     // tell subscribers after the pose is set
-    for (const auto& reset : m_resetCallbacks) {
+    for (const PoseCallback& reset : m_resetCallbacks) {
         reset(p);
     }
 }
