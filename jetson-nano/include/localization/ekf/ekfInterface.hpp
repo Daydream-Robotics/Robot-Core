@@ -23,6 +23,8 @@ struct LidarMeasurement {
  * @brief Every EKF dependency of the LiDAR code goes through this.
  *
  * The real adapter wraps OdomEkf and FullEkf. MockEkf stands in for tests and the simulator.
+ *
+ * @see docs/LIDAR_EKF_ASSUMPTIONS.md for what A1 to A12 mean.
  */
 class EkfInterface {
 public:
