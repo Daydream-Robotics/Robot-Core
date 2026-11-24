@@ -21,6 +21,7 @@ class MPCReference {
             double a = MPC_MOTOR_A; //motor time-constant
             double b = MPC_MOTOR_B; //motor gain constant
             double a_max = MPC_A_MAX; //max accel of bot (in/s^2)
+            double a_lat_max = MPC_A_LAT_MAX; //max sideways accel in corners (in/s^2)
             double v_ref_min = MPC_V_REF_MIN; //speed floor (in/s)
         };
 

@@ -23,7 +23,10 @@ typename MPCReference<F>::ZRef MPCReference<F>::build(const Pose& currentPose, c
     // max feasible heading rate derate to 90%
     const double W_REF_MAX = 0.9 * (2.0 * r * (0.9 * (m_params.b / m_params.a) * 12.0)) / TRACK_WIDTH;
 
+    const double A_LAT_MAX = m_params.a_lat_max; // in/s^2, sideways accel in corners
+
     //curvature based speed cap at arc length sq(sQuery): est local kappa from heading change then limit speed so the outer wheel never exceeds V_STRAIGHT_MAX
+    //and the sideways accel v^2 * kappa stays under A_LAT_MAX (the wheels' grip)
     auto capAt = [&](double sq) -> double {
         InterpSample a = path.sampleAtArcLength(sq);
         //the pt ~3in ahead (clamped)
@@ -31,8 +34,11 @@ typename MPCReference<F>::ZRef MPCReference<F>::build(const Pose& currentPose, c
         double ds = std::max(1e-3, b.s - a.s);
         //curvature
         double kappa = std::abs(utils::wrapAngle(b.theta - a.theta)) / ds;
-        //return outer wheel limit
-        return V_STRAIGHT_MAX / (1.0 + kappa * TRACK_WIDTH / 2.0);
+        //outer wheel limit
+        double outerWheelCap = V_STRAIGHT_MAX / (1.0 + kappa * TRACK_WIDTH / 2.0);
+        //grip limit
+        double lateralCap = std::sqrt(A_LAT_MAX / std::max(kappa, 1e-6));
+        return std::min(outerWheelCap, lateralCap);
     };
 
     //braking speed aware cap: look ahead over the current stopping distance and make sure we could deaccelerate
