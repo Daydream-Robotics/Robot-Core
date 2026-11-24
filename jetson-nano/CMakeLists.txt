@@ -89,15 +89,11 @@ endif()
 # Default off when included by DreamSim, on for standalone Nano builds.
 option(ROBOTCORE_BUILD_LIDAR_DRIVER
         "Build the Slamtec SDK LiDAR driver" ${_robotcore_top_level})
-option(ROBOTCORE_BUILD_LIDAR_TEST
-        "Build the LiDAR SDK integration test" OFF)
 
 # The SDK is needed only on supported host platforms when requested.
 # The original platform-independent lidar target remains unchanged.
-
-# A test requires the driver even if the driver option is OFF.
 if((WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        AND (ROBOTCORE_BUILD_LIDAR_DRIVER OR ROBOTCORE_BUILD_LIDAR_TEST))
+        AND ROBOTCORE_BUILD_LIDAR_DRIVER)
 
     find_package(Threads REQUIRED)
 
@@ -117,7 +113,7 @@ if((WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(Git REQUIRED)
 
     set(SLAMTEC_SDK_PATCH
-            "${CMAKE_CURRENT_LIST_DIR}/patches/rplidar_sdk-empty-queue.patch"
+            "${EXTERNAL}/patches/rplidar_sdk-empty-queue.patch"
     )
 
     if(NOT EXISTS "${SLAMTEC_SDK_PATCH}")
@@ -222,8 +218,11 @@ if((WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_compile_definitions(slamtec_lidar_sdk PRIVATE WIN32)
     endif()
 
+    # Robot-frame transformation belongs to our driver/perception library,
+    # not to the third-party Slamtec SDK or a test executable.
     add_library(robotcore_lidar_driver STATIC
             src/perception/lidar/lidarDriver.cpp
+            src/perception/lidar/lidarExtrinsics.cpp
     )
 
     target_include_directories(robotcore_lidar_driver PUBLIC
@@ -235,28 +234,14 @@ if((WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
             Threads::Threads
     )
 
+    # The Nano executable may call lidarMounts() / LidarTransform.
+    # Linking is harmless until those functions are called from main.cpp.
+    if(TARGET MPCController)
+        target_link_libraries(MPCController PRIVATE robotcore_lidar_driver)
+    endif()
+
     # Nano-only code (UART counters, SCHED_FIFO) is guarded by __jetson_nano__
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_compile_definitions(robotcore_lidar_driver PRIVATE __jetson_nano__)
     endif()
 endif()
-
-# - - - - - - - - - - - - - - [LIDAR SDK TEST] - - - - - - - - - - - - - -
-
-if(ROBOTCORE_BUILD_LIDAR_TEST
-        AND TARGET robotcore_lidar_driver)
-
-    add_executable(lidar_sdk_test
-            src/perception/lidar/lidarSdkTest.cpp
-    )
-
-    target_link_libraries(lidar_sdk_test PRIVATE
-            robotcore_lidar_driver
-    )
-
-elseif(ROBOTCORE_BUILD_LIDAR_TEST)
-    message(STATUS
-            "LiDAR SDK test unavailable on ${CMAKE_SYSTEM_NAME}"
-    )
-endif()
-
