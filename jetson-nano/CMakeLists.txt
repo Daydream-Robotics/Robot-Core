@@ -55,6 +55,7 @@ endif()
 # portable: Eigen + std only, so the simulator and tests can link it too
 add_library(robotcore_lidar STATIC
     src/perception/lidar/adaptiveThreshold.cpp
+    src/perception/lidar/poseBuffer.cpp
 )
 target_include_directories(robotcore_lidar PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
