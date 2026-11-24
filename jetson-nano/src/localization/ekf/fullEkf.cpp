@@ -44,8 +44,8 @@ void FullEkf::setPose(const StampedPose& p) {
 }
 
 void FullEkf::onPoseReset(PoseCallback cb) {
-    // TODO: add cb to m_resetCallbacks under m_callbackMutex
-    (void)cb;
+    std::lock_guard<std::mutex> lock(m_callbackMutex);
+    m_resetCallbacks.push_back(std::move(cb));
 }
 
 
