@@ -126,6 +126,13 @@ void PoseBuffer::clear() {
     m_lowRateLogged = false;
 }
 
+void PoseBuffer::subscribe(EkfInterface& ekf) {
+    // every odom_ekf_ pose goes into this buffer, time cast to the buffer's uint64_t
+    ekf.onOdomPose([this](const StampedPose& p) {
+        push(static_cast<uint64_t>(p.tUs), p.pose);
+    });
+}
+
 Pose PoseBuffer::interpolate(const Sample& a, const Sample& b, double alpha) {
     // x and y blended linearly
     const double x = a.pose.x + alpha * (b.pose.x - a.pose.x);

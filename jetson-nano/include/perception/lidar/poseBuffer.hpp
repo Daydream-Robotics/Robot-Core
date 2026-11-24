@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "config/constants.h"
+#include "localization/ekf/ekfInterface.hpp"
 #include "localization/odometry.hpp"
 
 /**
@@ -36,6 +37,15 @@ public:
      * @brief Clears every sample.
      */
     void clear();
+
+    /**
+     * @brief Pushes every odom_ekf_ pose from ekf into this buffer. Call once.
+     *
+     * @warning The buffer must outlive ekf's callbacks, the callback holds a pointer to this buffer.
+     *
+     * @param ekf EKF to listen to.
+     */
+    void subscribe(EkfInterface& ekf);
 
 private:
     /**
