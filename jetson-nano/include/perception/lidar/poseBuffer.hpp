@@ -67,7 +67,7 @@ private:
     static Pose interpolate(const Sample& a, const Sample& b, double alpha);
 
     mutable std::mutex m_mutex; ///< guards the ring buffer
-    std::array<Sample, LIDAR_POSE_BUFFER_SIZE> m_samples{}; ///< ring buffer, oldest overwritten first
+    std::array<Sample, LIDAR_POSE_BUFFER_CAPACITY> m_samples{}; ///< ring buffer, oldest overwritten first
     int m_head = 0; ///< index the next sample is written to
     int m_count = 0; ///< how many of m_samples are filled
     bool m_lowRateLogged = false; ///< low rate already logged

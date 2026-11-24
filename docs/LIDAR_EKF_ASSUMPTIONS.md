@@ -26,4 +26,4 @@ Everything the LiDAR code assumes about the EKFs. The LiDAR code only talks to t
 - **A5:** confirm the pose reference point is the robot's geometric center.
 - **A6, A11:** field origin, axes, and alliance mirroring vs. the #144 map.
 - **A10:** the adapter calls the `onPoseReset` callbacks wherever `reset()` is called.
-- **Time types:** the EKFs and `EkfInterface` use `int64_t` us, `LidarDriver` (`stamp_us`) and `PoseBuffer` use `uint64_t` us. Cast at the boundary for now, make them match later.
+- **Time types:** the EKFs and `EkfInterface` use `int64_t` us, `LidarDriver` (`stampUs`) and `PoseBuffer` use `uint64_t` us. Cast at the boundary for now, make them match later.

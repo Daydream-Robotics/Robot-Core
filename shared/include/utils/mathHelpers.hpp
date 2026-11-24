@@ -11,15 +11,26 @@
 namespace utils {
 
 /**
- * @brief Wraps an angle to (-pi, pi].
+ * @brief Wraps an angle to [-pi, pi].
  *
  * @param a Angle in radians.
- * @return double The same angle in (-pi, pi].
+ * @return double The same angle in [-pi, pi].
  */
 inline double wrapAngle(double a) {
     while (a > M_PI) a -= 2.0 * M_PI;
     while (a < -M_PI) a += 2.0 * M_PI;
     return a;
+}
+
+/**
+ * @brief Wraps an angle to (-pi, pi], -pi becomes pi.
+ *
+ * @param a Angle in radians.
+ * @return double The same angle in (-pi, pi].
+ */
+inline double normalizeAngle(double a) {
+    const double wrapped = wrapAngle(a);
+    return wrapped <= -M_PI ? M_PI : wrapped;
 }
 
 } // namespace utils

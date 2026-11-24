@@ -28,7 +28,7 @@ void AdaptiveThreshold::update(const Pose& tInit, const Pose& tResult) {
     double deltaTrans = std::hypot(tResult.x - tInit.x, tResult.y-tInit.y);
 
     // how far ICP turned the heading from the guess (rad), wrapped
-    double deltaTheta = utils::wrapAngle(tResult.theta-tInit.theta);
+    double deltaTheta = utils::normalizeAngle(tResult.theta-tInit.theta);
 
     // how far that heading change moves a point at max range (chord length, in)
     // a small heading error moves far points the most

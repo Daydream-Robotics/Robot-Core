@@ -20,7 +20,7 @@ void PoseBuffer::push(uint64_t tUs, const Pose& pose) {
     // order and gap checks need a previous sample
     if (m_count > 0) {
         // newest stored sample
-        const int latest = (m_head - 1 + LIDAR_POSE_BUFFER_SIZE) % LIDAR_POSE_BUFFER_SIZE;
+        const int latest = (m_head - 1 + LIDAR_POSE_BUFFER_CAPACITY) % LIDAR_POSE_BUFFER_CAPACITY;
         const Sample& latestSample = m_samples[latest];
 
         // drop an out-of-order or duplicate time
@@ -37,15 +37,15 @@ void PoseBuffer::push(uint64_t tUs, const Pose& pose) {
     // write at the head, the oldest sample is overwritten once full
     m_samples[m_head] = Sample{tUs, pose};
     // move the head forward, wrapping to 0 at the end
-    m_head = (m_head + 1) % LIDAR_POSE_BUFFER_SIZE;
-    // one more sample, up to LIDAR_POSE_BUFFER_SIZE
-    m_count = std::min(m_count + 1, LIDAR_POSE_BUFFER_SIZE);
+    m_head = (m_head + 1) % LIDAR_POSE_BUFFER_CAPACITY;
+    // one more sample, up to LIDAR_POSE_BUFFER_CAPACITY
+    m_count = std::min(m_count + 1, LIDAR_POSE_BUFFER_CAPACITY);
 
     // average odom rate over the full buffer
-    if (m_count == LIDAR_POSE_BUFFER_SIZE) {
+    if (m_count == LIDAR_POSE_BUFFER_CAPACITY) {
         const int oldest = m_head;
         const uint64_t spanUs = tUs - m_samples[oldest].tUs;
-        const double hz = (LIDAR_POSE_BUFFER_SIZE - 1) * 1e6 / static_cast<double>(spanUs);
+        const double hz = (LIDAR_POSE_BUFFER_CAPACITY - 1) * 1e6 / static_cast<double>(spanUs);
 
         // log once when the rate drops, again only after it recovers
         if (hz < LIDAR_POSE_MIN_HZ && !m_lowRateLogged) {
@@ -67,8 +67,8 @@ std::optional<Pose> PoseBuffer::poseAt(uint64_t tUs) const {
     }
 
     // oldest and newest samples
-    const int latestIdx = (m_head - 1 + LIDAR_POSE_BUFFER_SIZE) % LIDAR_POSE_BUFFER_SIZE;
-    const int oldestIdx = (m_head - m_count + LIDAR_POSE_BUFFER_SIZE) % LIDAR_POSE_BUFFER_SIZE;
+    const int latestIdx = (m_head - 1 + LIDAR_POSE_BUFFER_CAPACITY) % LIDAR_POSE_BUFFER_CAPACITY;
+    const int oldestIdx = (m_head - m_count + LIDAR_POSE_BUFFER_CAPACITY) % LIDAR_POSE_BUFFER_CAPACITY;
     const Sample& latestSample = m_samples[latestIdx];
     const Sample& oldestSample = m_samples[oldestIdx];
 
@@ -91,7 +91,7 @@ std::optional<Pose> PoseBuffer::poseAt(uint64_t tUs) const {
     // keeps lo at or before t and hi after t
     while (hi - lo > 1) {
         const int mid = lo + (hi - lo) / 2;
-        const Sample& midSample = m_samples[(oldestIdx + mid) % LIDAR_POSE_BUFFER_SIZE];
+        const Sample& midSample = m_samples[(oldestIdx + mid) % LIDAR_POSE_BUFFER_CAPACITY];
         if (midSample.tUs <= tUs) {
             lo = mid;
         } 
@@ -101,8 +101,8 @@ std::optional<Pose> PoseBuffer::poseAt(uint64_t tUs) const {
     }
 
     // the two samples around t
-    const Sample& a = m_samples[(oldestIdx + lo) % LIDAR_POSE_BUFFER_SIZE];
-    const Sample& b = m_samples[(oldestIdx + hi) % LIDAR_POSE_BUFFER_SIZE];
+    const Sample& a = m_samples[(oldestIdx + lo) % LIDAR_POSE_BUFFER_CAPACITY];
+    const Sample& b = m_samples[(oldestIdx + hi) % LIDAR_POSE_BUFFER_CAPACITY];
 
     // t lands on a sample
     if (a.tUs == tUs) {
@@ -126,21 +126,21 @@ void PoseBuffer::clear() {
     m_lowRateLogged = false;
 }
 
-void PoseBuffer::subscribe(EkfInterface& ekf) {
-    // every odom_ekf_ pose goes into this buffer, time cast to the buffer's uint64_t
-    ekf.onOdomPose([this](const StampedPose& p) {
-        push(static_cast<uint64_t>(p.tUs), p.pose);
-    });
-}
-
 Pose PoseBuffer::interpolate(const Sample& a, const Sample& b, double alpha) {
     // x and y blended linearly
     const double x = a.pose.x + alpha * (b.pose.x - a.pose.x);
     const double y = a.pose.y + alpha * (b.pose.y - a.pose.y);
 
     // heading takes the short way around
-    const double dTheta = utils::wrapAngle(b.pose.theta - a.pose.theta);
-    const double theta = utils::wrapAngle(a.pose.theta + alpha * dTheta);
+    const double dTheta = utils::normalizeAngle(b.pose.theta - a.pose.theta);
+    const double theta = utils::normalizeAngle(a.pose.theta + alpha * dTheta);
 
     return Pose{x, y, theta};
+}
+
+void PoseBuffer::subscribe(EkfInterface& ekf) {
+    // every odom_ekf_ pose goes into this buffer, time cast to the buffer's uint64_t
+    ekf.onOdomPose([this](const StampedPose& p) {
+        push(static_cast<uint64_t>(p.tUs), p.pose);
+    });
 }
