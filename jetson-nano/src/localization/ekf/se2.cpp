@@ -15,8 +15,8 @@ Pose compose(const Pose& a, const Pose& b) {
     double sinA = std::sin(a.theta);
 
     // rotate b's x and y into the world frame
-    double dxWorld = b.x * cosA - b.y * sinA;
-    double dyWorld = b.x * sinA + b.y * cosA;
+    double dxWorld = b.x * cosA + b.y * sinA;
+    double dyWorld = -b.x * sinA + b.y * cosA;
 
     // add the rotated move to a's position
     double x = a.x + dxWorld;
@@ -38,8 +38,8 @@ Pose inverse(const Pose& a) {
     double sinA = std::sin(a.theta);
 
     // rotate the negated position by -a.theta into a's frame
-    double x = backX * cosA + backY * sinA;
-    double y = -backX * sinA + backY * cosA;
+    double x = backX * cosA - backY * sinA;
+    double y = backX * sinA + backY * cosA;
 
     return Pose{x, y, heading};
 }
@@ -54,15 +54,15 @@ Eigen::Matrix3d composeJacA(const Pose& a, const Pose& b) {
     double sinA = std::sin(a.theta);
 
     // rotate b's x and y into the world frame
-    double dxWorld = b.x * cosA - b.y * sinA;
-    double dyWorld = b.x * sinA + b.y * cosA;
+    double dxWorld = b.x * cosA + b.y * sinA;
+    double dyWorld = -b.x * sinA + b.y * cosA;
 
     // start from identity
     Eigen::Matrix3d jac = Eigen::Matrix3d::Identity();
 
     // fill the a.theta column for x and y
-    jac(0, 2) = -dyWorld;
-    jac(1, 2) = dxWorld;
+    jac(0, 2) = dyWorld;
+    jac(1, 2) = -dxWorld;
 
     return jac;
 }
@@ -77,8 +77,8 @@ Eigen::Matrix3d composeJacB(const Pose& a) {
 
     // put the rotation by a's heading in the top-left 2x2
     jac(0, 0) = cosA;
-    jac(0, 1) = -sinA;
-    jac(1, 0) = sinA;
+    jac(0, 1) = sinA;
+    jac(1, 0) = -sinA;
     jac(1, 1) = cosA;
 
     return jac;
