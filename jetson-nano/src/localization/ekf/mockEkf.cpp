@@ -62,11 +62,42 @@ void MockEkf::onOdomPose(PoseCallback cb) {
 }
 
 std::optional<StampedPose> MockEkf::mainPoseAt(int64_t tUs) const {
-    // TODO: empty or tUs outside [front, back] -> nullopt
-    // TODO: linear scan for the first entry with time >= tUs, exact hit -> that entry
-    // TODO: interpolate with the entry before, theta with the wrapped difference
-    (void)tUs;
-    return std::nullopt;
+    // empty, or outside the history
+    if (m_history.empty() || tUs < m_history.front().tUs || tUs > m_history.back().tUs) {
+        return std::nullopt;
+    }
+
+    // binary search for the first entry at or after tUs
+    int lo = 0;
+    int hi = static_cast<int>(m_history.size()) - 1;
+    while (lo < hi) {
+        const int mid = (lo + hi) / 2;
+        if (m_history[mid].tUs < tUs) {
+            lo = mid + 1;
+        } 
+        else {
+            hi = mid;
+        }
+    }
+
+    // exact hit
+    const StampedPose& b = m_history[lo];
+    if (b.tUs == tUs) {
+        return b;
+    }
+
+    // entry just before tUs
+    const StampedPose& a = m_history[lo - 1];
+    // fraction of the way from a to b
+    const double alpha = static_cast<double>(tUs - a.tUs) / static_cast<double>(b.tUs - a.tUs);
+
+    // x and y linear, heading the short way around
+    const Pose p{a.pose.x + alpha * (b.pose.x - a.pose.x),
+                 a.pose.y + alpha * (b.pose.y - a.pose.y),
+                 utils::wrapAngle(a.pose.theta + alpha * utils::wrapAngle(b.pose.theta - a.pose.theta))};
+
+    // covariance from the nearer entry
+    return StampedPose{tUs, p, alpha < 0.5 ? a.cov : b.cov};
 }
 
 StampedPose MockEkf::mainPoseLatest() const {
