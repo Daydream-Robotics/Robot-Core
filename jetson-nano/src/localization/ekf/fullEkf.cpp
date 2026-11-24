@@ -169,15 +169,15 @@ void FullEkf::drainQueue() {
 
 std::optional<StampedPose> FullEkf::poseAt(int64_t tUs) const {
     std::lock_guard<std::mutex> lock(m_stateMutex);
-    // first entry at or after tUs
-    const int i = findEntry(tUs);
-    if (i < 0) {
+    // first entry at or after tUs, nothing if empty or too old
+    const std::optional<int> found = findEntry(tUs);
+    if (found == std::nullopt) {
         return std::nullopt;
     }
 
-    // oldest slot in the ring, then entry i
+    // oldest slot in the ring, then entry *found
     const int oldest = (m_histHead - m_histCount + FULL_EKF_HISTORY_SIZE) % FULL_EKF_HISTORY_SIZE;
-    const HistoryEntry& b = m_history[(oldest + i) % FULL_EKF_HISTORY_SIZE];
+    const HistoryEntry& b = m_history[(oldest + *found) % FULL_EKF_HISTORY_SIZE];
     // newer than the newest entry
     if (b.tUs < tUs) {
         return std::nullopt;
@@ -189,7 +189,7 @@ std::optional<StampedPose> FullEkf::poseAt(int64_t tUs) const {
     }
 
     // entry just before tUs
-    const HistoryEntry& a = m_history[(oldest + i - 1) % FULL_EKF_HISTORY_SIZE];
+    const HistoryEntry& a = m_history[(oldest + *found - 1) % FULL_EKF_HISTORY_SIZE];
     // fraction of the way from a to b
     const double alpha = static_cast<double>(tUs - a.tUs) / static_cast<double>(b.tUs - a.tUs);
     // x and y linear, heading the short way around
@@ -229,16 +229,32 @@ void FullEkf::pushHistory(const PoseIncrement& inc) {
     m_histCount = std::min(m_histCount + 1, FULL_EKF_HISTORY_SIZE);
 }
 
-int FullEkf::findEntry(int64_t tUs) const {
-    // TODO: empty history or tUs older than the oldest entry -> -1
-    // TODO: binary search for the first logical index i with time >= tUs, slot (oldest + i) % FULL_EKF_HISTORY_SIZE
-    // TODO: return i, the newest index if tUs is past every entry
-    (void)tUs;
-    return -1;
+std::optional<int> FullEkf::findEntry(int64_t tUs) const {
+    // oldest slot in the ring
+    const int oldest = (m_histHead - m_histCount + FULL_EKF_HISTORY_SIZE) % FULL_EKF_HISTORY_SIZE;
+    // nothing stored, or older than the history
+    if (m_histCount == 0 || tUs < m_history[oldest].tUs) {
+        return std::nullopt;
+    }
+
+    // binary search
+    int lo = 0;
+    int hi = m_histCount - 1;
+    while (lo < hi) {
+        const int mid = (lo + hi) / 2;
+        if (m_history[(oldest + mid) % FULL_EKF_HISTORY_SIZE].tUs < tUs) {
+            lo = mid + 1;
+        } 
+        else {
+            hi = mid;
+        }
+    }
+    // first entry at or after tUs
+    return lo;
 }
 
 UpdateResult FullEkf::applyLate(const PoseMeasurement& m) {
-    // TODO: i = findEntry(m.tUs), -1 -> ++m_tooOld and return a rejected result
+    // TODO: i = findEntry(m.tUs), nullopt -> ++m_tooOld and return a rejected result
     // TODO: use i - 1 if that entry is nearer to m.tUs
     // TODO: restore m_x, m_P, m_tUs from entry i
     // TODO: result = update(m), write the corrected state back into entry i

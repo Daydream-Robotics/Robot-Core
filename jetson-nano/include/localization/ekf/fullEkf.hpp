@@ -155,9 +155,9 @@ private:
      * @brief Finds the first history entry at or after a time. Caller holds m_stateMutex.
      *
      * @param tUs Time to look up.
-     * @return int Logical index, 0 is the oldest, or -1 if tUs is older than the history.
+     * @return std::optional<int> Logical index, 0 is the oldest. Nothing if the history is empty or tUs is older than it.
      */
-    int findEntry(int64_t tUs) const;
+    std::optional<int> findEntry(int64_t tUs) const;
 
     /**
      * @brief Applies a measurement from the past and replays the increments since. Caller holds m_stateMutex.
