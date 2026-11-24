@@ -7,8 +7,8 @@
 #include "localization/odometry.hpp"
 
 // SE(2) pose math shared by both EKFs and the LiDAR pipeline, in the compass frame from
-// docs/FIELD_FRAME.md (field +X forward, +Y left, robot +Y forward, +X right, theta 0 along +Y and CW
-// positive), x/y in inches, theta in radians.
+// docs/FIELD_FRAME.md (+X forward, +Y left, theta 0 along +Y and CW positive), x/y in inches,
+// theta in radians.
 // Every returned theta is wrapped to (-pi, pi] with utils::wrapAngle.
 
 namespace se2 {
