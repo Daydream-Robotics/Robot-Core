@@ -9,14 +9,14 @@
 FullEkf::FullEkf(const FullEkfNoise& noise) : m_noise(noise) {}
 
 
-void FullEkf::reset(const Pose& pose, const Eigen::Matrix3d& cov) {
+void FullEkf::setPose(const StampedPose& p) {
     // skip a pose or covariance with a NaN or infinity
-    if (!(std::isfinite(pose.x) && std::isfinite(pose.y) && std::isfinite(pose.theta) && cov.allFinite())) {
+    if (!(std::isfinite(p.pose.x) && std::isfinite(p.pose.y) && std::isfinite(p.pose.theta) && p.cov.allFinite())) {
         return;
     }
     
     // Skip invalid covariance matrices (not positive definite)
-    if (cov.llt().info() != Eigen::Success) {
+    if (p.cov.llt().info() != Eigen::Success) {
         return;
     }
 
@@ -26,15 +26,26 @@ void FullEkf::reset(const Pose& pose, const Eigen::Matrix3d& cov) {
         m_pending.clear();
     }
 
-    std::lock_guard<std::mutex> lock(m_stateMutex);
-    m_x = Pose{pose.x, pose.y, utils::wrapAngle(pose.theta)};
-    m_P = ((cov + cov.transpose()) / 2.0).eval();
-    m_rejectStreak = 0;
+    {
+        std::lock_guard<std::mutex> lock(m_stateMutex);
+        m_x = Pose{p.pose.x, p.pose.y, utils::wrapAngle(p.pose.theta)};
+        m_P = ((p.cov + p.cov.transpose()) / 2.0).eval();
+        m_rejectStreak = 0;
 
-    // forget cycles from before the reset
-    m_histHead = 0;
-    m_histCount = 0;
+        // forget cycles from before the reset
+        m_histHead = 0;
+        m_histCount = 0;
 
+        // TODO: m_tUs = p.tUs, so measurements from before the reset count as too old
+        // TODO: store the start state as the first history entry, with a zero increment
+    }
+
+    // TODO: call every reset callback with the new state, outside m_stateMutex
+}
+
+void FullEkf::onPoseReset(PoseCallback cb) {
+    // TODO: add cb to m_resetCallbacks under m_callbackMutex
+    (void)cb;
 }
 
 

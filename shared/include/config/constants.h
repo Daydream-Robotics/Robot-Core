@@ -146,6 +146,10 @@ constexpr double FULL_EKF_RECOVERY_THETA_SIGMA = 0.26; // recovery heading std d
 // history for late measurements, about 1 s at 10 ms cycles
 constexpr int FULL_EKF_HISTORY_SIZE = 100;
 
+// start pose covariance for setPose() at a known start position
+constexpr double FULL_EKF_INIT_XY_SIGMA = 1.0; // start position std dev (in)
+constexpr double FULL_EKF_INIT_THETA_SIGMA = 0.035; // start heading std dev (rad), about 2 deg
+
 
 /* - - - - - - - - - - - - - - [LIDAR] - - - - - - - - - - - - - - */
 // starting values from the LiDAR plan's parameter table; tune with the simulator and robot logs

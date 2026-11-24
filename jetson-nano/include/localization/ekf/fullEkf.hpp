@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <vector>
@@ -64,23 +65,35 @@ struct FullEkfNoise {
  */
 class FullEkf {
 public:
+    using PoseCallback = std::function<void(const StampedPose&)>;
+
     /**
-     * @brief Constructs the filter at the field origin. Call reset() with the start pose before use.
+     * @brief Constructs the filter at the field origin. Call setPose() with the start pose before use.
      *
      * @param noise Process inflation, gate, and recovery settings.
      */
     explicit FullEkf(const FullEkfNoise& noise);
 
     /**
-     * @brief Sets the field pose and its covariance, and drops queued measurements (thread-safe).
+     * @brief Sets the field pose and covariance, clears history and queued measurements, and notifies subscribers (thread-safe).
      *
-     * Call with the known start position for the match or auton. Ignored if the pose or
-     * covariance has a NaN or infinity.
+     * Call with the known start position for the match or auton, with a small covariance
+     * (FULL_EKF_INIT_XY_SIGMA, FULL_EKF_INIT_THETA_SIGMA). odom_ekf_ is not reset, only its
+     * increments are used. Ignored if the pose or covariance has a NaN or infinity, or the
+     * covariance is not positive definite.
      *
-     * @param pose Field pose.
-     * @param cov Covariance of pose (x, y, θ order, in² and rad²).
+     * @param p Field pose, its time on the Nano's steady_clock (us), and covariance (x, y, θ order, in² and rad²).
      */
-    void reset(const Pose& pose, const Eigen::Matrix3d& cov);
+    void setPose(const StampedPose& p);
+
+    /**
+     * @brief Subscribes to pose resets (LiDAR A10). Called once per accepted setPose(), after the state is set.
+     *
+     * Register before the EKF thread starts.
+     *
+     * @param cb Called with the new pose.
+     */
+    void onPoseReset(PoseCallback cb);
 
 
     /**
@@ -194,4 +207,6 @@ private:
     mutable std::mutex m_stateMutex; ///< guards m_x, m_P, m_tUs, m_lastUpdate, m_rejectStreak, history
     std::vector<PoseMeasurement> m_pending; ///< measurements waiting for the next predict()
     std::mutex m_pendingMutex; ///< guards m_pending, submit() runs on other threads
+    std::vector<PoseCallback> m_resetCallbacks; ///< onPoseReset() subscribers
+    std::mutex m_callbackMutex; ///< guards m_resetCallbacks
 };
