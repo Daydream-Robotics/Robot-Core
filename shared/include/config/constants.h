@@ -40,7 +40,7 @@ constexpr double PERPENDICULAR_TRACKING_WHEEL_OFFSET = 0.0; // positive is behin
 /* - - - - - - - - - - - - - - [ROBOT DIMS] - - - - - - - - - - - - - - */
 
 constexpr double DRIVE_WHEEL_DIAMETER_INCHES = 3.25;
-constexpr double DRIVE_GEAR_RATIO = 600.0/600.0; //450 rpm wheel / 600 rpm cartridge
+constexpr double DRIVE_GEAR_RATIO = 450.0/600.0; // 450 rpm wheel / 600 rpm cartridge
 constexpr double TRACK_WIDTH = 10.5; // drive wheel track width (in), also used by the Nano's MPC
 
 /* - - - - - - - - - - - - - - [DRIVE] - - - - - - - - - - - - - - */
@@ -119,8 +119,8 @@ constexpr double MPC_P_FINAL_MULT = 20.0; // multiplier for the last output weig
 constexpr double MPC_V_MAX = 12.0; // max drive voltage (V)
 constexpr double MPC_DELTA_U_MAX = 8.0; // max voltage increase per step (V)
 constexpr double MPC_DELTA_U_MIN = -8.0; // max voltage decrease per step (V)
-constexpr double MPC_X_FIELD_MAX = 200.0; // max |x| on the field (in)
-constexpr double MPC_Y_FIELD_MAX = 200.0; // max |y| on the field (in)
+constexpr double MPC_X_FIELD_MAX = 200.0; // max |x| from field center (in), past the 72in field edge so the bound stays inactive
+constexpr double MPC_Y_FIELD_MAX = 200.0; // max |y| from field center (in), past the 72in field edge so the bound stays inactive
 constexpr double MPC_OMEGA_WHEEL_MAX = 100.0; // max wheel speed (rad/s)
 
 enum class DriveType {
