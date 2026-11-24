@@ -7,6 +7,8 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#include <cstdint>
+
 #include "config/linkConstants.hpp"
 
 /* - - - - - - - - - - - - - - [PORTS] - - - - - - - - - - - - - - */
@@ -103,6 +105,16 @@ constexpr double LIDAR_1_X_IN = 6.0;
 constexpr double LIDAR_1_Y_IN = -4.0;
 constexpr double LIDAR_1_PSI_RAD = 0.0; // mount yaw plus the C1's 0 deg offset, check with a target on the left
 constexpr double LIDAR_1_HEIGHT_IN = 8.0; // scan plane height, below the field wall top (#144)
+
+/* - - - - - - - - - - - - - - [MOCK EKF] - - - - - - - - - - - - - - */
+// stand-in EKF for LiDAR tests and the simulator (jetson-nano/src/localization/ekf/mockEkf.cpp)
+
+constexpr double MOCK_EKF_ODOM_RATE_HZ = 100.0; // default odom_ekf_ publish rate (A2)
+constexpr int64_t MOCK_EKF_HISTORY_US = 1000000; // how far back mainPoseAt() can look (us)
+
+// fixed covariance put on every mock pose
+constexpr double MOCK_EKF_POSE_SIGMA_IN = 0.5; // position std dev (in)
+constexpr double MOCK_EKF_POSE_SIGMA_RAD = 0.01; // heading std dev (rad)
 
 
 #endif

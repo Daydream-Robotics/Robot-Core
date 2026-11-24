@@ -66,6 +66,7 @@ target_include_directories(robotcore_lidar PUBLIC
 # portable: Eigen + std only, so the simulator and tests can link it too
 add_library(robotcore_ekf STATIC
     src/localization/ekf/se2.cpp
+    src/localization/ekf/mockEkf.cpp
 )
 target_include_directories(robotcore_ekf PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
