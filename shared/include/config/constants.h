@@ -110,6 +110,7 @@ constexpr double LIDAR_1_HEIGHT_IN = 8.0; // scan plane height, below the field 
 constexpr uint64_t LIDAR_POSE_EXTRAPOLATE_US = 5000; // poseAt() returns the newest pose up to this far past it (us)
 constexpr uint64_t LIDAR_POSE_GAP_US = 30000; // gap between odom poses that gets logged (us)
 constexpr double LIDAR_POSE_MIN_HZ = 50.0; // odom rate below this gets logged once (Hz)
+constexpr int LIDAR_POSE_BUFFER_SIZE = 200; // odom poses kept, 1 s at 200 Hz
 
 /* - - - - - - - - - - - - - - [MOCK EKF] - - - - - - - - - - - - - - */
 // stand-in EKF for LiDAR tests and the simulator (jetson-nano/src/localization/ekf/mockEkf.cpp)
