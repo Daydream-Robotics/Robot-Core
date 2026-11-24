@@ -14,7 +14,7 @@ struct OdomInputs {
     double dt = 0.0; ///< seconds since the previous OdomInputs
 
     double dsPar = 0.0; ///< parallel tracking wheel travel (in)
-    double dsPerp = 0.0; ///< perpendicular tracking wheel travel (in)
+    double dsPerp = 0.0; ///< perpendicular tracking wheel travel, positive along +X at heading 0 (in)
     double dsLeft = 0.0; ///< left drive travel from IMEs (in)
     double dsRight = 0.0; ///< right drive travel from IMEs (in)
     double dTheta = 0.0; ///< IMU heading change, CW+ (rad)

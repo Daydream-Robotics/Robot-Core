@@ -11,7 +11,7 @@ The frame `main_ekf_` (`FullEkf`) runs in, and the frame the static field map (#
 Same as jerryio. Units are inches.
 
 - +X points forward (TODO: toward which field wall), +Y points left of +X.
-- Robot frame: +Y forward, +X right, so a robot at heading 0 lines up with the field axes.
+- A robot at heading 0 faces +Y, and its sideways (perpendicular wheel) direction is +X.
 - Heading is compass: 0 points along +Y, 90° along +X, increasing clockwise.
 
 

@@ -45,7 +45,7 @@ struct OdomHealth {
  * @brief Odometry EKF: fuses tracking wheels, IMEs, and IMU. Takes relative movements.
  *
  * State is (x, y, theta, v_x, v_y, omega). Pose is in the odometry frame, and v_x, v_y are
- * sideways (right) and forward speed in the robot frame.
+ * sideways and forward speed in the robot frame (along +X and +Y at heading 0).
  *
  * Thread safety: step() and reset() run on one thread (the link thread). The getters and
  * increment() may be called from any thread. Register callbacks before the first step().
