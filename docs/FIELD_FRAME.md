@@ -10,23 +10,32 @@ The frame `main_ekf_` (`FullEkf`) runs in, and the frame the static field map (#
 
 Same as jerryio. Units are inches.
 
-- +X points forward (TODO: toward which field wall), +Y points left of +X.
+- +X points forward, away from the red driver station. +Y points left of +X.
 - A robot at heading 0 faces +Y, and its sideways (perpendicular wheel) direction is +X.
 - Heading is compass: 0 points along +Y, 90° along +X, increasing clockwise.
 
-
 ## Alliance side
 
-TODO: not decided yet. Either one frame for both alliances (start poses differ), or a frame mirrored per alliance (start poses match, the map is mirrored).
+One frame for both alliances. The frame is tied to the red driver station, so it does not change with the alliance, and the static field map (#144) is drawn once.
+
+Autons are written once, for red, and transformed for blue before they run: every path point, path heading, and the start pose.
+
+This season (Override) the field is rotationally symmetric: rotating 180° about the field center takes the red driver station to the blue one, with every field element in the same place (red elements become blue). The blue transform is:
+
+- (x, y) → (−x, −y)
+- θ → θ + π, wrapped to (−π, π]
+
+A rotation keeps clockwise as clockwise, so hand-written turns ("turn right 90°") stay the same for blue.
+
+Do not mirror or rotate the frame itself. It stays tied to the red driver station for both alliances.
 
 ## Start poses
 
-TODO: the `setPose()` pose for each auton start position, for both alliances.
+TODO: the `setPose()` pose for each red auton start position. Blue uses the transformed red pose.
 
-| Alliance | Start position | x (in) | y (in) | heading (compass, deg) |
-|---|---|---|---|---|
-| Red | TODO | | | |
-| Blue | TODO | | | |
+| Start position | x (in) | y (in) | heading (compass, deg) |
+|---|---|---|---|
+| TODO | | | |
 
 Start covariance is `FULL_EKF_INIT_XY_SIGMA` (1 in) and `FULL_EKF_INIT_THETA_SIGMA` (about 2°) in `constants.h`.
 
