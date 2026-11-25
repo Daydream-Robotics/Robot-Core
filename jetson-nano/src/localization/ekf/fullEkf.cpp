@@ -9,14 +9,14 @@
 FullEkf::FullEkf(const FullEkfNoise& noise) : m_noise(noise) {}
 
 
-void FullEkf::reset(const Pose& pose, const Eigen::Matrix3d& cov) {
+void FullEkf::setPose(const StampedPose& p) {
     // skip a pose or covariance with a NaN or infinity
-    if (!(std::isfinite(pose.x) && std::isfinite(pose.y) && std::isfinite(pose.theta) && cov.allFinite())) {
+    if (!(std::isfinite(p.pose.x) && std::isfinite(p.pose.y) && std::isfinite(p.pose.theta) && p.cov.allFinite())) {
         return;
     }
     
     // Skip invalid covariance matrices (not positive definite)
-    if (cov.llt().info() != Eigen::Success) {
+    if (p.cov.llt().info() != Eigen::Success) {
         return;
     }
 
@@ -26,15 +26,46 @@ void FullEkf::reset(const Pose& pose, const Eigen::Matrix3d& cov) {
         m_pending.clear();
     }
 
-    std::lock_guard<std::mutex> lock(m_stateMutex);
-    m_x = Pose{pose.x, pose.y, utils::wrapAngle(pose.theta)};
-    m_P = ((cov + cov.transpose()) / 2.0).eval();
-    m_rejectStreak = 0;
+    // the stored state, handed to subscribers after the state lock is released
+    StampedPose reset;
 
-    // forget cycles from before the reset
-    m_histHead = 0;
-    m_histCount = 0;
+    {
+        std::lock_guard<std::mutex> lock(m_stateMutex);
+        // new state, heading wrapped
+        m_x = Pose{p.pose.x, p.pose.y, utils::wrapAngle(p.pose.theta)};
+        // new covariance, rounding asymmetry removed
+        m_P = ((p.cov + p.cov.transpose()) / 2.0).eval();
+        // rejections from before the reset don't count
+        m_rejectStreak = 0;
 
+        // forget cycles from before the reset
+        m_histHead = 0;
+        m_histCount = 0;
+
+        // measurements stamped before the reset now count as too old
+        m_tUs = p.tUs;
+        // start state as the first history entry, no motion led to it
+        pushHistory(PoseIncrement{p.tUs, p.tUs, Pose{0.0, 0.0, 0.0}, Eigen::Matrix3d::Zero()});
+
+        // no update since the reset yet
+        m_lastUpdate = UpdateResult{};
+
+        // copy what the filter stored, wrapped heading and symmetric P
+        reset = StampedPose{m_tUs, m_x, m_P};
+    }
+
+    // onPoseReset() may add subscribers from another thread
+    std::lock_guard<std::mutex> lock(m_callbackMutex);
+    // tell subscribers after the state is set, outside m_stateMutex
+    for (const PoseCallback& cb : m_resetCallbacks) {
+        cb(reset);
+    }
+}
+
+void FullEkf::onPoseReset(PoseCallback cb) {
+    std::lock_guard<std::mutex> lock(m_callbackMutex);
+    // keep every subscriber, each gets every reset
+    m_resetCallbacks.push_back(std::move(cb));
 }
 
 

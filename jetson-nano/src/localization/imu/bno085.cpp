@@ -204,7 +204,7 @@ std::optional<double> BNO085::headingIncrement(int64_t t0Us, int64_t t1Us) const
         return std::nullopt;
     }
 
-    // change in heading between the two times, CCW+
+    // change in heading between the two times, CW+
     return *theta1 - *theta0;
 }
 
@@ -480,7 +480,8 @@ void BNO085::handleReports(const Packet& p) {
 }
 
 void BNO085::addHeading(int64_t tUs, double yaw, uint8_t accuracy) {
-    yaw *= m_cfg.yawSign;
+    // chip yaw is CCW about its Z axis, heading is CW+, so negate
+    yaw *= -m_cfg.yawSign;
     // unwrap and add the short way around from the last yaw, so theta keeps counting past +-pi
     if (m_haveYaw) {
         m_theta += utils::wrapAngle(yaw - m_lastYaw);

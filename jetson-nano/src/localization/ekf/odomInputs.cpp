@@ -51,6 +51,8 @@ std::optional<OdomInputs> OdomInputAdapter::convert(const SerialLink::Sample& sa
     };
     wheel(ODOM_PAR_WHEEL, PARALLEL_TRACKING_WHEEL_DIAMETER, in.dsPar, in.parValid);
     wheel(ODOM_PERP_WHEEL, PERPENDICULAR_TRACKING_WHEEL_DIAMETER, in.dsPerp, in.perpValid);
+    // flip the brain's perpendicular wheel sign, the EKF wants it positive along +X at heading 0
+    in.dsPerp = -in.dsPerp;
 
     // drive IMEs: output shaft rad -> wheel in, one value per group
     if (ODOM_LEFT_GROUP < static_cast<int>(sample.imeStepRad.size()) &&

@@ -45,7 +45,7 @@ struct OdomHealth {
  * @brief Odometry EKF: fuses tracking wheels, IMEs, and IMU. Takes relative movements.
  *
  * State is (x, y, theta, v_x, v_y, omega). Pose is in the odometry frame, and v_x, v_y are
- * forward and sideways speed in the robot frame.
+ * sideways and forward speed in the robot frame (along +X and +Y at heading 0).
  *
  * Thread safety: step() and reset() run on one thread (the link thread). The getters and
  * increment() may be called from any thread. Register callbacks before the first step().
@@ -128,7 +128,7 @@ public:
     /**
      * @brief Latest forward speed and turn rate.
      *
-     * @return Twist v_x and omega from the state, with their 2x2 block of P.
+     * @return Twist v_y and omega from the state, with their 2x2 block of P.
      */
     Twist twist() const;
 
@@ -239,6 +239,6 @@ private:
     int m_incrementCount = 0; ///< how many of m_increments are filled
 
     OdomHealth m_health; ///< returned by health()
-    double m_prevVx = 0.0; ///< v_x at the end of the previous step (in/s)
-    double m_accelX = 0.0; ///< |forward acceleration| over the previous step (in/s^2), used in the IME noise
+    double m_prevVy = 0.0; ///< v_y at the end of the previous step (in/s)
+    double m_accelY = 0.0; ///< |forward acceleration| over the previous step (in/s^2), used in the IME noise
 };
