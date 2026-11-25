@@ -123,6 +123,16 @@ constexpr uint64_t LIDAR_POSE_EXTRAPOLATE_US = 5000; // poseAt() returns the new
 constexpr uint64_t LIDAR_POSE_GAP_US = 30000; // gap between odom poses that gets logged (us)
 constexpr double LIDAR_POSE_MIN_HZ = 50.0; // odom rate below this gets logged once (Hz)
 
+/* - - - - - - - - - - - - - - [MOCK EKF] - - - - - - - - - - - - - - */
+// stand-in EKF for LiDAR tests and the simulator (jetson-nano/src/localization/ekf/mockEkf.cpp)
+
+constexpr double MOCK_EKF_ODOM_RATE_HZ = 100.0; // default odom_ekf_ publish rate (A2)
+constexpr int64_t MOCK_EKF_HISTORY_US = 1000000; // how far back mainPoseAt() can look (us)
+
+// fixed covariance put on every mock pose
+constexpr double MOCK_EKF_POSE_SIGMA_IN = 0.5; // position std dev (in)
+constexpr double MOCK_EKF_POSE_SIGMA_RAD = 0.01; // heading std dev (rad)
+
 // deskew and scan merge
 constexpr uint64_t LIDAR_SWEEP_US = 100000; // one C1 sweep at 10 Hz (us)
 constexpr int LIDAR_STALE_SWEEPS = 3; // a sensor is stale after this many missed sweeps
