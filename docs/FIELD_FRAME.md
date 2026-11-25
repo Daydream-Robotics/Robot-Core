@@ -31,11 +31,7 @@ Do not mirror or rotate the frame itself. It stays tied to the red driver statio
 
 ## Start poses
 
-TODO: the `setPose()` pose for each red auton start position. Blue uses the transformed red pose.
-
-| Start position | x (in) | y (in) | heading (compass, deg) |
-|---|---|---|---|
-| TODO | | | |
+Each auton's start pose is the first point of its jerryio path, with that point's heading. Blue autons use the same pose rotated 180° (above), then `setPose()` with the start covariance below.
 
 Start covariance is `FULL_EKF_INIT_XY_SIGMA` (1 in) and `FULL_EKF_INIT_THETA_SIGMA` (about 2°) in `constants.h`.
 
