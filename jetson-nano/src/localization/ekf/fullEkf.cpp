@@ -47,7 +47,10 @@ void FullEkf::setPose(const StampedPose& p) {
         // start state as the first history entry, no motion led to it
         pushHistory(PoseIncrement{p.tUs, p.tUs, Pose{0.0, 0.0, 0.0}, Eigen::Matrix3d::Zero()});
 
-         // copy what the filter stored, wrapped heading and symmetric P
+        // no update since the reset yet
+        m_lastUpdate = UpdateResult{};
+
+        // copy what the filter stored, wrapped heading and symmetric P
         reset = StampedPose{m_tUs, m_x, m_P};
     }
 
