@@ -105,16 +105,16 @@ constexpr std::size_t LIDAR_SYNC_FIT_WINDOW = 16; // sync times fitted over this
 constexpr double LIDAR_SYNC_MAX_SLOPE_ERROR = 0.02; // fitted sample period must stay this close to us_per_sample (fraction)
 constexpr double LIDAR_SYNC_RESYNC_US = 3000.0; // sync this late is a read delay once, dropped samples twice in a row (us)
 
-// sensor 0 mount, robot frame (+X forward, +Y left, CCW+), TODO: measure, placeholder values
-constexpr double LIDAR_0_X_IN = 6.0;
-constexpr double LIDAR_0_Y_IN = 4.0;
-constexpr double LIDAR_0_PSI_RAD = 0.0; // mount yaw plus the C1's 0 deg offset, check with a target on the left
+// sensor 0 mount, robot frame, x sideways (+X at heading 0), y forward (+Y at heading 0), yaw CW+, TODO: measure, placeholder values
+constexpr double LIDAR_0_X_IN = -4.0;
+constexpr double LIDAR_0_Y_IN = 6.0;
+constexpr double LIDAR_0_PSI_RAD = 0.0; // mount yaw plus the C1's 0 deg offset, check with a target on the left (should read bearing −90 deg)
 constexpr double LIDAR_0_HEIGHT_IN = 8.0; // scan plane height, below the field wall top (#144)
 
-// sensor 1 mount, robot frame (+X forward, +Y left, CCW+), TODO: measure, placeholder values
-constexpr double LIDAR_1_X_IN = 6.0;
-constexpr double LIDAR_1_Y_IN = -4.0;
-constexpr double LIDAR_1_PSI_RAD = 0.0; // mount yaw plus the C1's 0 deg offset, check with a target on the left
+// sensor 1 mount, robot frame, x sideways (+X at heading 0), y forward (+Y at heading 0), yaw CW+, TODO: measure, placeholder values
+constexpr double LIDAR_1_X_IN = 4.0;
+constexpr double LIDAR_1_Y_IN = 6.0;
+constexpr double LIDAR_1_PSI_RAD = 0.0; // mount yaw plus the C1's 0 deg offset, check with a target on the left (should read bearing −90 deg)
 constexpr double LIDAR_1_HEIGHT_IN = 8.0; // scan plane height, below the field wall top (#144)
 
 // odom_ekf_ pose buffer
