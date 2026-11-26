@@ -1,19 +1,13 @@
 #include "perception/lidar/deskew.hpp"
 
 #include <algorithm>
-#include <cmath>
 
 #include "config/constants.h"
-#include "utils/mathHelpers.hpp"
+#include "localization/ekf/se2.hpp"
 
-uint64_t ScanMerger::deskewScan(const RobotScan& scan, const PoseBuffer& poses, const Pose& ref,
-                                std::vector<DeskewedPoint>& out) {
+uint64_t ScanMerger::deskewScan(const RobotScan& scan, const PoseBuffer& poses, const Pose& ref, std::vector<DeskewedPoint>& out) {
     // points with no pose in the buffer
     uint64_t dropped = 0;
-
-    // rotation into the reference frame
-    const double cRef = std::cos(-ref.theta);
-    const double sRef = std::sin(-ref.theta);
 
     for (const RobotPoint& p : scan.points) {
         // robot pose when this point was measured
@@ -25,25 +19,13 @@ uint64_t ScanMerger::deskewScan(const RobotScan& scan, const PoseBuffer& poses, 
             continue;
         }
 
-        // heading change from the point's time to the reference
-        const double dTheta = utils::normalizeAngle(pose->theta - ref.theta);
-        const double c = std::cos(dTheta);
-        const double s = std::sin(dTheta);
-
-        // rotate the point by the heading change
-        const double rx = c * p.xIn - s * p.yIn;
-        const double ry = s * p.xIn + c * p.yIn;
-
-        // robot motion from the point's time to the reference, world frame
-        const double dx = pose->x - ref.x;
-        const double dy = pose->y - ref.y;
-
-        // that motion in the reference robot frame
-        const double tx = cRef * dx - sRef * dy;
-        const double ty = sRef * dx + cRef * dy;
+        // robot motion from the reference pose to the point's pose, in the reference robot frame
+        const Pose motion = se2::between(ref, *pose);
+        // the point mapped through that motion into the reference robot frame
+        const Pose inRef = se2::compose(motion, Pose{p.xIn, p.yIn, 0.0});
 
         // deskewed point, tagged with its sensor
-        out.push_back(DeskewedPoint{rx + tx, ry + ty, scan.sensorId});
+        out.push_back(DeskewedPoint{inRef.x, inRef.y, scan.sensorId});
     }
     return dropped;
 }
