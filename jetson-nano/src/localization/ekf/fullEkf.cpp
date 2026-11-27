@@ -262,9 +262,7 @@ SourceStats FullEkf::sourceStats(MeasurementSource source) const {
 }
 
 std::size_t FullEkf::sourceIndex(MeasurementSource source) {
-    // TODO: static_cast<std::size_t>(source)
-    (void)source;
-    return 0;
+    return static_cast<std::size_t>(source);
 }
 
 void FullEkf::propagate(const PoseIncrement& inc) {

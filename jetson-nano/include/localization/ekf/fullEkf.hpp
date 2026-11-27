@@ -23,6 +23,10 @@ enum class MeasurementSource : uint8_t {
 
 constexpr std::size_t MEASUREMENT_SOURCE_COUNT = 1; ///< number of MeasurementSource values
 
+// the last source must fit in the per-source arrays, update this when a source is added
+static_assert(static_cast<std::size_t>(MeasurementSource::ICP) < MEASUREMENT_SOURCE_COUNT,
+              "MEASUREMENT_SOURCE_COUNT is smaller than the number of MeasurementSource values");
+
 /**
  * @brief Absolute pose measurement for the full EKF.
  */
