@@ -244,21 +244,21 @@ int FullEkf::tooOldCount() const {
 }
 
 void FullEkf::setSourceConfig(MeasurementSource source, const SourceConfig& config) {
-    // TODO: lock m_stateMutex, store config in m_sourceConfig[sourceIndex(source)]
-    (void)source;
-    (void)config;
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    // replace this source's settings
+    m_sourceConfig[sourceIndex(source)] = config;
 }
 
 void FullEkf::setSourceEnabled(MeasurementSource source, bool enabled) {
-    // TODO: lock m_stateMutex, set m_sourceConfig[sourceIndex(source)].enabled
-    (void)source;
-    (void)enabled;
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    // turn this source on or off
+    m_sourceConfig[sourceIndex(source)].enabled = enabled;
 }
 
 SourceStats FullEkf::sourceStats(MeasurementSource source) const {
-    // TODO: lock m_stateMutex, return a copy of m_sourceStats[sourceIndex(source)]
-    (void)source;
-    return SourceStats{};
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    // copy this source's counters
+    return m_sourceStats[sourceIndex(source)];
 }
 
 std::size_t FullEkf::sourceIndex(MeasurementSource source) {
