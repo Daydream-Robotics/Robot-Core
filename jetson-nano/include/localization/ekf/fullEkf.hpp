@@ -77,7 +77,6 @@ struct FullEkfNoise {
     Eigen::Matrix3d qExtra = Eigen::Vector3d(FULL_EKF_Q_EXTRA_XY_SIGMA * FULL_EKF_Q_EXTRA_XY_SIGMA,
                                              FULL_EKF_Q_EXTRA_XY_SIGMA * FULL_EKF_Q_EXTRA_XY_SIGMA,
                                              FULL_EKF_Q_EXTRA_THETA_SIGMA * FULL_EKF_Q_EXTRA_THETA_SIGMA).asDiagonal();
-    double gate = FULL_EKF_GATE; ///< TODO (#188): replaced by SourceConfig::gate, remove once update() uses it
     int recoveryRejects = FULL_EKF_RECOVERY_REJECTS; ///< consecutive rejections before P is raised to recoveryP
     ///< P is raised to at least this after recoveryRejects consecutive rejections
     Eigen::Matrix3d recoveryP = Eigen::Vector3d(FULL_EKF_RECOVERY_XY_SIGMA * FULL_EKF_RECOVERY_XY_SIGMA,
@@ -258,7 +257,7 @@ private:
     Pose m_x{0.0, 0.0, 0.0}; ///< field pose
     Eigen::Matrix3d m_P = Eigen::Matrix3d::Identity(); ///< covariance of m_x (x, y, θ order, in² and rad²)
     int64_t m_tUs = 0; ///< time of the latest predict, Nano steady_clock (us)
-    FullEkfNoise m_noise; ///< process inflation and gate
+    FullEkfNoise m_noise; ///< process inflation and recovery
     UpdateResult m_lastUpdate; ///< most recent update, for lastUpdate()
     int m_rejectStreak = 0; ///< consecutive gate rejections, reset on an accepted update
     std::array<HistoryEntry, FULL_EKF_HISTORY_SIZE> m_history{}; ///< ring buffer of past cycles
