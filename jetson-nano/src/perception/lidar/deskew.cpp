@@ -27,6 +27,7 @@ uint64_t ScanMerger::deskewScan(const RobotScan& scan, const PoseBuffer& poses, 
         // deskewed point, tagged with its sensor
         out.push_back(DeskewedPoint{inRef.x, inRef.y, scan.sensorId});
     }
+
     return dropped;
 }
 
@@ -57,7 +58,7 @@ std::optional<DeskewedCloud> ScanMerger::build(const PoseBuffer& poses) {
         latest = m_latest;
     }
 
-    // atore newest sweep end
+    // store newest sweep end
     uint64_t tRef = 0;
     for (const std::optional<RobotScan>& s : latest) {
         if (s.has_value()) {
@@ -70,7 +71,7 @@ std::optional<DeskewedCloud> ScanMerger::build(const PoseBuffer& poses) {
         return std::nullopt;
     }
 
-    // odom not caught up to tRef ye
+    // odom not caught up to tRef yet
     const std::optional<Pose> ref = poses.poseAt(tRef);
     if (ref == std::nullopt) {
         return std::nullopt;
