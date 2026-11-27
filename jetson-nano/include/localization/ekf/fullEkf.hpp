@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <mutex>
@@ -14,11 +15,13 @@
 #include "localization/odometry.hpp"
 
 /**
- * @brief Where an absolute pose measurement came from. #188 adds per-source settings and counters.
+ * @brief Where an absolute pose measurement came from. Each source has its own SourceConfig and SourceStats.
  */
 enum class MeasurementSource : uint8_t {
     ICP ///< KISS-ICP scan-to-map match
 };
+
+constexpr std::size_t MEASUREMENT_SOURCE_COUNT = 1; ///< number of MeasurementSource values
 
 /**
  * @brief Absolute pose measurement for the full EKF.
@@ -28,6 +31,28 @@ struct PoseMeasurement {
     Pose pose{0.0, 0.0, 0.0}; ///< field frame
     Eigen::Matrix3d cov = Eigen::Matrix3d::Zero(); ///< covariance of pose (x, y, θ order, in² and rad²)
     MeasurementSource source{}; ///< source
+    uint32_t healthFlags = 0; ///< nonzero means the source flagged it unhealthy, rejected without updating
+};
+
+/**
+ * @brief Per-source settings (thread-safe to change at runtime with setSourceConfig()).
+ */
+struct SourceConfig {
+    bool enabled = true; ///< false rejects every measurement from this source
+    double gate = FULL_EKF_GATE; ///< reject an update with d² above this, starts at χ² 3-DOF 99%
+    ///< floor on the measurement covariance, applied before the gate
+    Eigen::Matrix3d minCov = Eigen::Vector3d(FULL_EKF_ICP_MIN_XY_SIGMA * FULL_EKF_ICP_MIN_XY_SIGMA,
+                                             FULL_EKF_ICP_MIN_XY_SIGMA * FULL_EKF_ICP_MIN_XY_SIGMA,
+                                             FULL_EKF_ICP_MIN_THETA_SIGMA * FULL_EKF_ICP_MIN_THETA_SIGMA).asDiagonal();
+};
+
+/**
+ * @brief Per-source counters, for logging and tuning.
+ */
+struct SourceStats {
+    uint32_t accepted = 0; ///< passed the gate and were applied
+    uint32_t rejected = 0; ///< disabled, unhealthy, invalid, or above the gate
+    double lastNis = 0.0; ///< d² of the most recent gated measurement
 };
 
 /**
@@ -48,7 +73,7 @@ struct FullEkfNoise {
     Eigen::Matrix3d qExtra = Eigen::Vector3d(FULL_EKF_Q_EXTRA_XY_SIGMA * FULL_EKF_Q_EXTRA_XY_SIGMA,
                                              FULL_EKF_Q_EXTRA_XY_SIGMA * FULL_EKF_Q_EXTRA_XY_SIGMA,
                                              FULL_EKF_Q_EXTRA_THETA_SIGMA * FULL_EKF_Q_EXTRA_THETA_SIGMA).asDiagonal();
-    double gate = FULL_EKF_GATE; ///< reject an update with d² above this, starts at χ² 3-DOF 99%
+    double gate = FULL_EKF_GATE; ///< TODO (#188): replaced by SourceConfig::gate, remove once update() uses it
     int recoveryRejects = FULL_EKF_RECOVERY_REJECTS; ///< consecutive rejections before P is raised to recoveryP
     ///< P is raised to at least this after recoveryRejects consecutive rejections
     Eigen::Matrix3d recoveryP = Eigen::Vector3d(FULL_EKF_RECOVERY_XY_SIGMA * FULL_EKF_RECOVERY_XY_SIGMA,
@@ -139,6 +164,30 @@ public:
      */
     int tooOldCount() const;
 
+    /**
+     * @brief Replaces one source's settings (thread-safe).
+     *
+     * @param source Source to change.
+     * @param config New enable flag, gate, and covariance floor.
+     */
+    void setSourceConfig(MeasurementSource source, const SourceConfig& config);
+
+    /**
+     * @brief Turns one source on or off at runtime (thread-safe).
+     *
+     * @param source Source to change.
+     * @param enabled False rejects every measurement from it.
+     */
+    void setSourceEnabled(MeasurementSource source, bool enabled);
+
+    /**
+     * @brief One source's counters (thread-safe).
+     *
+     * @param source Source to read.
+     * @return SourceStats Accepted and rejected counts and the last NIS.
+     */
+    SourceStats sourceStats(MeasurementSource source) const;
+
 private:
     /**
      * @brief One cycle of filter history.
@@ -193,6 +242,14 @@ private:
      */
     void drainQueue();
 
+    /**
+     * @brief Array slot for a source.
+     *
+     * @param source Source to look up.
+     * @return std::size_t Index into m_sourceConfig and m_sourceStats.
+     */
+    static std::size_t sourceIndex(MeasurementSource source);
+
 
     Pose m_x{0.0, 0.0, 0.0}; ///< field pose
     Eigen::Matrix3d m_P = Eigen::Matrix3d::Identity(); ///< covariance of m_x (x, y, θ order, in² and rad²)
@@ -204,7 +261,9 @@ private:
     int m_histHead = 0; ///< slot the next entry is written to
     int m_histCount = 0; ///< number of stored entries, up to FULL_EKF_HISTORY_SIZE
     int m_tooOld = 0; ///< measurements dropped for being older than the history
-    mutable std::mutex m_stateMutex; ///< guards m_x, m_P, m_tUs, m_lastUpdate, m_rejectStreak, history
+    std::array<SourceConfig, MEASUREMENT_SOURCE_COUNT> m_sourceConfig{}; ///< per-source settings
+    std::array<SourceStats, MEASUREMENT_SOURCE_COUNT> m_sourceStats{}; ///< per-source counters
+    mutable std::mutex m_stateMutex; ///< guards m_x, m_P, m_tUs, m_lastUpdate, m_rejectStreak, history, source settings and counters
     std::vector<PoseMeasurement> m_pending; ///< measurements waiting for the next predict()
     std::mutex m_pendingMutex; ///< guards m_pending, submit() runs on other threads
     std::vector<PoseCallback> m_resetCallbacks; ///< onPoseReset() subscribers

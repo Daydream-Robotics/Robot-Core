@@ -109,6 +109,10 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
     // not accepted until it passes the gate
     UpdateResult result = {m.tUs, m.source};
 
+    // TODO (#188): look up this source's config and stats with sourceIndex(m.source)
+    // TODO (#188): source disabled -> count as rejected, return without updating
+    // TODO (#188): m.healthFlags nonzero -> count as rejected, return without updating
+
     // skip a measurement with a NaN or infinity, or a variance that isn't positive
     if (!(std::isfinite(m.pose.x) && std::isfinite(m.pose.y) && std::isfinite(m.pose.theta) && m.cov.allFinite())
         || !(m.cov.diagonal().array() > 0.0).all()) {
@@ -120,6 +124,8 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
     nu(0) = m.pose.x - m_x.x;
     nu(1) = m.pose.y - m_x.y;
     nu(2) = utils::wrapAngle(m.pose.theta - m_x.theta);
+
+    // TODO (#188): R = m.cov with its diagonal raised to at least the source's minCov diagonal, use R below instead of m.cov
 
     // after too many rejections in a row, raise P so the gate reopens
     if (m_rejectStreak >= m_noise.recoveryRejects) {
@@ -145,6 +151,8 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
         return result;
     }
 
+    // TODO (#188): store d2 as the source's lastNis
+    // TODO (#188): gate with the source's gate instead of m_noise.gate, count a rejection
     // reject above the gate
     if (d2 > m_noise.gate) {
         ++m_rejectStreak;
@@ -167,6 +175,7 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
     // remove rounding asymmetry
     m_P = ((m_P + m_P.transpose()) / 2.0).eval();
 
+    // TODO (#188): count the source's accepted measurement
     result.accepted = true;
     return result;
 }
@@ -232,6 +241,30 @@ std::optional<StampedPose> FullEkf::poseAt(int64_t tUs) const {
 int FullEkf::tooOldCount() const {
     std::lock_guard<std::mutex> lock(m_stateMutex);
     return m_tooOld;
+}
+
+void FullEkf::setSourceConfig(MeasurementSource source, const SourceConfig& config) {
+    // TODO: lock m_stateMutex, store config in m_sourceConfig[sourceIndex(source)]
+    (void)source;
+    (void)config;
+}
+
+void FullEkf::setSourceEnabled(MeasurementSource source, bool enabled) {
+    // TODO: lock m_stateMutex, set m_sourceConfig[sourceIndex(source)].enabled
+    (void)source;
+    (void)enabled;
+}
+
+SourceStats FullEkf::sourceStats(MeasurementSource source) const {
+    // TODO: lock m_stateMutex, return a copy of m_sourceStats[sourceIndex(source)]
+    (void)source;
+    return SourceStats{};
+}
+
+std::size_t FullEkf::sourceIndex(MeasurementSource source) {
+    // TODO: static_cast<std::size_t>(source)
+    (void)source;
+    return 0;
 }
 
 void FullEkf::propagate(const PoseIncrement& inc) {
