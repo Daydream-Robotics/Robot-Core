@@ -56,6 +56,8 @@ struct SourceConfig {
 struct SourceStats {
     uint32_t accepted = 0; ///< passed the gate and were applied
     uint32_t rejected = 0; ///< disabled, unhealthy, invalid, or above the gate
+    uint32_t rejectStreak = 0; ///< consecutive gate rejections
+    uint32_t tooOld = 0; ///< older than the history, dropped before update()
     double lastNis = 0.0; ///< d² of the most recent gated measurement
 };
 
@@ -259,14 +261,13 @@ private:
     int64_t m_tUs = 0; ///< time of the latest predict, Nano steady_clock (us)
     FullEkfNoise m_noise; ///< process inflation and recovery
     UpdateResult m_lastUpdate; ///< most recent update, for lastUpdate()
-    int m_rejectStreak = 0; ///< consecutive gate rejections, reset on an accepted update
     std::array<HistoryEntry, FULL_EKF_HISTORY_SIZE> m_history{}; ///< ring buffer of past cycles
     int m_histHead = 0; ///< slot the next entry is written to
     int m_histCount = 0; ///< number of stored entries, up to FULL_EKF_HISTORY_SIZE
     int m_tooOld = 0; ///< measurements dropped for being older than the history
     std::array<SourceConfig, MEASUREMENT_SOURCE_COUNT> m_sourceConfig{}; ///< per-source settings
     std::array<SourceStats, MEASUREMENT_SOURCE_COUNT> m_sourceStats{}; ///< per-source counters
-    mutable std::mutex m_stateMutex; ///< guards m_x, m_P, m_tUs, m_lastUpdate, m_rejectStreak, history, source settings and counters
+    mutable std::mutex m_stateMutex; ///< guards m_x, m_P, m_tUs, m_lastUpdate, history, source settings and counters
     std::vector<PoseMeasurement> m_pending; ///< measurements waiting for the next predict()
     std::mutex m_pendingMutex; ///< guards m_pending, submit() runs on other threads
     std::vector<PoseCallback> m_resetCallbacks; ///< onPoseReset() subscribers

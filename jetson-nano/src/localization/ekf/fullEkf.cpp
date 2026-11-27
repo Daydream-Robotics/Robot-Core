@@ -36,7 +36,10 @@ void FullEkf::setPose(const StampedPose& p) {
         // new covariance, rounding asymmetry removed
         m_P = ((p.cov + p.cov.transpose()) / 2.0).eval();
         // rejections from before the reset don't count
-        m_rejectStreak = 0;
+        for (SourceStats& s : m_sourceStats) {
+            s.rejectStreak = 0;
+        }
+        
 
         // forget cycles from before the reset
         m_histHead = 0;
@@ -133,9 +136,9 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
     }
 
     // after too many rejections in a row, raise P so the gate reopens
-    if (m_rejectStreak >= m_noise.recoveryRejects) {
+    if (stats.rejectStreak >= m_noise.recoveryRejects) {
         m_P = m_P.cwiseMax(m_noise.recoveryP);
-        m_rejectStreak = 0;
+        stats.rejectStreak = 0;
     }
 
     // innovation covariance, filter uncertainty plus measurement noise
@@ -163,11 +166,11 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
 
     // reject above this source's gate
     if (d2 > cfg.gate) {
-        ++m_rejectStreak;
+        ++stats.rejectStreak;
         ++stats.rejected;
         return result;
     }
-    m_rejectStreak = 0;
+    stats.rejectStreak = 0;
 
     // Kalman gain, P S⁻¹
     const Eigen::Matrix3d K = sLdlt.solve(m_P).transpose();
@@ -331,6 +334,7 @@ UpdateResult FullEkf::applyLate(const PoseMeasurement& m) {
     if (found == std::nullopt) {
         // older than the history, drop and count it
         ++m_tooOld;
+        ++m_sourceStats[sourceIndex(m.source)].tooOld;
         return UpdateResult{m.tUs, m.source};
     }
 
