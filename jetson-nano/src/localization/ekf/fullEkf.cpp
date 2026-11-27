@@ -35,11 +35,10 @@ void FullEkf::setPose(const StampedPose& p) {
         m_x = Pose{p.pose.x, p.pose.y, utils::wrapAngle(p.pose.theta)};
         // new covariance, rounding asymmetry removed
         m_P = ((p.cov + p.cov.transpose()) / 2.0).eval();
-        // rejections from before the reset don't count
+        // rejections from before the reset don't count, for any source
         for (SourceStats& s : m_sourceStats) {
             s.rejectStreak = 0;
         }
-        
 
         // forget cycles from before the reset
         m_histHead = 0;
@@ -251,11 +250,6 @@ std::optional<StampedPose> FullEkf::poseAt(int64_t tUs) const {
     return StampedPose{tUs, p, alpha < 0.5 ? a.P : b.P};
 }
 
-int FullEkf::tooOldCount() const {
-    std::lock_guard<std::mutex> lock(m_stateMutex);
-    return m_tooOld;
-}
-
 void FullEkf::setSourceConfig(MeasurementSource source, const SourceConfig& config) {
     std::lock_guard<std::mutex> lock(m_stateMutex);
     // replace this source's settings
@@ -332,8 +326,7 @@ UpdateResult FullEkf::applyLate(const PoseMeasurement& m) {
     // first entry at or after m.tUs
     std::optional<int> found = findEntry(m.tUs);
     if (found == std::nullopt) {
-        // older than the history, drop and count it
-        ++m_tooOld;
+        // older than the history, drop and count it for this source
         ++m_sourceStats[sourceIndex(m.source)].tooOld;
         return UpdateResult{m.tUs, m.source};
     }

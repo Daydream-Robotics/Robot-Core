@@ -56,7 +56,7 @@ struct SourceConfig {
 struct SourceStats {
     uint32_t accepted = 0; ///< passed the gate and were applied
     uint32_t rejected = 0; ///< disabled, unhealthy, invalid, or above the gate
-    uint32_t rejectStreak = 0; ///< consecutive gate rejections
+    int rejectStreak = 0; ///< consecutive gate rejections
     uint32_t tooOld = 0; ///< older than the history, dropped before update()
     double lastNis = 0.0; ///< d² of the most recent gated measurement
 };
@@ -163,13 +163,6 @@ public:
     std::optional<StampedPose> poseAt(int64_t tUs) const;
 
     /**
-     * @brief Measurements dropped for being older than the history (thread-safe).
-     *
-     * @return int Count since construction.
-     */
-    int tooOldCount() const;
-
-    /**
      * @brief Replaces one source's settings (thread-safe).
      *
      * @param source Source to change.
@@ -264,7 +257,6 @@ private:
     std::array<HistoryEntry, FULL_EKF_HISTORY_SIZE> m_history{}; ///< ring buffer of past cycles
     int m_histHead = 0; ///< slot the next entry is written to
     int m_histCount = 0; ///< number of stored entries, up to FULL_EKF_HISTORY_SIZE
-    int m_tooOld = 0; ///< measurements dropped for being older than the history
     std::array<SourceConfig, MEASUREMENT_SOURCE_COUNT> m_sourceConfig{}; ///< per-source settings
     std::array<SourceStats, MEASUREMENT_SOURCE_COUNT> m_sourceStats{}; ///< per-source counters
     mutable std::mutex m_stateMutex; ///< guards m_x, m_P, m_tUs, m_lastUpdate, history, source settings and counters
