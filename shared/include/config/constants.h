@@ -138,6 +138,10 @@ constexpr double FULL_EKF_Q_EXTRA_THETA_SIGMA = 0.0005; // per-cycle heading std
 // update gate on d^2 = nu^T S^-1 nu, chi-squared 3 DOF at 99%
 constexpr double FULL_EKF_GATE = 11.34;
 
+// floor on the KISS-ICP measurement covariance
+constexpr double FULL_EKF_ICP_MIN_XY_SIGMA = 0.25; // position std dev (in)
+constexpr double FULL_EKF_ICP_MIN_THETA_SIGMA = 0.005; // heading std dev (rad), about 0.3 deg
+
 // recovery: after this many consecutive gate rejections, P is raised to the recovery covariance
 constexpr int FULL_EKF_RECOVERY_REJECTS = 5; // about 0.5 s of ICP
 constexpr double FULL_EKF_RECOVERY_XY_SIGMA = 12.0; // recovery position std dev (in)

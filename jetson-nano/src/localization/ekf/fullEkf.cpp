@@ -14,7 +14,7 @@ void FullEkf::setPose(const StampedPose& p) {
     if (!(std::isfinite(p.pose.x) && std::isfinite(p.pose.y) && std::isfinite(p.pose.theta) && p.cov.allFinite())) {
         return;
     }
-    
+
     // Skip invalid covariance matrices (not positive definite)
     if (p.cov.llt().info() != Eigen::Success) {
         return;
@@ -35,8 +35,10 @@ void FullEkf::setPose(const StampedPose& p) {
         m_x = Pose{p.pose.x, p.pose.y, utils::wrapAngle(p.pose.theta)};
         // new covariance, rounding asymmetry removed
         m_P = ((p.cov + p.cov.transpose()) / 2.0).eval();
-        // rejections from before the reset don't count
-        m_rejectStreak = 0;
+        // rejections from before the reset don't count, for any source
+        for (SourceStats& s : m_sourceStats) {
+            s.rejectStreak = 0;
+        }
 
         // forget cycles from before the reset
         m_histHead = 0;
@@ -93,7 +95,7 @@ void FullEkf::submit(const PoseMeasurement& m) {
 }
 
 StampedPose FullEkf::latest() const {
-    // the EKF thread may be writing m_x and m_P, so wait for it to finish
+    // the EKF thread may be writing m_x and m_P
     std::lock_guard<std::mutex> lock(m_stateMutex);
     // copy out while locked
     return StampedPose{m_tUs, m_x, m_P};
@@ -109,9 +111,14 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
     // not accepted until it passes the gate
     UpdateResult result = {m.tUs, m.source};
 
-    // skip a measurement with a NaN or infinity, or a variance that isn't positive
-    if (!(std::isfinite(m.pose.x) && std::isfinite(m.pose.y) && std::isfinite(m.pose.theta) && m.cov.allFinite())
-        || !(m.cov.diagonal().array() > 0.0).all()) {
+    // this source's settings and counters
+    const SourceConfig& cfg = m_sourceConfig[sourceIndex(m.source)];
+    SourceStats& stats = m_sourceStats[sourceIndex(m.source)];
+
+    // skip a disabled source, a measurement it flagged unhealthy, a NaN or infinity, or a variance that isn't positive
+    if (!cfg.enabled || m.healthFlags != 0 || !(std::isfinite(m.pose.x) && std::isfinite(m.pose.y)
+        && std::isfinite(m.pose.theta) && m.cov.allFinite()) || !(m.cov.diagonal().array() > 0.0).all()) {
+        ++stats.rejected;
         return result;
     }
 
@@ -121,18 +128,25 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
     nu(1) = m.pose.y - m_x.y;
     nu(2) = utils::wrapAngle(m.pose.theta - m_x.theta);
 
+    // floor the measurement covariance, diagonal only
+    Eigen::Matrix3d R = m.cov;
+    for (int i = 0; i < 3; ++i) {
+        R(i, i) = std::max(R(i, i), cfg.minCov(i, i));
+    }
+
     // after too many rejections in a row, raise P so the gate reopens
-    if (m_rejectStreak >= m_noise.recoveryRejects) {
+    if (stats.rejectStreak >= m_noise.recoveryRejects) {
         m_P = m_P.cwiseMax(m_noise.recoveryP);
-        m_rejectStreak = 0;
+        stats.rejectStreak = 0;
     }
 
     // innovation covariance, filter uncertainty plus measurement noise
-    const Eigen::Matrix3d S = m_P + m.cov;
+    const Eigen::Matrix3d S = m_P + R;
     // factor S once for both solves
     const Eigen::LDLT<Eigen::Matrix3d> sLdlt = S.ldlt();
     // reject if S can't be factored or isn't positive definite
     if (sLdlt.info() != Eigen::Success || !sLdlt.isPositive()) {
+        ++stats.rejected;
         return result;
     }
 
@@ -142,15 +156,20 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
 
     // reject if d² isn't a number or is negative
     if (!std::isfinite(d2) || d2 < 0.0) {
+        ++stats.rejected;
         return result;
     }
 
-    // reject above the gate
-    if (d2 > m_noise.gate) {
-        ++m_rejectStreak;
+    // NIS for tuning
+    stats.lastNis = d2;
+
+    // reject above this source's gate
+    if (d2 > cfg.gate) {
+        ++stats.rejectStreak;
+        ++stats.rejected;
         return result;
     }
-    m_rejectStreak = 0;
+    stats.rejectStreak = 0;
 
     // Kalman gain, P S⁻¹
     const Eigen::Matrix3d K = sLdlt.solve(m_P).transpose();
@@ -163,10 +182,12 @@ UpdateResult FullEkf::update(const PoseMeasurement& m) {
 
     // Joseph form covariance update
     const Eigen::Matrix3d ikh = Eigen::Matrix3d::Identity() - K;
-    m_P = ikh * m_P * ikh.transpose() + K * m.cov * K.transpose();
+    m_P = ikh * m_P * ikh.transpose() + K * R * K.transpose();
     // remove rounding asymmetry
     m_P = ((m_P + m_P.transpose()) / 2.0).eval();
 
+    // applied
+    ++stats.accepted;
     result.accepted = true;
     return result;
 }
@@ -229,9 +250,26 @@ std::optional<StampedPose> FullEkf::poseAt(int64_t tUs) const {
     return StampedPose{tUs, p, alpha < 0.5 ? a.P : b.P};
 }
 
-int FullEkf::tooOldCount() const {
+void FullEkf::setSourceConfig(MeasurementSource source, const SourceConfig& config) {
     std::lock_guard<std::mutex> lock(m_stateMutex);
-    return m_tooOld;
+    // replace this source's settings
+    m_sourceConfig[sourceIndex(source)] = config;
+}
+
+void FullEkf::setSourceEnabled(MeasurementSource source, bool enabled) {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    // turn this source on or off
+    m_sourceConfig[sourceIndex(source)].enabled = enabled;
+}
+
+SourceStats FullEkf::sourceStats(MeasurementSource source) const {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    // copy this source's counters
+    return m_sourceStats[sourceIndex(source)];
+}
+
+std::size_t FullEkf::sourceIndex(MeasurementSource source) {
+    return static_cast<std::size_t>(source);
 }
 
 void FullEkf::propagate(const PoseIncrement& inc) {
@@ -275,7 +313,7 @@ std::optional<int> FullEkf::findEntry(int64_t tUs) const {
         const int mid = (lo + hi) / 2;
         if (m_history[(oldest + mid) % FULL_EKF_HISTORY_SIZE].tUs < tUs) {
             lo = mid + 1;
-        } 
+        }
         else {
             hi = mid;
         }
@@ -288,8 +326,8 @@ UpdateResult FullEkf::applyLate(const PoseMeasurement& m) {
     // first entry at or after m.tUs
     std::optional<int> found = findEntry(m.tUs);
     if (found == std::nullopt) {
-        // older than the history, drop and count it
-        ++m_tooOld;
+        // older than the history, drop and count it for this source
+        ++m_sourceStats[sourceIndex(m.source)].tooOld;
         return UpdateResult{m.tUs, m.source};
     }
 
