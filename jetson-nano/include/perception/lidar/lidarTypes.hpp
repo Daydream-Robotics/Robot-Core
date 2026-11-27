@@ -7,8 +7,8 @@
  * @brief One point in the robot frame.
  */
 struct RobotPoint {
-    double xIn = 0.0; ///< robot frame, +X forward (in)
-    double yIn = 0.0; ///< robot frame, +Y left (in)
+    double xIn = 0.0; ///< robot frame, sideways (+X at heading 0) (in)
+    double yIn = 0.0; ///< robot frame, forward (+Y at heading 0) (in)
     uint64_t stampUs = 0; ///< the point's own monotonic timestamp
 };
 

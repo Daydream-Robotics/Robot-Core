@@ -49,6 +49,7 @@ std::vector<LidarMount> lidarMounts() {
     for (const LidarMount& mount : mounts) {
         validate(mount);
     }
+
     return mounts;
 }
 
@@ -73,25 +74,30 @@ RobotScan LidarTransform::toRobotFrame(const Scan& scan) const {
     const double s = std::sin(m_mount.psiRad);
 
     for (const auto& point : scan.points) {
-        // bearingRad is already CCW-positive
+        // bearingRad is already CW-positive
         const double r = point.rangeIn;
         const double beta = point.bearingRad;
         if (!std::isfinite(r) || !std::isfinite(beta) ||
             r < m_mount.rMinIn || r > m_mount.rMaxIn) {
-
             continue;
         }
-        // masks are in the sensor frame
-        if (masked(beta)) continue;
 
-        const double sensorX = r * std::cos(beta);
-        const double sensorY = r * std::sin(beta);
-        const double x = m_mount.xIn + c * sensorX - s * sensorY;
-        const double y = m_mount.yIn + s * sensorX + c * sensorY;
-        if (insideFootprint(x, y)) continue;
+        // masks are in the sensor frame
+        if (masked(beta)) {
+            continue;
+        }
+
+        const double sensorX = r * std::sin(beta);
+        const double sensorY = r * std::cos(beta);
+        const double x = m_mount.xIn + c * sensorX + s * sensorY;
+        const double y = m_mount.yIn - s * sensorX + c * sensorY;
+        if (insideFootprint(x, y)) {
+            continue;
+        }
 
         result.points.push_back({x, y, point.stampUs});
     }
+
     return result;
 }
 
@@ -100,22 +106,32 @@ bool LidarTransform::masked(double bearingRad) const {
     for (const auto& mask : m_mount.blockedBearings) {
         // a -180 to 180 mask blocks the whole circle
         if ((mask.startRad == -M_PI && mask.endRad == M_PI) ||
-            (mask.startRad == M_PI && mask.endRad == -M_PI)) return true;
+            (mask.startRad == M_PI && mask.endRad == -M_PI)) {
+            return true;
+        }
+
         const double begin = utils::normalizeAngle(mask.startRad);
         const double end = utils::normalizeAngle(mask.endRad);
         if (begin <= end) {
-            if (angle >= begin - LIDAR_MASK_EPSILON_RAD && angle <= end + LIDAR_MASK_EPSILON_RAD) return true;
-        } else { // wraps across +/-pi
-            if (angle >= begin - LIDAR_MASK_EPSILON_RAD || angle <= end + LIDAR_MASK_EPSILON_RAD) return true;
+            if (angle >= begin - LIDAR_MASK_EPSILON_RAD && angle <= end + LIDAR_MASK_EPSILON_RAD) {
+                return true;
+            }
+        }
+        else {
+            // wraps across +/-pi
+            if (angle >= begin - LIDAR_MASK_EPSILON_RAD || angle <= end + LIDAR_MASK_EPSILON_RAD) {
+                return true;
+            }
         }
     }
+
     return false;
 }
 
 bool LidarTransform::insideFootprint(double xIn, double yIn) const {
     const auto& f = m_mount.footprint;
-    return xIn >= -f.rearIn - f.marginIn &&
-           xIn <=  f.frontIn + f.marginIn &&
-           yIn >= -f.rightIn - f.marginIn &&
-           yIn <=  f.leftIn + f.marginIn;
+    return xIn >= -f.leftIn - f.marginIn &&
+           xIn <=  f.rightIn + f.marginIn &&
+           yIn >= -f.rearIn - f.marginIn &&
+           yIn <=  f.frontIn + f.marginIn;
 }

@@ -7,7 +7,7 @@
 #include "perception/lidar/lidarTypes.hpp"
 
 /**
- * @brief Blocked bearing range in the sensor frame (rad, CCW+). May wrap across ±pi.
+ * @brief Blocked bearing range in the sensor frame (rad, CW+), runs clockwise from startRad to endRad. May wrap across ±pi.
  */
 struct LidarBearingMask {
     double startRad = 0.0; ///< start of the blocked range (rad)
@@ -17,7 +17,7 @@ struct LidarBearingMask {
 /**
  * @brief Axis-aligned robot footprint around the EKF origin (in).
  *
- * Covers x in [-rearIn, frontIn] and y in [-rightIn, leftIn], grown by marginIn.
+ * Covers y in [-rearIn, frontIn] and x in [-leftIn, rightIn], grown by marginIn.
  */
 struct LidarRobotFootprint {
     double frontIn = 0.0; ///< origin to the front edge (in)
@@ -32,9 +32,9 @@ struct LidarRobotFootprint {
  */
 struct LidarMount {
     uint8_t sensorId = 0; ///< matches Scan::sensorId
-    double xIn = 0.0; ///< sensor position, robot frame (+X forward) (in)
-    double yIn = 0.0; ///< sensor position, robot frame (+Y left) (in)
-    double psiRad = 0.0; ///< sensor yaw in the robot frame, CCW+, includes the C1's 0 deg offset (rad)
+    double xIn = 0.0; ///< sensor position, robot frame, sideways (+X at heading 0) (in)
+    double yIn = 0.0; ///< sensor position, robot frame, forward (+Y at heading 0) (in)
+    double psiRad = 0.0; ///< sensor yaw in the robot frame, CW+, includes the C1's 0 deg offset (rad)
 
     double rMinIn = 0.0; ///< closer points are dropped (in)
     double rMaxIn = 0.0; ///< farther points are dropped (in)
@@ -75,7 +75,7 @@ private:
     /**
      * @brief Checks a sensor-frame bearing against the blocked ranges.
      *
-     * @param bearingRad Bearing in the sensor frame (rad, CCW+).
+     * @param bearingRad Bearing in the sensor frame (rad, CW+).
      * @return bool True if blocked.
      */
     bool masked(double bearingRad) const;

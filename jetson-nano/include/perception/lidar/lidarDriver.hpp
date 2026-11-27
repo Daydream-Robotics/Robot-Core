@@ -17,7 +17,7 @@
 
 struct LidarPoint {
     double rangeIn = 0.0;    // inches
-    double bearingRad = 0.0; // sensor frame, counterclockwise positive, [-pi, pi]
+    double bearingRad = 0.0; // sensor frame, clockwise positive, (-pi, pi]
     uint64_t stampUs = 0;    // monotonic microseconds (CLOCK_MONOTONIC on Linux)
     uint8_t quality = 0;      // optional, keeps diagnostic strength from SDK
 };
@@ -67,12 +67,14 @@ public:
 
     explicit LidarDriver(LidarConfig cfg);
     ~LidarDriver();
+
     LidarDriver(const LidarDriver&) = delete;
     LidarDriver& operator=(const LidarDriver&) = delete;
 
     // True means thread launch succeeded, NOT that hardware is connected.
     bool start(ScanCallback onScan);
     void stop();
+
     LidarHealth health() const;
     bool connected() const { return m_connected.load(); }
 
@@ -87,11 +89,13 @@ private:
     bool connectAndStart();
     void recover(bool wasStreaming);
     void shutdownConnection(bool reset);
+
     void onSamples(const sl_lidar_response_measurement_node_hq_t* nodes,
                    size_t count, uint64_t rxUs);
     void finishSweep(uint64_t tEndUs);
     uint64_t fitSyncTime(uint64_t index, uint64_t rawUs);
     void resetSweepState();
+
     void openUartCounters();
     void pollUartCounters();
     void closeUartCounters();
@@ -104,17 +108,21 @@ private:
 
     LidarConfig m_cfg;
     ScanCallback m_onScan;
+
     sl::IChannel* m_channel = nullptr;
     sl::ILidarDriver* m_drv = nullptr;
     float m_usPerSample = 0.0f;
+
     uint64_t m_tStartUs = 0;
     uint64_t m_sampleIndex = 0;
     std::deque<SyncObservation> m_syncObs; // recent sync samples, fitted to remove read jitter
     int m_lateSyncs = 0;                   // consecutive syncs far later than the fit
     uint64_t m_lastChecksumErrors = 0;     // SDK checksum count already added to health
+
     uint64_t m_lastSyncRxUs = 0;
     uint64_t m_lastDataRxUs = 0;
     uint64_t m_lastPeriodUs = 0;
+
     double m_startAngleCwRad = 0.0;
     std::vector<RawSample> m_building;
     bool m_buildingOverflow = false;
@@ -131,6 +139,7 @@ private:
     std::thread m_thread;
     std::atomic<bool> m_running{false};
     std::atomic<bool> m_connected{false};
+
     mutable std::mutex m_healthMutex;
     LidarHealth m_health;
 };

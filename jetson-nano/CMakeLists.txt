@@ -76,6 +76,9 @@ target_include_directories(robotcore_ekf PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen/include
 )
 
+# deskew uses se2 from the EKF core
+target_link_libraries(robotcore_lidar PUBLIC robotcore_ekf)
+
 # - - - - - - - - - - - - - - [NANO EXECUTABLE] - - - - - - - - - - - - - -
 # only built when jetson-nano/ is the top-level project (DreamSim's add_subdirectory skips it)
 # CMAKE_SOURCE_DIR check instead of PROJECT_IS_TOP_LEVEL, which needs cmake 3.21

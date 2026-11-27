@@ -25,14 +25,14 @@ double AdaptiveThreshold::tau() const {
 
 void AdaptiveThreshold::update(const Pose& tInit, const Pose& tResult) {
     // how far ICP moved the position from the guess (in)
-    double deltaTrans = std::hypot(tResult.x - tInit.x, tResult.y-tInit.y);
+    double deltaTrans = std::hypot(tResult.x - tInit.x, tResult.y - tInit.y);
 
     // how far ICP turned the heading from the guess (rad), wrapped
-    double deltaTheta = utils::normalizeAngle(tResult.theta-tInit.theta);
+    double deltaTheta = utils::normalizeAngle(tResult.theta - tInit.theta);
 
     // how far that heading change moves a point at max range (chord length, in)
     // a small heading error moves far points the most
-    double deltaRot = 2.0 * m_rMax * std::sin(std::abs(deltaTheta)/2.0);
+    double deltaRot = 2.0 * m_rMax * std::sin(std::abs(deltaTheta) / 2.0);
 
     // worst-case point displacement caused by the guess error
     double delta = deltaRot + deltaTrans;

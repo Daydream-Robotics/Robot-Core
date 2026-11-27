@@ -15,8 +15,8 @@
  * @brief One deskewed point in the robot frame at the cloud's reference time.
  */
 struct DeskewedPoint {
-    double xIn = 0.0; ///< robot frame at t_ref, +X forward (in)
-    double yIn = 0.0; ///< robot frame at t_ref, +Y left (in)
+    double xIn = 0.0; ///< robot frame at t_ref, sideways (+X at heading 0) (in)
+    double yIn = 0.0; ///< robot frame at t_ref, forward (+Y at heading 0) (in)
     uint8_t sensorId = 0; ///< sensor that saw the point
 };
 
@@ -56,7 +56,7 @@ public:
     /**
      * @brief Deskews one scan into the robot frame at the reference pose.
      *
-     * p* = R(theta_i - theta_ref) * p + R(-theta_ref) * (t_i - t_ref), using odom_ekf_ poses only.
+     * p* = se2::compose(se2::between(ref, pose_i), p), odom_ekf_ poses only.
      *
      * @param scan Robot-frame scan from one sensor.
      * @param poses odom_ekf_ pose buffer.

@@ -51,7 +51,7 @@ void PoseBuffer::push(uint64_t tUs, const Pose& pose) {
         if (hz < LIDAR_POSE_MIN_HZ && !m_lowRateLogged) {
             std::fprintf(stderr, "[PoseBuffer] odom rate %.1f Hz below %.1f Hz\n", hz, LIDAR_POSE_MIN_HZ);
             m_lowRateLogged = true;
-        } 
+        }
         else if (hz >= LIDAR_POSE_MIN_HZ) {
             m_lowRateLogged = false;
         }
@@ -94,7 +94,7 @@ std::optional<Pose> PoseBuffer::poseAt(uint64_t tUs) const {
         const Sample& midSample = m_samples[(oldestIdx + mid) % LIDAR_POSE_BUFFER_CAPACITY];
         if (midSample.tUs <= tUs) {
             lo = mid;
-        } 
+        }
         else {
             hi = mid;
         }
