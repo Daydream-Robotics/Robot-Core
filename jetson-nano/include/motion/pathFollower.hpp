@@ -18,7 +18,7 @@ class PathFollower {
         /**
          * @brief Initializes the tracker with a motion controller
          * @param controller Motion controller to use to compute motor speeds
-         * @param link Brain link: drive speeds and battery in, drive commands out
+         * @param link Brain link: drive speeds and battery in, drive commands out, one slot per RobotDrive group
          * @param poseSource Where the robot's pose comes from (see Pose for the frame)
          */
         PathFollower(MotionController& controller, SerialLink& link, PoseSource poseSource);
@@ -38,7 +38,7 @@ class PathFollower {
         bool step();
 
         /**
-         * @brief Stops both drive groups (STOP, using the group's brake mode)
+         * @brief Stops every drive group (STOP, using the group's brake mode)
          */
         void stop();
 

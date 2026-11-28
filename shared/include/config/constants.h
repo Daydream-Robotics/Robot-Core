@@ -98,13 +98,15 @@ constexpr double MPC_SAMPLE_PERIOD = 0.02; // control step (s)
 constexpr double MPC_COMMAND_DELAY = 0.01; // s from solving to the brain applying the command (it goes out with the next state)
 
 // motor model at the wheel: omega_dot = -a*omega + b*V
-constexpr double MPC_MOTOR_A = 5.22; // motor time-constant (1/s)
-constexpr double MPC_MOTOR_B = 19.02; // motor gain constant (rad/s^2 per V)
+// a doesn't depend on the gear ratio, b scales with it (identifyMotorModel fits b on motor speed * gear ratio)
+// fit on the 450 rpm diff / H drive bot
+constexpr double MPC_MOTOR_A = 9.1; // motor time-constant (1/s)
+constexpr double MPC_MOTOR_B = 41.0; // motor gain constant (rad/s^2 per V)
 
 // reference generation
 constexpr double MPC_A_MAX = 85.0; // max accel/decel of the reference (in/s^2)
 constexpr double MPC_V_REF_MIN = 3.0; // reference speed floor (in/s)
-constexpr double MPC_A_LAT_MAX = 80.0; // max sideways accel in corners (in/s^2): caps corner speed at sqrt(a_lat / curvature)
+constexpr double MPC_A_LAT_MAX = 80.0; // max sideways accel in corners (in/s^2), every drive and heading mode: caps corner speed at sqrt(a_lat / curvature)
 
 // cost weights
 constexpr double MPC_P_X = 300.0; // output weight for x
@@ -122,6 +124,32 @@ constexpr double MPC_DELTA_U_MIN = -8.0; // max voltage decrease per step (V)
 constexpr double MPC_X_FIELD_MAX = 200.0; // max |x| from field center (in), past the 72in field edge so the bound stays inactive
 constexpr double MPC_Y_FIELD_MAX = 200.0; // max |y| from field center (in), past the 72in field edge so the bound stays inactive
 constexpr double MPC_OMEGA_WHEEL_MAX = 100.0; // max wheel speed (rad/s)
+
+/* - - - - - - - - - - - - - - [MPC X DRIVE] - - - - - - - - - - - - - - */
+// used by the Nano's MPC when it runs kinematics::XDrive. group order FL, FR, BL, BR (see mpc/drivetrain.hpp)
+// PLACEHOLDERS until the X drive is built: measure the geometry, identify a and b per wheel
+// the motor model is the diff drive's, geared from its ratio to XDRIVE_GEAR_RATIO
+constexpr double XDRIVE_WHEEL_DIAMETER_INCHES = 3.25; // omni wheel diameter (in)
+constexpr double XDRIVE_GEAR_RATIO = 450.0/600.0; // 450 rpm wheel / 600 rpm cartridge
+constexpr double XDRIVE_RHO = 7.0; // robot center to each wheel's contact point (in)
+constexpr double XDRIVE_MOTOR_A = MPC_MOTOR_A; // motor time-constant per wheel (1/s)
+constexpr double XDRIVE_MOTOR_B = MPC_MOTOR_B * XDRIVE_GEAR_RATIO / DRIVE_GEAR_RATIO; // motor gain constant per wheel (rad/s^2 per V)
+
+/* - - - - - - - - - - - - - - [MPC H DRIVE] - - - - - - - - - - - - - - */
+// used by the Nano's MPC when it runs kinematics::HDrive. group order L, R, strafe (see mpc/drivetrain.hpp)
+// positive strafe voltage must push the robot left, reverse the strafe motor on the brain if it doesn't
+// side groups use the measured diff drive fit (same 450 rpm bot), the strafe group is still a PLACEHOLDER: identify a and b on the robot
+// the motor model is the diff drive's, geared from its ratio to each group's ratio
+constexpr double HDRIVE_WHEEL_DIAMETER_INCHES = 3.25; // side wheel diameter (in)
+constexpr double HDRIVE_GEAR_RATIO = 450.0/600.0; // side wheel rpm / cartridge rpm
+constexpr double HDRIVE_STRAFE_GEAR_RATIO = 600.0/600.0; // strafe wheel rpm / cartridge rpm
+constexpr double HDRIVE_TRACK_WIDTH = 10.5; // side wheel track width (in)
+constexpr double HDRIVE_STRAFE_WHEEL_DIAMETER_INCHES = 3.25; // strafe wheel diameter (in)
+constexpr double HDRIVE_STRAFE_OFFSET = 0.0; // strafe wheel forward offset from the robot center (in)
+constexpr double HDRIVE_SIDE_MOTOR_A = MPC_MOTOR_A; // side groups motor time-constant (1/s)
+constexpr double HDRIVE_SIDE_MOTOR_B = MPC_MOTOR_B * HDRIVE_GEAR_RATIO / DRIVE_GEAR_RATIO; // side groups motor gain constant (rad/s^2 per V)
+constexpr double HDRIVE_STRAFE_MOTOR_A = MPC_MOTOR_A; // strafe group motor time-constant (1/s), TODO: identify on the robot
+constexpr double HDRIVE_STRAFE_MOTOR_B = MPC_MOTOR_B * HDRIVE_STRAFE_GEAR_RATIO / DRIVE_GEAR_RATIO; // strafe group motor gain constant (rad/s^2 per V), TODO: identify on the robot
 
 enum class DriveType {
     SPLIT_ARCADE,

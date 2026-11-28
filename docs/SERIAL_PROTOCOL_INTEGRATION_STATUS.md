@@ -19,7 +19,7 @@ The current build passes `__v5_brain__` for the Brain and `__jetson_nano__` for 
 
 ## Configuration and ownership
 
-`packets::buildLinkConfig()` builds the same configuration payload on each side and derives its nonzero ID from the payload. It configures left and right drive groups, parallel and perpendicular tracking sensors, and the Brain ADI outputs described in `linkConstants.hpp`. The Brain applies its built-in configuration on startup; the Nano sends its config when it sees a different ID. A matching ID is not proof of a working physical link.
+`packets::buildLinkConfig()` builds the same configuration payload on each side and derives its nonzero ID from the payload. It configures the drive groups of the robot's drivetrain, parallel and perpendicular tracking sensors, and the Brain ADI outputs described in `linkConstants.hpp`. The drivetrain is `RobotDrive` in `shared/include/config/robotDrive.hpp` (`kinematics::DiffDrive`, `kinematics::XDrive` or `kinematics::HDrive`). Drive groups take the first slots in the drivetrain's group order: diff L, R; X FL, FR, BL, BR; H L, R, strafe. `packets::driveSlot(group)` gives a group's slot and `packets::DRIVE_GROUPS` the count. Changing `RobotDrive` changes the config and its ID, so both the Brain and the Nano must be rebuilt with the same setting. The X and H drive ports in `linkConstants.hpp` are placeholders until those robots are built, and their signs must make positive voltage drive each group its positive way (forward on every X wheel and H side, left on the H strafe wheel). The Brain applies its built-in configuration on startup; the Nano sends its config when it sees a different ID. A matching ID is not proof of a working physical link.
 
 The Brain link defaults to Nano control enabled. `setNanoControl(false)` prevents the link from applying motor and ADI commands; while the robot is enabled it also suppresses state frames, although queued logs can still be sent. While disabled, state transmission continues. `setNanoControl(true)` allows link commands to affect the configured motors and ADI outputs; coordinate this with existing Brain subsystems so they do not command the same devices at the same time. One-shot requests are handled separately from that output gate. The watchdog code brakes groups after missing commands in autonomous; verify this behavior with the actual robot before relying on it.
 
@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
         const auto sample = link.latestSample();
         if (sample && link.linkUp()) {
             // Check sample->status, sample->lastError, and device flags before use.
-            // Example: sample->imeRad[packets::LEFT_DRIVE_SLOT], after checking size.
+            // Example: sample->imeRad[packets::driveSlot(0)], after checking size.
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -90,15 +90,15 @@ int main(int argc, char** argv) {
 
 The current Nano code accepts numeric baud rates 115200, 230400, 460800, and 921600. `start()` returns `false` for an unsupported baud, invalid configuration, or failed port/GPIO setup. It does not mean the Brain is connected; use `linkUp()` and `latestSample()` after startup. `onSample()` registers a callback on the reader thread, so keep it short.
 
-`Sample` contains reconstructed group and tracking-wheel positions and steps in radians, group speed in rad/s at the motor output shaft, battery millivolts, controller data, status, error, and fault flags. Group and wheel vectors follow the slot constants in `serial.hpp`; check vector sizes before indexing. Convert motor-shaft angles and speeds using the robot's external gearing when wheel values are needed.
+`Sample` contains reconstructed group and tracking-wheel positions and steps in radians, group speed in rad/s at the motor output shaft, battery millivolts, controller data, status, error, and fault flags. Group and wheel vectors follow the slot constants in `serial.hpp`; check vector sizes before indexing. Convert motor-shaft angles and speeds using the robot's external gearing when wheel values are needed (`driveGearRatio(group)` in `robotDrive.hpp` for the drive groups).
 
 To issue commands after the application has established appropriate control ownership:
 
 ```cpp
-link.setGroup(packets::LEFT_DRIVE_SLOT, packets::GroupMode::STOP, 0);
+link.setGroup(packets::driveSlot(0), packets::GroupMode::STOP, 0);
 // For a voltage command, value is millivolts, e.g. GroupMode::VOLTAGE, 1000.
 // link.setAdi(0, true);  // ADI slot 0 is Brain port A, if enabled in the config.
-// auto id = link.request(packets::Request::GROUP_TARE, packets::LEFT_DRIVE_SLOT);
+// auto id = link.request(packets::Request::GROUP_TARE, packets::driveSlot(0));
 // bool acknowledged = link.requestDone(id);
 ```
 
