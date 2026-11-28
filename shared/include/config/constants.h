@@ -99,8 +99,9 @@ constexpr double MPC_COMMAND_DELAY = 0.01; // s from solving to the brain applyi
 
 // motor model at the wheel: omega_dot = -a*omega + b*V
 // a doesn't depend on the gear ratio, b scales with it (identifyMotorModel fits b on motor speed * gear ratio)
-constexpr double MPC_MOTOR_A = 5.22; // motor time-constant (1/s)
-constexpr double MPC_MOTOR_B = 19.02; // motor gain constant (rad/s^2 per V)
+// fit on the 450 rpm diff / H drive bot
+constexpr double MPC_MOTOR_A = 9.1; // motor time-constant (1/s)
+constexpr double MPC_MOTOR_B = 41.0; // motor gain constant (rad/s^2 per V)
 
 // reference generation
 constexpr double MPC_A_MAX = 85.0; // max accel/decel of the reference (in/s^2)
@@ -137,18 +138,18 @@ constexpr double XDRIVE_MOTOR_B = MPC_MOTOR_B * XDRIVE_GEAR_RATIO / DRIVE_GEAR_R
 /* - - - - - - - - - - - - - - [MPC H DRIVE] - - - - - - - - - - - - - - */
 // used by the Nano's MPC when it runs kinematics::HDrive. group order L, R, strafe (see mpc/drivetrain.hpp)
 // positive strafe voltage must push the robot left, reverse the strafe motor on the brain if it doesn't
-// PLACEHOLDERS copied from the diff drive until the H drive is built: measure the geometry, identify a and b per group
+// side groups use the measured diff drive fit (same 450 rpm bot), the strafe group is still a PLACEHOLDER: identify a and b on the robot
 // the motor model is the diff drive's, geared from its ratio to each group's ratio
 constexpr double HDRIVE_WHEEL_DIAMETER_INCHES = 3.25; // side wheel diameter (in)
-constexpr double HDRIVE_GEAR_RATIO = 600.0/600.0; // side wheel rpm / cartridge rpm
+constexpr double HDRIVE_GEAR_RATIO = 450.0/600.0; // side wheel rpm / cartridge rpm
 constexpr double HDRIVE_STRAFE_GEAR_RATIO = 600.0/600.0; // strafe wheel rpm / cartridge rpm
 constexpr double HDRIVE_TRACK_WIDTH = 10.5; // side wheel track width (in)
 constexpr double HDRIVE_STRAFE_WHEEL_DIAMETER_INCHES = 3.25; // strafe wheel diameter (in)
 constexpr double HDRIVE_STRAFE_OFFSET = 0.0; // strafe wheel forward offset from the robot center (in)
 constexpr double HDRIVE_SIDE_MOTOR_A = MPC_MOTOR_A; // side groups motor time-constant (1/s)
 constexpr double HDRIVE_SIDE_MOTOR_B = MPC_MOTOR_B * HDRIVE_GEAR_RATIO / DRIVE_GEAR_RATIO; // side groups motor gain constant (rad/s^2 per V)
-constexpr double HDRIVE_STRAFE_MOTOR_A = MPC_MOTOR_A; // strafe group motor time-constant (1/s)
-constexpr double HDRIVE_STRAFE_MOTOR_B = MPC_MOTOR_B * HDRIVE_STRAFE_GEAR_RATIO / DRIVE_GEAR_RATIO; // strafe group motor gain constant (rad/s^2 per V)
+constexpr double HDRIVE_STRAFE_MOTOR_A = MPC_MOTOR_A; // strafe group motor time-constant (1/s), TODO: identify on the robot
+constexpr double HDRIVE_STRAFE_MOTOR_B = MPC_MOTOR_B * HDRIVE_STRAFE_GEAR_RATIO / DRIVE_GEAR_RATIO; // strafe group motor gain constant (rad/s^2 per V), TODO: identify on the robot
 
 enum class DriveType {
     SPLIT_ARCADE,
