@@ -100,7 +100,8 @@ WheelVelocities RamseteController::compute(const Pose& currentPose, const ALS_Pa
     double commandLinearVel_preClamp = (target.v * std::cos(e_theta)) + (k * e_x);
     double commmandAngularVel = targetAngularVel + (k * e_theta) + (m_b * target.v * sinc(e_theta) * e_y);
 
-    double maxLinearSpeedInchesPerSecond = (450.0 / 60.0) * (M_PI * DRIVE_WHEEL_DIAMETER_INCHES);
+    // 600 rpm cartridge through the external gearing
+    double maxLinearSpeedInchesPerSecond = (600.0 * DRIVE_GEAR_RATIO / 60.0) * (M_PI * DRIVE_WHEEL_DIAMETER_INCHES);
     double commandLinearVel = std::clamp(commandLinearVel_preClamp, 0.0, maxLinearSpeedInchesPerSecond);
 
     // reverse linear velocity in case of reverse

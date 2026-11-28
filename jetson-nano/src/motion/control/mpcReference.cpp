@@ -57,6 +57,7 @@ typename MPCReference<Drive, F>::ZRef MPCReference<Drive, F>::build(const Pose& 
     };
 
     //speed cap at arc length sq(sQuery): every group's speed along the path plus the turn the heading needs stays under its top speed
+    //and the sideways accel v^2 * kappa stays under a_lat_max (the wheels' grip)
     auto capAt = [&](double sq) -> double {
         InterpSample a = path.sampleAtArcLength(sq);
         //the pt ~3in ahead (clamped)
@@ -77,15 +78,10 @@ typename MPCReference<Drive, F>::ZRef MPCReference<Drive, F>::build(const Pose& 
                 cap = std::min(cap, wheel_max[j] / per_v);
             }
         }
-        //X and H drives not facing along the path: they don't turn, so the group speeds above don't slow them in corners.
-        //cap the cornering accel v^2 * kappa. TANGENT turns like a diff drive, so the group speed cap above already covers it
-        if constexpr (Drive::HOLONOMIC) {
-            if (mode != HeadingMode::TANGENT) {
-                double kappa_p = std::abs(utils::wrapAngle(b.theta - a.theta)) / ds;
-                if (kappa_p > 1e-6) {
-                    cap = std::min(cap, std::sqrt(m_params.a_lat_max / kappa_p));
-                }
-            }
+        //grip limit on every drive and heading mode: the path's curvature sets the sideways accel v^2 * kappa
+        double kappa_p = std::abs(utils::wrapAngle(b.theta - a.theta)) / ds;
+        if (kappa_p > 1e-6) {
+            cap = std::min(cap, std::sqrt(m_params.a_lat_max / kappa_p));
         }
         return cap;
     };
